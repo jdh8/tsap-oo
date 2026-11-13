@@ -1,0 +1,266 @@
+/* Subset of Libertinus Sans for suits — served from the jdh8.github.io
+   origin (see /fonts/SUITS-README.md), shared by all card sites.  No suits
+   appear here, but the body font stack stays identical to the other games. */
+@font-face {
+  font-family: "Libertinus Suits";
+  font-weight: 1 1000;
+  font-style: oblique -90deg 90deg;
+  src: url("https://jdh8.github.io/fonts/suits.woff2") format("woff2");
+  /* Only the four filled suits.  Lacking U+0020, this face is never the first
+     available font, so line boxes keep the fallback's metrics instead of
+     Libertinus's short ascent, which would hoist every baseline. */
+  unicode-range: U+2660, U+2663, U+2665-2666;
+}
+
+/* The kitchen-table look of the other games: flat felt, gold action buttons,
+   no gradients or gloss.  The cards are the real thing — narrow strips of
+   dyed stock with the piece printed in black — so their colours are paper
+   colours, not ink. */
+
+:root {
+  --felt: #2c7a63;
+  --paper: #fdfdf7;
+  --ink: #1b1b1b;
+  --gold: #f5c518;
+  --red: #d9534f;
+  --yellow: #f0c541;
+  --green: #4caf7d;
+  --white: #fdfdf7;
+  --back: #7a3b8f;
+  --card-w: 1.75rem;
+  --card-h: 4.5rem;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 15px/1.4 "Libertinus Suits", system-ui, sans-serif;
+  color: #f2f2f2;
+  background: var(--felt);
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 15rem);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "header header"
+    "main   log";
+  min-height: 100vh;
+}
+
+header {
+  grid-area: header;
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+h1 { font-size: 1.2rem; margin: 0; }
+.scores { display: flex; gap: 0.8rem; opacity: 0.9; font-variant-numeric: tabular-nums; }
+.scores span { white-space: nowrap; }
+.scores .dealer::after { content: "莊"; color: var(--gold); font-size: 0.75rem; margin-left: 0.15rem; }
+.scores .me { font-weight: 700; }
+
+/* Quiet header controls — not game actions, so styled apart from the gold
+   action buttons.  `#new` carries the auto margin that pushes the trailing
+   group to the header's right edge. */
+.quiet {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+#new { margin-left: auto; }
+.quiet:hover { background: rgba(255, 255, 255, 0.12); }
+
+main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.6rem;
+  padding: 0.8rem 1rem;
+  max-width: 60rem;
+  width: 100%;
+  margin: 0 auto;
+}
+.middle {
+  display: grid;
+  grid-template-columns: minmax(6rem, 1fr) minmax(0, 3fr) minmax(6rem, 1fr);
+  gap: 0.6rem;
+  align-items: center;
+}
+
+/* Opponents: a name, a face-down row for the concealed count, exposed melds. */
+.opp { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
+.opp .name { opacity: 0.85; font-weight: 600; }
+.opp .name.acting { color: var(--gold); }
+.opp .name .dealer { color: var(--gold); font-size: 0.75rem; margin-left: 0.2rem; }
+.fan { display: flex; }
+.fan .card { margin-left: calc(var(--card-w) * -0.6); box-shadow: -1px 1px 2px rgba(0, 0, 0, 0.3); }
+.fan .card:first-child { margin-left: 0; }
+.melds { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; }
+.meld { display: flex; gap: 0.15rem; padding: 0.2rem; border-radius: 6px; background: rgba(0, 0, 0, 0.18); }
+.side .fan .card, .side .meld .card, .top .fan .card, .top .meld .card {
+  --card-w: 1.1rem;
+  --card-h: 2.8rem;
+  font-size: 0.9rem;
+}
+
+/* Centre of the table: the card on offer, the discard pile, the draw pile. */
+.table {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: calc(var(--card-h) * 2.6);
+  padding: 0.5rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.12);
+}
+.offer { display: flex; align-items: center; gap: 0.6rem; min-height: calc(var(--card-h) + 0.6rem); }
+.offer .card { box-shadow: 0 0 0 3px var(--gold); }
+.offer .who { font-size: 0.9rem; opacity: 0.9; }
+.discards { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.2rem; max-width: 100%; }
+.discards .card { --card-w: 1.1rem; --card-h: 2.8rem; font-size: 0.9rem; opacity: 0.85; }
+.pile { font-size: 0.85rem; opacity: 0.8; }
+
+/* You: status line, exposed melds, the hand, and the claim buttons. */
+.me { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+.status { min-height: 1.4rem; font-weight: 600; }
+.status.acting { color: var(--gold); }
+.hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem; }
+.exposed { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; }
+
+/* Cards: dyed strips, piece in black, a thin inner border like the print. */
+.card {
+  width: var(--card-w);
+  height: var(--card-h);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  flex: none;
+  position: relative;
+}
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.card.red { background: var(--red); }
+.card.yellow { background: var(--yellow); }
+.card.green { background: var(--green); }
+.card.white { background: var(--white); }
+.card.back {
+  background-color: var(--back);
+  background-image: repeating-linear-gradient(
+    45deg, rgba(255, 255, 255, 0.18) 0 4px, transparent 4px 8px);
+  border: 2px solid #fff;
+}
+.card.back::before { display: none; }
+.card.clickable { cursor: pointer; transition: transform 0.08s; }
+.card.clickable:hover { transform: translateY(-0.4rem); }
+.card.locked { opacity: 0.5; }
+.card.new { animation: pulse 0.9s ease; }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); }
+  30% { box-shadow: 0 0 0 3px var(--gold); }
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  min-height: 2.6rem;
+}
+button.action {
+  font: inherit;
+  padding: 0.35rem 0.9rem;
+  border: 0;
+  border-radius: 6px;
+  background: var(--gold);
+  color: #222;
+  cursor: pointer;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+button.action:hover { background: #ffd83a; }
+button.action .card { --card-w: 0.95rem; --card-h: 2.4rem; font-size: 0.85rem; box-shadow: none; }
+button.action .card::before { inset: 2px; }
+button.action.pass { background: transparent; color: inherit; border: 1px solid rgba(255, 255, 255, 0.35); }
+button.action.pass:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* The result sheet: a plain card of paper over the felt. */
+.result {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  width: min(26rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  padding: 1rem 1.2rem;
+  background: var(--paper);
+  color: #222;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+/* `display: flex` above would beat the `hidden` attribute's UA rule. */
+.result[hidden] { display: none; }
+.result h2 { margin: 0; font-size: 1.1rem; }
+.result .melds { justify-content: center; }
+.result .meld { background: rgba(0, 0, 0, 0.06); }
+.result .meld .card { --card-w: 1.1rem; --card-h: 2.8rem; font-size: 0.9rem; }
+
+.log {
+  grid-area: log;
+  padding: 0.5rem 1rem;
+  background: rgba(0, 0, 0, 0.18);
+  overflow-y: auto;
+  max-height: 100vh;
+  font-size: 0.85rem;
+}
+.log h2 { font-size: 0.8rem; letter-spacing: 0.05em; opacity: 0.7; margin: 0.3rem 0; }
+.log div { padding: 0.1rem 0; opacity: 0.9; }
+
+/* Hidden by default: drop the panel and reclaim its grid column. */
+body.log-hidden {
+  grid-template-columns: 1fr;
+  grid-template-areas: "header" "main";
+}
+body.log-hidden .log { display: none; }
+
+@media (max-width: 40rem) {
+  body {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    grid-template-areas: "header" "main" "log";
+  }
+  .middle { grid-template-columns: minmax(4rem, 1fr) minmax(0, 3fr) minmax(4rem, 1fr); }
+  :root { --card-w: 1.5rem; --card-h: 3.9rem; }
+  .log { max-height: 12rem; }
+}

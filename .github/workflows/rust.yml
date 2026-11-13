@@ -1,0 +1,82 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+# susik is a path dependency (`../susik`) until it is on crates.io, so every
+# job checks both repositories out side by side and runs cargo in tsap-oo/.
+defaults:
+  run:
+    working-directory: tsap-oo
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+      with: { path: tsap-oo }
+    - uses: actions/checkout@v7
+      with: { repository: jdh8/susik, path: susik }
+    - name: Check formatting
+      run: cargo fmt --check && cargo fmt --check --manifest-path web/Cargo.toml
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+      with: { path: tsap-oo }
+    - uses: actions/checkout@v7
+      with: { repository: jdh8/susik, path: susik }
+    - name: Clippy
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+  doc:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+      with: { path: tsap-oo }
+    - uses: actions/checkout@v7
+      with: { repository: jdh8/susik, path: susik }
+    - name: Build docs
+      env:
+        RUSTDOCFLAGS: -D warnings
+      run: cargo doc --no-deps --all-features
+
+  # web/ is its own workspace, so none of the jobs above reach it.
+  web:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+      with: { path: tsap-oo }
+    - uses: actions/checkout@v7
+      with: { repository: jdh8/susik, path: susik }
+    - name: Test the web crate natively
+      run: cargo test
+      working-directory: tsap-oo/web
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        rust: [stable, "1.93"]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v7
+      with: { path: tsap-oo }
+    - uses: actions/checkout@v7
+      with: { repository: jdh8/susik, path: susik }
+    - name: Install Rust ${{ matrix.rust }}
+      run: rustup toolchain install ${{ matrix.rust }} --profile minimal && rustup default ${{ matrix.rust }}
+    - name: Test (all features)
+      run: cargo test --all-features --verbose
+    # The round, view, driver, and bot must build without `rand`.
+    - name: Check (no default features)
+      run: cargo check --no-default-features --verbose

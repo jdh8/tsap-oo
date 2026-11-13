@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#2c7a63">
+  <title>十胡</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="log-hidden">
+  <header>
+    <h1>十胡</h1>
+    <div id="scores" class="scores"></div>
+    <button id="new" class="quiet" title="重新發牌（n）">新局</button>
+    <button id="logtoggle" class="quiet" title="顯示／隱藏紀錄（l）"></button>
+    <a class="quiet" href="https://jdh8.github.io/">arcade</a>
+  </header>
+  <main>
+    <section id="west" class="opp top"></section>
+    <div class="middle">
+      <section id="north" class="opp side"></section>
+      <section class="table">
+        <div id="offer" class="offer"></div>
+        <div id="discards" class="discards"></div>
+        <div id="pile" class="pile"></div>
+      </section>
+      <section id="south" class="opp side"></section>
+    </div>
+    <section id="me" class="me">
+      <div id="status" class="status"></div>
+      <div id="exposed" class="exposed"></div>
+      <div id="hand" class="hand"></div>
+      <div id="actions" class="actions"></div>
+    </section>
+    <div id="result" class="result" hidden></div>
+  </main>
+  <aside id="log" class="log"></aside>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

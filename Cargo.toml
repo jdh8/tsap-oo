@@ -1,0 +1,38 @@
+[package]
+name = "tsap-oo"
+version = "0.1.0"
+authors = ["Chen-Pang He (https://jdh8.org)"]
+edition = "2024"
+rust-version = "1.93"
+description = "十胡 (Tsa̍p-ôo), the Taiwanese Four Color Cards game: rules, round state machine, scoreboard, and bots"
+repository = "https://github.com/jdh8/tsap-oo"
+homepage = "https://github.com/jdh8/tsap-oo"
+documentation = "https://docs.rs/tsap-oo"
+readme = "README.md"
+license = "Apache-2.0"
+categories = ["game-development", "games", "simulation"]
+keywords = ["four-color-cards", "si-se-pai", "card-game", "taiwan", "bot"]
+exclude = [".claude/", "CLAUDE.md", "web/"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[features]
+default = ["rand"]
+# Shuffled dealing: `Round::deal` and `Game::deal`.
+rand = ["dep:rand", "susik/rand"]
+
+[dependencies]
+# Path until susik is on crates.io; the version is what gets published.
+susik = { version = "0.1.0", path = "../susik" }
+rand = { version = "0.10", optional = true }
+thiserror = "2"
+
+# Auto-discovery would hide this example from `cargo run --example` listings
+# when the feature is off; the explicit entry documents the requirement.
+[[example]]
+name = "arena"
+required-features = ["rand"]
+
+[profile.dev.package."*"]
+opt-level = 2
