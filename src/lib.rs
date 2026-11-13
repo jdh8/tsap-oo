@@ -14,6 +14,7 @@ pub use game::Game;
 pub use heuristic::HeuristicBot;
 pub use round::{
     Claim, ClaimOptions, DealError, Event, Offer, Phase, Round, RoundError, RoundResult,
+    discardable,
 };
 pub use rules::Rules;
 pub use strategy::Strategy;

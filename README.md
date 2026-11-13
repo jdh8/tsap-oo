@@ -30,9 +30,17 @@ Play it in the browser at [jdh8.github.io/tsap-oo][web]; the front end in
   the drawer or by the next player into 將士象, 車馬包, soldiers of three
   or four colours, or a pair.  Win beats kong beats pong beats eat; equal
   claims go to the earlier seat in turn order.  Winning is compulsory.
+- Generals (將帥) are each a meld by themselves, one 胡 apiece however many
+  are held.  A drawn general that nobody wins on or kongs is kept by its
+  drawer; generals are never ponged or eaten into a pair, and may not be
+  discarded.
+- A seat with nothing to discard is a 相公: the round ends, they pay ten 胡
+  to each other seat, and the same dealer deals again.  No claim that would
+  lead there is allowed (`ClaimOptions::blocked`), so it only follows a
+  drawn general or a forced kong.
 - A concealed triplet is never split for a claim, and the card just claimed
   cannot be discarded in the same turn.  A claim must leave another card to
-  discard, so a hand cannot meld itself out below ten.
+  discard that is not a general, so a hand cannot meld itself out below ten.
 - 胡: lone general 1, 將士象 2, 車馬包 1, soldiers of three colours 3 and of
   four 5, a triplet 3 concealed or 1 ponged, a quad 8 concealed or 6 konged,
   a pair 0.  "Concealed" means dealt and never shown; every meld formed with
@@ -43,6 +51,15 @@ These follow the mainstream Taiwanese table (the Chinese Wikipedia article
 and the common Taiwanese write-ups agree on it).  House variants — a
 different value for four-colour soldiers, the 將 parity rule, five-player
 八胡 — are not modelled; all values are fields of `Rules`.
+
+Open questions, played provisionally:
+
+- The 相公 penalty of ten 胡 to each seat is from the Taiwanese write-ups;
+  that the round then ends and the dealer stays is a guess, as they do not
+  say.
+- A fourth general drawn by another seat is konged by the holder of the
+  triplet (the forced kong outranks the drawer keeping it) and scores as an
+  exposed kong.
 
 ## Modules
 

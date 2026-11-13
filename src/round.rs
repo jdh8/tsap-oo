@@ -18,6 +18,13 @@
 //! 4. Unclaimed, the card joins the discard pile and the next player
 //!    draws.
 //!
+//! Generals (將帥) stand apart: each is a meld by itself, so a drawn general
+//! that nobody wins on or kongs is kept by its drawer without asking, a
+//! general is never ponged or eaten into a pair, and a general may not be
+//! discarded.  A seat left with nothing to discard — only by drawing a
+//! general or by a forced kong, since no such claim is allowed — is a 相公:
+//! the round ends and they pay; see [`RoundResult::foul`].
+//!
 //! The state machine is runtime-checked: actions return [`RoundError`]
 //! instead of panicking, and [`Phase`] says whose decision is pending.  The
 //! round shows every hand and the pile through its accessors; bots and
@@ -27,7 +34,7 @@
 
 use crate::{Rules, Seat};
 use std::collections::VecDeque;
-use susik::{Card, Hand, Meld, Solver, completions};
+use susik::{Card, Hand, Meld, Rank, Solver, completions};
 use thiserror::Error;
 
 /// Whose decision the round waits for
@@ -70,13 +77,17 @@ pub struct ClaimOptions {
     pub pong: bool,
     /// The melds the card may be eaten into
     pub eats: Vec<Meld>,
+    /// Claims the cards allow but the rules do not, because they would
+    /// leave the seat nothing to discard (相公); shown so a user interface
+    /// can say why
+    pub blocked: Vec<Claim>,
 }
 
 impl ClaimOptions {
-    /// Whether nothing but passing is possible
+    /// Whether the seat has nothing to consider, allowed or blocked
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        !self.pong && self.eats.is_empty()
+        !self.pong && self.eats.is_empty() && self.blocked.is_empty()
     }
 }
 
@@ -95,6 +106,13 @@ pub enum Event {
         /// Who discarded
         seat: Seat,
         /// The card
+        card: Card,
+    },
+    /// A drawn general was kept by its drawer
+    Keep {
+        /// Who drew and kept it
+        seat: Seat,
+        /// The general
         card: Card,
     },
     /// A card was eaten
@@ -127,6 +145,11 @@ pub enum Event {
         /// With how many 胡
         hu: u32,
     },
+    /// A seat was left with nothing to discard (相公)
+    Foul {
+        /// Who fouled
+        seat: Seat,
+    },
     /// The pile ran down to the dead cards
     Exhausted,
 }
@@ -135,8 +158,11 @@ pub enum Event {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct RoundResult {
-    /// The winner, or `None` for an exhausted pile
+    /// The winner, or `None` for an exhausted pile or a foul
     pub winner: Option<Seat>,
+    /// The seat left with nothing to discard (相公), who pays the threshold
+    /// to each other seat
+    pub foul: Option<Seat>,
     /// The winner's 胡
     pub hu: u32,
     /// The winner's full layout: exposed melds, then the meld of the winning
@@ -166,6 +192,19 @@ pub enum RoundError {
     /// The card was just claimed and cannot be discarded this turn
     #[error("{0} was just claimed and cannot be discarded now")]
     Locked(Card),
+    /// Generals cannot be discarded
+    #[error("{0} is a general and cannot be discarded")]
+    General(Card),
+}
+
+/// The cards of `hand` that may be discarded when `locked` was just claimed
+///
+/// Everything but `locked` and the generals.
+#[must_use]
+pub fn discardable(hand: Hand, locked: Option<Card>) -> Hand {
+    hand.iter()
+        .filter(|&card| Some(card) != locked && card.rank != Rank::General)
+        .collect()
 }
 
 /// The pile handed to [`Round::from_pile`] was not the full deck
@@ -234,7 +273,7 @@ impl Round {
             && let Ok(hu) = u32::try_from(layout.score)
             && hu >= rules.threshold
         {
-            round.finish(Some(dealer), hu, layout.melds, None, None);
+            round.finish(Some(dealer), None, hu, layout.melds, None, None);
         }
         Ok(round)
     }
@@ -355,11 +394,11 @@ impl Round {
                 if !options.pong {
                     return Err(RoundError::NotAllowed);
                 }
-                self.take(seat, Meld::Triplet(offer.card), offer.card);
-                self.events.push(Event::Pong {
+                let event = Event::Pong {
                     seat,
                     card: offer.card,
-                });
+                };
+                self.take(seat, Meld::Triplet(offer.card), offer.card, event);
                 return Ok(());
             }
             Claim::Eat(meld) => {
@@ -384,13 +423,17 @@ impl Round {
     ///
     /// [`RoundError::WrongPhase`] unless the round waits on this seat's
     /// discard; [`RoundError::Locked`] for the card just claimed;
-    /// [`RoundError::NotInHand`] for a card the seat does not hold.
+    /// [`RoundError::NotInHand`] for a card the seat does not hold;
+    /// [`RoundError::General`] for a general.
     pub fn discard(&mut self, seat: Seat, card: Card) -> Result<(), RoundError> {
         if self.phase != Phase::Discard(seat) {
             return Err(RoundError::WrongPhase);
         }
         if self.locked == Some(card) {
             return Err(RoundError::Locked(card));
+        }
+        if card.rank == Rank::General && self.hands[seat as usize].contains(card) {
+            return Err(RoundError::General(card));
         }
         if !self.hands[seat as usize].remove(card) {
             return Err(RoundError::NotInHand(card));
@@ -420,8 +463,9 @@ impl Round {
             completions(hand, card)
                 .into_iter()
                 .filter(|meld| match meld {
-                    // Holding a pair, one pongs instead.
-                    Meld::Pair(_) => n == 1,
+                    // Holding a pair, one pongs instead; generals stay
+                    // singles, which outscore a pair.
+                    Meld::Pair(_) => n == 1 && card.rank != Rank::General,
                     Meld::Court(_) | Meld::Field(_) | Meld::Soldiers(_) => true,
                     Meld::Single(_) | Meld::Triplet(_) | Meld::Quad(_) => false,
                 })
@@ -437,16 +481,25 @@ impl Round {
         } else {
             Vec::new()
         };
-        // A claim must leave a card to discard other than the locked one;
-        // a hand fully melded below the threshold has no legal claim.
+        // A claim must leave a card to discard other than the locked one
+        // and the generals; a hand fully melded below the threshold has no
+        // legal claim.
         let leaves_discard = |meld: &Meld| {
             (hand - meld.cards().without(card))
                 .distinct()
-                .any(|(c, _)| c != card)
+                .any(|(c, _)| c != card && c.rank != Rank::General)
         };
+        let pong = n == 2 && card.rank != Rank::General;
+        let can_pong = pong && leaves_discard(&Meld::Triplet(card));
+        let (eats, blocked): (Vec<Meld>, Vec<Meld>) = eats.into_iter().partition(leaves_discard);
         ClaimOptions {
-            pong: n == 2 && leaves_discard(&Meld::Triplet(card)),
-            eats: eats.into_iter().filter(leaves_discard).collect(),
+            pong: can_pong,
+            eats,
+            blocked: (pong && !can_pong)
+                .then_some(Claim::Pong)
+                .into_iter()
+                .chain(blocked.into_iter().map(Claim::Eat))
+                .collect(),
         }
     }
 
@@ -485,16 +538,25 @@ impl Round {
         for seat in Self::order(offer) {
             if let Some((hu, layout)) = self.win(seat, card) {
                 let from = (!(drawn && seat == source)).then_some(source);
-                self.finish(Some(seat), hu, layout, Some(card), from);
+                self.finish(Some(seat), None, hu, layout, Some(card), from);
                 return;
             }
         }
         for seat in Self::order(offer) {
             if self.hands[seat as usize].count(card) == 3 {
-                self.take(seat, Meld::Quad(card), card);
-                self.events.push(Event::Kong { seat, card });
+                self.take(seat, Meld::Quad(card), card, Event::Kong { seat, card });
                 return;
             }
+        }
+        // A drawn general is its drawer's: it goes into the hand, where it
+        // scores as a single or a court just as it would on the table, and
+        // still counts towards a kong of the fourth.
+        if drawn && card.rank == Rank::General {
+            self.hands[source as usize].insert(card);
+            self.offer = None;
+            self.events.push(Event::Keep { seat: source, card });
+            self.turn(source, None);
+            return;
         }
         self.queue = Self::order(offer)
             .filter(|&seat| !self.options_for(offer, seat).is_empty())
@@ -504,15 +566,26 @@ impl Round {
     }
 
     /// Move the rest of `meld` out of `seat`'s hand, expose it with the
-    /// claimed `card`, and hand `seat` the discard.
-    fn take(&mut self, seat: Seat, meld: Meld, card: Card) {
+    /// claimed `card`, record `event`, and hand `seat` the discard.
+    fn take(&mut self, seat: Seat, meld: Meld, card: Card, event: Event) {
         self.hands[seat as usize] -= meld.cards().without(card);
         self.exposed[seat as usize].push(meld);
         self.offer = None;
         self.queue.clear();
         self.eat = None;
-        self.locked = Some(card);
-        self.phase = Phase::Discard(seat);
+        self.events.push(event);
+        self.turn(seat, Some(card));
+    }
+
+    /// Hand `seat` the discard, or end the round on their foul when they
+    /// have nothing to discard.
+    fn turn(&mut self, seat: Seat, locked: Option<Card>) {
+        if discardable(self.hands[seat as usize], locked).is_empty() {
+            self.finish(None, Some(seat), 0, Vec::new(), None, None);
+        } else {
+            self.locked = locked;
+            self.phase = Phase::Discard(seat);
+        }
     }
 
     /// Ask the next claimant, or settle the offer when none remain.
@@ -528,12 +601,12 @@ impl Round {
             return;
         }
         if let Some((seat, meld)) = self.eat.take() {
-            self.take(seat, meld, offer.card);
-            self.events.push(Event::Eat {
+            let event = Event::Eat {
                 seat,
                 meld,
                 card: offer.card,
-            });
+            };
+            self.take(seat, meld, offer.card, event);
             return;
         }
         // Unclaimed: the card settles on the discard pile as its source's
@@ -551,7 +624,7 @@ impl Round {
 
     fn draw(&mut self, seat: Seat) {
         if self.pile.len() <= self.rules.dead_tail {
-            self.finish(None, 0, Vec::new(), None, None);
+            self.finish(None, None, 0, Vec::new(), None, None);
             return;
         }
         let card = self.pile.pop().expect("more than the dead tail remains");
@@ -562,17 +635,20 @@ impl Round {
     fn finish(
         &mut self,
         winner: Option<Seat>,
+        foul: Option<Seat>,
         hu: u32,
         layout: Vec<Meld>,
         winning_card: Option<Card>,
         from: Option<Seat>,
     ) {
-        self.events.push(match winner {
-            Some(seat) => Event::Win { seat, hu },
-            None => Event::Exhausted,
+        self.events.push(match (winner, foul) {
+            (Some(seat), _) => Event::Win { seat, hu },
+            (None, Some(seat)) => Event::Foul { seat },
+            (None, None) => Event::Exhausted,
         });
         self.result = Some(RoundResult {
             winner,
+            foul,
             hu,
             layout,
             winning_card,
@@ -583,5 +659,35 @@ impl Round {
         self.eat = None;
         self.locked = None;
         self.phase = Phase::Finished;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Game;
+
+    /// A seat holding only generals that draws another has nothing to
+    /// discard: the round ends and they pay ten to each other seat.
+    #[test]
+    fn stranded_generals_foul() {
+        let rules = Rules::new();
+        let mut round = Round::from_pile(rules, Seat::East, Hand::FULL.iter().collect()).unwrap();
+        round.hands = [Hand::EMPTY; 4];
+        round.hands[Seat::South as usize] = "帥.帥..".parse().unwrap();
+        round.resolve("綠將".parse().unwrap(), Seat::South, true);
+
+        assert_eq!(round.phase(), Phase::Finished);
+        assert_eq!(
+            round.events().last(),
+            Some(&Event::Foul { seat: Seat::South })
+        );
+        let result = round.result().unwrap();
+        assert_eq!((result.winner, result.foul), (None, Some(Seat::South)));
+
+        let mut game = Game::new(rules, Seat::East);
+        game.settle(result);
+        assert_eq!(game.scores(), [10, -30, 10, 10]);
+        assert_eq!(game.dealer(), Seat::East);
     }
 }

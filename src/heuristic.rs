@@ -1,6 +1,6 @@
 //! A greedy bot.
 
-use crate::round::{Claim, ClaimOptions};
+use crate::round::{Claim, ClaimOptions, discardable};
 use crate::rules::Rules;
 use crate::strategy::Strategy;
 use crate::view::View;
@@ -73,8 +73,8 @@ impl HeuristicBot {
 
     /// The hand's value after its best discard other than `locked`
     fn after_discard(&mut self, hand: Hand, locked: Card, need: i32) -> i32 {
-        hand.distinct()
-            .filter(|&(card, _)| card != locked)
+        discardable(hand, Some(locked))
+            .distinct()
             .map(|(card, _)| self.value(hand.without(card), need))
             .max()
             .expect("claims leave a card to discard")
@@ -112,10 +112,9 @@ impl Strategy for HeuristicBot {
     fn discard(&mut self, view: &View<'_>) -> Card {
         let need = self.start(view);
         let hand = view.hand();
-        let locked = view.locked();
-        hand.distinct()
+        discardable(hand, view.locked())
+            .distinct()
             .map(|(card, _)| card)
-            .filter(|&card| Some(card) != locked)
             .max_by_key(|&card| self.value(hand.without(card), need))
             .expect("a hand to discard from")
     }

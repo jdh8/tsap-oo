@@ -8,7 +8,9 @@ use rand::rngs::StdRng;
 use rand::{RngExt as _, SeedableRng as _};
 use serde::Serialize;
 use tsap_oo::susik::{Card, Color, Hand, Meld, Solver};
-use tsap_oo::{Claim, Event, Game, HeuristicBot, Phase, Round, Rules, Seat, Strategy, Table, View};
+use tsap_oo::{
+    Claim, Event, Game, HeuristicBot, Phase, Round, Rules, Seat, Strategy, Table, View, discardable,
+};
 use wasm_bindgen::prelude::*;
 
 const HUMAN: Seat = Seat::South;
@@ -80,6 +82,9 @@ struct OfferJson {
 struct OptionsJson {
     pong: bool,
     eats: Vec<Vec<CardJson>>,
+    /// Claims shown disabled: taking them would leave nothing to discard
+    blocked_pong: bool,
+    blocked_eats: Vec<Vec<CardJson>>,
 }
 
 #[derive(Serialize)]
@@ -91,6 +96,7 @@ struct DiscardJson {
 #[derive(Serialize)]
 struct ResultJson {
     winner: Option<char>,
+    foul: Option<char>,
     hu: u32,
     layout: Vec<Vec<CardJson>>,
     winning_card: Option<CardJson>,
@@ -109,7 +115,9 @@ struct Snapshot {
     offer: Option<OfferJson>,
     /// The human's claim options while the round waits on their claim
     options: Option<OptionsJson>,
-    locked: Option<String>,
+    /// The cards the human may not discard: the one just claimed and the
+    /// generals
+    locked: Vec<String>,
     discards: Vec<DiscardJson>,
     log: Vec<String>,
     result: Option<ResultJson>,
@@ -119,10 +127,12 @@ fn describe(event: &Event) -> String {
     match *event {
         Event::Draw { seat, card } => format!("{seat}摸 {card}"),
         Event::Discard { seat, card } => format!("{seat}打 {card}"),
+        Event::Keep { seat, card } => format!("{seat}收 {card}"),
         Event::Eat { seat, meld, card } => format!("{seat}吃 {card}：{meld}"),
         Event::Pong { seat, card } => format!("{seat}碰 {card}"),
         Event::Kong { seat, card } => format!("{seat}槓 {card}"),
         Event::Win { seat, hu } => format!("{seat}胡牌，{hu} 胡"),
+        Event::Foul { seat } => format!("{seat}相公"),
         Event::Exhausted => "流局".to_owned(),
     }
 }
@@ -139,6 +149,15 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
         OptionsJson {
             pong: options.pong,
             eats: options.eats.iter().map(cards).collect(),
+            blocked_pong: options.blocked.contains(&Claim::Pong),
+            blocked_eats: options
+                .blocked
+                .iter()
+                .filter_map(|claim| match claim {
+                    Claim::Eat(meld) => Some(cards(meld)),
+                    _ => None,
+                })
+                .collect(),
         }
     });
     Snapshot {
@@ -163,7 +182,15 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
             drawn: offer.drawn,
         }),
         options,
-        locked: round.locked().map(|card| CardJson::from(card).code),
+        locked: if round.phase() == Phase::Discard(HUMAN) {
+            let hand = round.hand(HUMAN);
+            (hand - discardable(hand, round.locked()))
+                .distinct()
+                .map(|(card, _)| CardJson::from(card).code)
+                .collect()
+        } else {
+            Vec::new()
+        },
         discards: round
             .discards()
             .iter()
@@ -175,6 +202,7 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
         log: round.events().iter().map(describe).collect(),
         result: round.result().map(|result| ResultJson {
             winner: result.winner.map(Seat::letter),
+            foul: result.foul.map(Seat::letter),
             hu: result.hu,
             layout: result.layout.iter().map(cards).collect(),
             winning_card: result.winning_card.map(CardJson::from),
@@ -391,16 +419,11 @@ mod tests {
                     core.claim(Claim::Pass);
                 }
                 Phase::Discard(HUMAN) => {
-                    let locked = core.table.round().locked();
+                    let round = core.table.round();
+                    let legal = discardable(round.hand(HUMAN), round.locked());
                     let hint: Card = core.hint().unwrap().parse().unwrap();
-                    assert!(Some(hint) != locked && core.table.round().hand(HUMAN).contains(hint));
-                    let card = core
-                        .table
-                        .round()
-                        .hand(HUMAN)
-                        .iter()
-                        .find(|&c| Some(c) != locked)
-                        .unwrap();
+                    assert!(legal.contains(hint));
+                    let card = legal.first().unwrap();
                     core.discard(&CardJson::from(card).code);
                 }
                 _ => {

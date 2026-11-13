@@ -7,7 +7,8 @@ use susik::Card;
 /// Scores and the dealer across rounds
 ///
 /// The winner collects their 胡 from each of the other three seats and deals
-/// next; after an exhausted pile the same dealer deals again.
+/// next; after an exhausted pile the same dealer deals again, as after a
+/// foul (相公), whose seat pays the threshold to each of the other three.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Game {
     rules: Rules,
@@ -63,15 +64,25 @@ impl Game {
         Round::deal(self.rules, self.dealer, rng)
     }
 
-    /// Record a finished round: pay the winner and pass them the deal
+    /// Record a finished round: pay the winner and pass them the deal, or
+    /// collect a foul's penalty
     pub fn settle(&mut self, result: &RoundResult) {
-        let Some(winner) = result.winner else {
-            return;
+        // The winner collects their 胡; a foul "collects" minus the threshold.
+        let (collector, hu) = match (result.winner, result.foul) {
+            (Some(winner), _) => (winner, to_i32(result.hu)),
+            (None, Some(foul)) => (foul, -to_i32(self.rules.threshold)),
+            (None, None) => return,
         };
-        let hu = i32::try_from(result.hu).unwrap_or(i32::MAX / 4);
         for seat in Seat::ALL {
-            self.scores[seat as usize] += if seat == winner { 3 * hu } else { -hu };
+            self.scores[seat as usize] += if seat == collector { 3 * hu } else { -hu };
         }
-        self.dealer = winner;
+        if let Some(winner) = result.winner {
+            self.dealer = winner;
+        }
     }
+}
+
+/// 胡 are far below `i32::MAX`.
+fn to_i32(n: u32) -> i32 {
+    i32::try_from(n).unwrap_or(i32::MAX / 4)
 }

@@ -14,7 +14,8 @@ pub trait Strategy {
     /// `options`
     fn claim(&mut self, view: &View<'_>, options: &ClaimOptions) -> Claim;
 
-    /// Choose a card from the hand, other than [`View::locked`]
+    /// Choose one of the hand's [`discardable`](crate::discardable) cards,
+    /// given [`View::locked`]
     fn discard(&mut self, view: &View<'_>) -> Card;
 
     /// A short name for logs

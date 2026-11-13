@@ -207,6 +207,7 @@ button.action {
   gap: 0.4rem;
 }
 button.action:hover { background: #ffd83a; }
+button.action:disabled { opacity: 0.45; cursor: not-allowed; background: var(--gold); }
 button.action .card { --card-w: 0.95rem; --card-h: 2.4rem; font-size: 0.85rem; box-shadow: none; }
 button.action .card::before { inset: 2px; }
 button.action.pass { background: transparent; color: inherit; border: 1px solid rgba(255, 255, 255, 0.35); }

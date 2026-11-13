@@ -17,7 +17,7 @@ fn main() {
     let mut game = Game::new(rules, Seat::East);
     let mut rng = SmallRng::seed_from_u64(0);
     let mut wins = [0; 4];
-    let mut exhausted = 0;
+    let (mut exhausted, mut fouls) = (0, 0);
     let mut hu_total = 0;
     for _ in 0..rounds {
         let bots = Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as _));
@@ -29,12 +29,13 @@ fn main() {
                 wins[seat as usize] += 1;
                 hu_total += result.hu;
             }
+            None if result.foul.is_some() => fouls += 1,
             None => exhausted += 1,
         }
         game.settle(result);
     }
-    let won = rounds - exhausted;
-    println!("{rounds} rounds: {won} won, {exhausted} exhausted");
+    let won = rounds - exhausted - fouls;
+    println!("{rounds} rounds: {won} won, {exhausted} exhausted, {fouls} fouled");
     for seat in Seat::ALL {
         println!(
             "  {seat}: {} wins, score {}",

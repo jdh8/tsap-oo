@@ -1,7 +1,7 @@
 //! Scripted deals reaching every claim, the forced kong, a win, and 天胡
 
 use susik::{Card, Color, Hand, Meld};
-use tsap_oo::{Claim, ClaimOptions, Event, Phase, Round, RoundError, Rules, Seat};
+use tsap_oo::{Claim, ClaimOptions, Event, Phase, Round, RoundError, Rules, Seat, discardable};
 
 fn hand(s: &str) -> Hand {
     s.parse().unwrap()
@@ -75,6 +75,7 @@ fn eat_pong_kong_and_win() {
         ClaimOptions {
             pong: false,
             eats: vec![Meld::Pair(card("黃炮")), Meld::Field(Color::Yellow)],
+            blocked: vec![],
         }
     );
     assert_eq!(
@@ -96,7 +97,8 @@ fn eat_pong_kong_and_win() {
         round.claim_options(Seat::West),
         ClaimOptions {
             pong: true,
-            eats: vec![]
+            eats: vec![],
+            blocked: vec![],
         }
     );
     round.claim(Seat::West, Claim::Pass).unwrap();
@@ -161,6 +163,54 @@ fn eat_pong_kong_and_win() {
 }
 
 #[test]
+fn a_drawn_general_is_kept() {
+    // The hands of `eat_pong_kong_and_win`, with a green general on top of
+    // the pile: East holds its pair and South the 士象 to eat it with.
+    let east = hand("帥帥帥仕仕仕相相相俥傌兵兵.帥仕仕炮.將將.將將");
+    let south = hand(".俥傌炮.士士象象車車馬馬包包.將將士士象象卒");
+    let west = hand("俥俥傌傌.相相相炮炮兵兵兵.卒卒.車車馬馬包包");
+    let north = hand("相炮.帥帥帥.士士車車馬馬包包.士士象象卒卒卒");
+    let mut pile = pile([east, south, west, north]);
+    let general = card("綠將");
+    let at = pile[..31].iter().position(|&c| c == general).unwrap();
+    pile.swap(at, 30);
+    let mut round = Round::from_pile(Rules::new(), Seat::East, pile).unwrap();
+
+    assert_eq!(
+        round.discard(Seat::East, card("紅帥")),
+        Err(RoundError::General(card("紅帥")))
+    );
+    // Nobody wants the red soldier, so South draws the general and keeps
+    // it: no eat for South, no pong for East.
+    round.discard(Seat::East, card("紅兵")).unwrap();
+    assert_eq!(round.phase(), Phase::Discard(Seat::South));
+    assert_eq!(
+        round.events().last(),
+        Some(&Event::Keep {
+            seat: Seat::South,
+            card: general
+        })
+    );
+    assert_eq!(round.hand(Seat::South), south.with(general));
+    assert!(round.exposed(Seat::South).is_empty());
+    assert_eq!(round.locked(), None);
+    assert_eq!(
+        round.discard(Seat::South, general),
+        Err(RoundError::General(general))
+    );
+    conserved(&round);
+
+    // Neither generals nor the locked card are ever discardable.
+    let generals = hand("帥..將將.");
+    assert!(discardable(generals, None).is_empty());
+    assert_eq!(
+        discardable(generals.with(card("白卒")), None),
+        hand("...卒")
+    );
+    assert!(discardable(generals.with(card("白卒")), Some(card("白卒"))).is_empty());
+}
+
+#[test]
 fn dealer_wins_on_the_deal() {
     let dream = hand("帥帥帥帥仕仕仕仕相相相相.帥帥帥仕仕仕相相相..");
     let filler = hand("俥俥俥俥傌傌傌傌炮炮炮炮兵兵兵兵.帥俥俥俥..");
@@ -191,7 +241,7 @@ mod playouts {
     use super::conserved;
     use rand::SeedableRng as _;
     use rand::rngs::SmallRng;
-    use tsap_oo::{Game, HeuristicBot, Phase, Rules, Seat, Step, Table};
+    use tsap_oo::{Event, Game, HeuristicBot, Phase, Rules, Seat, Step, Table};
 
     /// Bots play out whole rounds; cards are conserved after every step and
     /// every win reaches the threshold.
@@ -200,7 +250,7 @@ mod playouts {
         let rules = Rules::new();
         let mut game = Game::new(rules, Seat::East);
         let mut rng = SmallRng::seed_from_u64(2026);
-        let (mut wins, mut exhausted) = (0, 0);
+        let (mut wins, mut exhausted, mut fouls) = (0, 0, 0);
         for _ in 0..200 {
             let bots = Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as _));
             let mut table = Table::new(game.deal(&mut rng), bots);
@@ -211,8 +261,8 @@ mod playouts {
                         conserved(round);
                         // A claim never strands a seat without a discard.
                         if round.phase() == Phase::Discard(seat) {
-                            let mut cards = round.hand(seat).distinct();
-                            assert!(cards.any(|(card, _)| Some(card) != round.locked()));
+                            let cards = tsap_oo::discardable(round.hand(seat), round.locked());
+                            assert!(!cards.is_empty());
                         }
                     }
                     Step::Human(_) => unreachable!("every seat has a bot"),
@@ -232,10 +282,20 @@ mod playouts {
                     game.settle(result);
                     assert_eq!(game.dealer(), winner);
                 }
+                None if result.foul.is_some() => {
+                    // Only a draw or a forced kong strands a seat.
+                    let events = table.round().events();
+                    assert!(matches!(
+                        events[events.len() - 2],
+                        Event::Keep { .. } | Event::Kong { .. }
+                    ));
+                    game.settle(result);
+                    fouls += 1;
+                }
                 None => exhausted += 1,
             }
         }
-        assert_eq!(wins + exhausted, 200);
+        assert_eq!(wins + exhausted + fouls, 200);
         assert!(wins > 0, "the bots never won");
         assert_eq!(game.scores().iter().sum::<i32>(), 0);
     }

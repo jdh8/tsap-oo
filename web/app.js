@@ -157,7 +157,7 @@ function render() {
     const box = document.createElement('div');
     box.className = 'group';
     for (const c of group) {
-      const locked = c.code === state.locked;
+      const locked = state.locked.includes(c.code);
       const el = cardEl(c, locked ? 'locked' : myDiscard ? 'clickable' : '');
       if (myDiscard && !locked) el.onclick = () => show(game.discard(c.code));
       box.append(el);
@@ -175,6 +175,16 @@ function render() {
       for (const c of cards) b.append(cardEl(c));
       actions.append(b);
     });
+    // Claims the rules forbid, shown so the reason is visible.
+    const blocked = (label, cards = []) => {
+      const b = button(label, null);
+      for (const c of cards) b.append(cardEl(c));
+      b.disabled = true;
+      b.title = '吃碰後會沒有牌可打（將帥不能打），所以不行';
+      actions.append(b);
+    };
+    if (state.options.blocked_pong) blocked('碰');
+    for (const cards of state.options.blocked_eats) blocked('吃', cards);
     actions.append(button('過', () => show(game.pass()), 'pass', 'pass'));
   }
   if (!finished && state.actor === state.human) {
@@ -203,6 +213,9 @@ function render() {
       const how = r.from ? `${NAMES[r.from]}${r.winning_card ? '放' : ''}` : r.winning_card ? '自摸' : '天胡';
       h2.textContent = `${NAMES[r.winner]}${r.winner === state.human ? '（你）' : ''}胡牌，${r.hu} 胡（${how}）`;
       result.append(h2, meldsEl(r.layout));
+    } else if (r.foul) {
+      h2.textContent = `${NAMES[r.foul]}${r.foul === state.human ? '（你）' : ''}相公：沒有牌可打，賠每家 10 胡`;
+      result.append(h2);
     } else {
       h2.textContent = '流局';
       result.append(h2);
