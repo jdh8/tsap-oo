@@ -1,7 +1,7 @@
 # tsap-oo
 
-十胡, the Taiwanese Four Color Cards game, on top of the `../susik` deck
-crate (a path dependency until susik is on crates.io).  Everything about the
+十胡, the Taiwanese Four Color Cards game, on top of the `susik` deck
+crate.  Everything about the
 cards themselves — `Card`, `Hand`, `Meld`, the layout `Solver` — lives in
 susik; this crate owns dealing, the claim priority, scoring, and the bots.
 The browser front end is the standalone crate in `web/`.

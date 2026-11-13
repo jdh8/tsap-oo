@@ -23,8 +23,7 @@ default = ["rand"]
 rand = ["dep:rand", "susik/rand"]
 
 [dependencies]
-# Path until susik is on crates.io; the version is what gets published.
-susik = { version = "0.1.0", path = "../susik" }
+susik = "0.1.0"
 rand = { version = "0.10", optional = true }
 thiserror = "2"
 

@@ -169,6 +169,8 @@ dependencies = [
 [[package]]
 name = "susik"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb25d3149d520a28ec4cbafb7f18cb822d2f70e8b22bce15b0b609da9460d3ff"
 dependencies = [
  "rand",
  "thiserror",
