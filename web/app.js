@@ -35,6 +35,7 @@ async function main() {
     if (e.key === '?') id('rules').showModal();
     if (e.key === 'n') newGame();
     if (e.key === 'l') toggleLog();
+    if (e.key === 'h') showHint();
   });
   newGame();
 }
@@ -168,13 +169,18 @@ function render() {
   const actions = id('actions');
   actions.replaceChildren();
   if (state.options) {
-    if (state.options.pong) actions.append(button('碰', () => show(game.pong())));
+    if (state.options.pong) actions.append(button('碰', () => show(game.pong()), '', 'pong'));
     state.options.eats.forEach((cards, i) => {
-      const b = button('吃', () => show(game.eat(i)));
+      const b = button('吃', () => show(game.eat(i)), '', `eat${i}`);
       for (const c of cards) b.append(cardEl(c));
       actions.append(b);
     });
-    actions.append(button('過', () => show(game.pass()), 'pass'));
+    actions.append(button('過', () => show(game.pass()), 'pass', 'pass'));
+  }
+  if (!finished && state.actor === state.human) {
+    const b = button('提示', showHint, 'pass');
+    b.title = '電腦會怎麼做（h）';
+    actions.append(b);
   }
 
   // The log grows by whatever happened since the last render.
@@ -205,9 +211,20 @@ function render() {
   }
 }
 
-function button(label, onclick, cls = '') {
+// Ring what a bot would do here: a card in your hand or a claim button.  The
+// ring lasts until the next render, i.e. for this one decision.
+function showHint() {
+  const hint = game.hint();
+  if (!hint) return;
+  document
+    .querySelector(`#hand [data-code="${hint}"]:not(.locked), #actions [data-hint="${hint}"]`)
+    ?.classList.add('hint');
+}
+
+function button(label, onclick, cls = '', hint = '') {
   const b = document.createElement('button');
   b.className = `action ${cls}`.trim();
+  if (hint) b.dataset.hint = hint;
   b.textContent = label;
   b.onclick = onclick;
   return b;

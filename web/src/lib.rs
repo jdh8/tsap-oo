@@ -8,7 +8,7 @@ use rand::rngs::StdRng;
 use rand::{RngExt as _, SeedableRng as _};
 use serde::Serialize;
 use tsap_oo::susik::{Card, Color, Hand, Meld, Solver};
-use tsap_oo::{Claim, Event, Game, HeuristicBot, Phase, Round, Rules, Seat, Strategy, Table};
+use tsap_oo::{Claim, Event, Game, HeuristicBot, Phase, Round, Rules, Seat, Strategy, Table, View};
 use wasm_bindgen::prelude::*;
 
 const HUMAN: Seat = Seat::East;
@@ -238,6 +238,29 @@ impl Core {
         }
     }
 
+    /// What a greedy bot would do in the human's place: a card code to
+    /// discard, or `pass`, `pong`, `eat<index>`; `None` when it is not the
+    /// human's decision
+    fn hint(&self) -> Option<String> {
+        let round = self.table.round();
+        let mut bot = HeuristicBot::new(self.game.rules());
+        let view = View::new(round, HUMAN);
+        match round.phase() {
+            Phase::Claim(HUMAN) => {
+                let options = round.claim_options(HUMAN);
+                Some(match bot.claim(&view, &options) {
+                    Claim::Pass => "pass".to_owned(),
+                    Claim::Pong => "pong".to_owned(),
+                    Claim::Eat(meld) => {
+                        format!("eat{}", options.eats.iter().position(|&m| m == meld)?)
+                    }
+                })
+            }
+            Phase::Discard(HUMAN) => Some(CardJson::from(bot.discard(&view)).code),
+            _ => None,
+        }
+    }
+
     /// Settle the finished round and deal the next
     fn next_round(&mut self) {
         let Some(result) = self.table.round().result() else {
@@ -305,6 +328,13 @@ impl WebGame {
         self.core.snapshot()
     }
 
+    /// The greedy bot's pick for your decision: a card code, `pass`, `pong`
+    /// or `eat<index>`; empty when it is not your decision
+    #[must_use]
+    pub fn hint(&self) -> String {
+        self.core.hint().unwrap_or_default()
+    }
+
     /// Settle the round and deal the next
     pub fn next_round(&mut self) -> String {
         self.core.next_round();
@@ -350,10 +380,20 @@ mod tests {
                 }
                 Phase::Claim(HUMAN) => {
                     assert!(value["options"].is_object());
+                    let hint = core.hint().unwrap();
+                    let eats = value["options"]["eats"].as_array().unwrap().len();
+                    assert!(
+                        hint == "pass"
+                            || (hint == "pong" && value["options"]["pong"] == true)
+                            || (0..eats).any(|i| hint == format!("eat{i}")),
+                        "the hint is an offered claim: {hint}"
+                    );
                     core.claim(Claim::Pass);
                 }
                 Phase::Discard(HUMAN) => {
                     let locked = core.table.round().locked();
+                    let hint: Card = core.hint().unwrap().parse().unwrap();
+                    assert!(Some(hint) != locked && core.table.round().hand(HUMAN).contains(hint));
                     let card = core
                         .table
                         .round()
@@ -364,6 +404,7 @@ mod tests {
                     core.discard(&CardJson::from(card).code);
                 }
                 _ => {
+                    assert!(core.hint().is_none());
                     assert!(value["seats"][1]["hand"].is_null(), "bots stay concealed");
                     assert!(matches!(core.table.step(), Ok(Step::Acted(_))));
                 }

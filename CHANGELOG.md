@@ -19,3 +19,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `web/`: the browser front end, one human against three bots.  Your hand
   is arranged into its best melds automatically, loose cards last.  A `?`
   button (or the `?` key) opens a how-to-play sheet with the 胡 of each meld.
+  A 提示 button (or the `h` key) rings the claim or discard a greedy bot
+  would make in your place.
