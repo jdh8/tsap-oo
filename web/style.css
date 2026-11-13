@@ -15,10 +15,11 @@
 /* The kitchen-table look of the other games: flat felt, gold action buttons,
    no gradients or gloss.  The cards are the real thing — narrow strips of
    dyed stock with the piece printed in black — so their colours are paper
-   colours, not ink. */
+   colours, not ink.  The felt is blue here, not the usual green, because
+   green is one of the four suits. */
 
 :root {
-  --felt: #2c7a63;
+  --felt: #24507a;
   --paper: #fdfdf7;
   --ink: #1b1b1b;
   --gold: #f5c518;
@@ -26,7 +27,7 @@
   --yellow: #f0c541;
   --green: #4caf7d;
   --white: #fdfdf7;
-  --back: #7a3b8f;
+  --back: #8a4b2a;
   --card-w: 1.75rem;
   --card-h: 4.5rem;
 }
