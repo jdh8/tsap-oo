@@ -9,8 +9,8 @@ const PACE_MS = 550; // pause between bot steps, so they can be followed
 // Seats run counterclockwise, so the next player (下家) sits to your right.
 const SEATS = ['E', 'S', 'W', 'N'];
 const NAMES = { E: '東', S: '南', W: '西', N: '北' };
-const RELATION = { E: '你', S: '下家', W: '對家', N: '上家' };
-const SLOT = { S: 'south', W: 'west', N: 'north' };
+const RELATION = { S: '你', W: '下家', N: '對家', E: '上家' };
+const SLOT = { W: 'west', N: 'north', E: 'east' };
 
 let game;
 let state;

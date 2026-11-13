@@ -1,4 +1,4 @@
-//! Browser front end for 十胡: one human (east) against three greedy bots.
+//! Browser front end for 十胡: one human (south) against three greedy bots.
 //!
 //! The engine holds the whole game; JS is a thin renderer that calls one
 //! method per user action or bot step and redraws from the JSON snapshot
@@ -11,7 +11,7 @@ use tsap_oo::susik::{Card, Color, Hand, Meld, Solver};
 use tsap_oo::{Claim, Event, Game, HeuristicBot, Phase, Round, Rules, Seat, Strategy, Table, View};
 use wasm_bindgen::prelude::*;
 
-const HUMAN: Seat = Seat::East;
+const HUMAN: Seat = Seat::South;
 
 // ---------------------------------------------------------------------------
 // Snapshot: what the page draws
@@ -356,8 +356,8 @@ mod tests {
         while rounds < 5 {
             let json = core.snapshot();
             let value: serde_json::Value = serde_json::from_str(&json).unwrap();
-            assert_eq!(value["human"], "E");
-            let grouped: usize = value["seats"][0]["hand"]
+            assert_eq!(value["human"], HUMAN.letter().to_string());
+            let grouped: usize = value["seats"][HUMAN as usize]["hand"]
                 .as_array()
                 .unwrap()
                 .iter()
@@ -372,7 +372,7 @@ mod tests {
                 Phase::Finished => {
                     assert!(value["result"].is_object());
                     assert!(
-                        value["seats"][1]["hand"].is_array(),
+                        value["seats"][Seat::East as usize]["hand"].is_array(),
                         "bots reveal at the end"
                     );
                     core.next_round();
@@ -405,7 +405,10 @@ mod tests {
                 }
                 _ => {
                     assert!(core.hint().is_none());
-                    assert!(value["seats"][1]["hand"].is_null(), "bots stay concealed");
+                    assert!(
+                        value["seats"][Seat::East as usize]["hand"].is_null(),
+                        "bots stay concealed"
+                    );
                     assert!(matches!(core.table.step(), Ok(Step::Acted(_))));
                 }
             }

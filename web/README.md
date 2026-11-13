@@ -33,7 +33,7 @@ python3 -m http.server
 # open http://localhost:8000/
 ```
 
-You sit east; the bots take the other three seats.  When a public card is
+You sit south; the bots take the other three seats.  When a public card is
 yours to claim, the buttons under your hand offer 碰, each possible 吃, and
 過; when it is your discard, click a card.  Wins and kongs are compulsory and
 happen by themselves.
