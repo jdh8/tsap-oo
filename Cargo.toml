@@ -12,7 +12,7 @@ readme = "README.md"
 license = "Apache-2.0"
 categories = ["game-development", "games", "simulation"]
 keywords = ["four-color-cards", "si-se-pai", "card-game", "taiwan", "bot"]
-exclude = [".claude/", "CLAUDE.md", "web/"]
+exclude = [".claude/", "CLAUDE.md", "research/", "web/"]
 
 [package.metadata.docs.rs]
 all-features = true
