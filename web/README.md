@@ -36,7 +36,12 @@ python3 -m http.server
 You sit south; the bots take the other three seats.  When a public card is
 yours to claim, the buttons under your hand offer 碰, each possible 吃, and
 過; when it is your discard, click a card.  Wins and kongs are compulsory and
-happen by themselves.
+happen by themselves, and so does keeping a general (將帥) you draw.
+
+Generals cannot be discarded, so they are dimmed in your hand.  A 碰 or 吃
+that would leave you nothing to discard is shown as a disabled button;
+running out of discards anyway (相公) ends the round and costs you ten 胡 to
+each bot.
 
 ## Deploy
 
