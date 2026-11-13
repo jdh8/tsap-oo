@@ -29,8 +29,10 @@ async function main() {
   };
   id('logtoggle').onclick = toggleLog;
   id('logtoggle').textContent = '顯示紀錄';
+  id('help').onclick = () => id('rules').showModal();
   document.addEventListener('keydown', (e) => {
-    if (e.metaKey || e.ctrlKey) return;
+    if (e.metaKey || e.ctrlKey || id('rules').open) return;
+    if (e.key === '?') id('rules').showModal();
     if (e.key === 'n') newGame();
     if (e.key === 'l') toggleLog();
   });

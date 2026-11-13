@@ -237,6 +237,26 @@ button.action.pass:hover { background: rgba(255, 255, 255, 0.12); }
 .result .meld { background: rgba(0, 0, 0, 0.06); }
 .result .meld .card { --card-w: 1.1rem; --card-h: 2.8rem; font-size: 0.9rem; }
 
+/* The help sheet: the same paper, as a native modal <dialog>. */
+.rules {
+  width: min(30rem, calc(100vw - 2rem));
+  padding: 1rem 1.2rem;
+  background: var(--paper);
+  color: #222;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+.rules::backdrop { background: rgba(0, 0, 0, 0.4); }
+.rules h2 { margin: 0 0 0.4rem; font-size: 1.1rem; }
+.rules ul { margin: 0 0 0.8rem; padding-left: 1.2rem; }
+.rules table { border-collapse: collapse; width: 100%; }
+.rules th, .rules td { padding: 0.25rem 0.4rem; border-bottom: 1px solid rgba(0, 0, 0, 0.12); text-align: left; }
+.rules td:last-child, .rules th:last-child { text-align: right; white-space: nowrap; }
+.rules .card { display: inline-flex; margin-right: 0.15rem; --card-w: 1.1rem; --card-h: 2.8rem; font-size: 0.9rem; }
+.rules p { font-size: 0.85rem; opacity: 0.8; }
+.rules form { text-align: center; }
+
 .log {
   grid-area: log;
   padding: 0.5rem 1rem;

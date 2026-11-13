@@ -13,8 +13,46 @@
     <div id="scores" class="scores"></div>
     <button id="new" class="quiet" title="重新發牌（n）">新局</button>
     <button id="logtoggle" class="quiet" title="顯示／隱藏紀錄（l）"></button>
+    <button id="help" class="quiet" title="玩法與胡數（?）">?</button>
     <a class="quiet" href="https://jdh8.github.io/">arcade</a>
   </header>
+  <!-- The values mirror `Rules::new`; the page plays no other table. -->
+  <dialog id="rules" class="rules" closedby="any">
+    <h2>玩法</h2>
+    <ul>
+      <li>四人各 20 張，莊家 21 張並先打一張；逆時針輪流。</li>
+      <li>沒人要的牌進棄牌堆，換下一家摸牌；摸到的牌翻開給大家看。</li>
+      <li>每張公開的牌（摸的或打的）依序處理：<b>胡 &gt; 槓 &gt; 碰 &gt; 吃</b>。
+        能胡必胡、手上有暗刻必槓，這兩樣自動進行。</li>
+      <li><b>碰</b>：手上有一對相同的牌，誰都可以碰。</li>
+      <li><b>吃</b>：只有摸牌的人和下家可以，湊成下表的組合或一對。</li>
+      <li>剛吃、碰進來的牌，這一回合不能打出去（變暗的那張）。</li>
+      <li>21 張牌全部排成組合，合計滿 <b>10 胡</b>就胡牌；贏家向其他三家各收自己的胡數，並當下一局的莊。</li>
+      <li>牌堆剩最後 6 張時流局，莊家連莊。</li>
+    </ul>
+    <h2>胡數</h2>
+    <table>
+      <tr><th>牌型</th><th>例</th><th>胡</th></tr>
+      <tr><td>單張將／帥</td>
+        <td><span class="card red">帥</span></td><td>1</td></tr>
+      <tr><td>將士象（同色）</td>
+        <td><span class="card green">將</span><span class="card green">士</span><span class="card green">象</span></td><td>2</td></tr>
+      <tr><td>車馬包（同色）</td>
+        <td><span class="card yellow">俥</span><span class="card yellow">傌</span><span class="card yellow">炮</span></td><td>1</td></tr>
+      <tr><td>三色兵卒</td>
+        <td><span class="card red">兵</span><span class="card yellow">兵</span><span class="card white">卒</span></td><td>3</td></tr>
+      <tr><td>四色兵卒</td>
+        <td><span class="card red">兵</span><span class="card yellow">兵</span><span class="card green">卒</span><span class="card white">卒</span></td><td>5</td></tr>
+      <tr><td>對子</td>
+        <td><span class="card white">馬</span><span class="card white">馬</span></td><td>0</td></tr>
+      <tr><td>三張相同</td>
+        <td><span class="card green">車</span><span class="card green">車</span><span class="card green">車</span></td><td>暗刻 3<br>碰 1</td></tr>
+      <tr><td>四張相同</td>
+        <td><span class="card red">仕</span><span class="card red">仕</span><span class="card red">仕</span><span class="card red">仕</span></td><td>暗槓 8<br>槓 6</td></tr>
+    </table>
+    <p>「暗」指發牌時就拿齊、從未亮出；用公開的牌湊成的一律算明的。</p>
+    <form method="dialog"><button class="action">知道了</button></form>
+  </dialog>
   <main>
     <section id="west" class="opp top"></section>
     <div class="middle">

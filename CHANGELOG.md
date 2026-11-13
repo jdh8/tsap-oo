@@ -17,4 +17,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `View`, `Strategy`, `Table`, `HeuristicBot`: the bot framework and a greedy
   bot.
 - `web/`: the browser front end, one human against three bots.  Your hand
-  is arranged into its best melds automatically, loose cards last.
+  is arranged into its best melds automatically, loose cards last.  A `?`
+  button (or the `?` key) opens a how-to-play sheet with the 胡 of each meld.
