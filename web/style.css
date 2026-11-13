@@ -134,7 +134,8 @@ main {
 .me { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
 .status { min-height: 1.4rem; font-weight: 600; }
 .status.acting { color: var(--gold); }
-.hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem; }
+.hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.9rem; }
+.hand .group { display: flex; gap: 0.25rem; }
 .exposed { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; }
 
 /* Cards: dyed strips, piece in black, a thin inner border like the print. */

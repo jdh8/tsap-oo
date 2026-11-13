@@ -7,7 +7,7 @@
 use rand::rngs::StdRng;
 use rand::{RngExt as _, SeedableRng as _};
 use serde::Serialize;
-use tsap_oo::susik::{Card, Color, Meld};
+use tsap_oo::susik::{Card, Color, Hand, Meld, Solver};
 use tsap_oo::{Claim, Event, Game, HeuristicBot, Phase, Round, Rules, Seat, Strategy, Table};
 use wasm_bindgen::prelude::*;
 
@@ -45,13 +45,28 @@ fn cards(meld: &Meld) -> Vec<CardJson> {
     meld.cards().iter().map(CardJson::from).collect()
 }
 
+/// A hand sorted into its best melds, with the loose cards as a last group
+fn arrange(rules: &Rules, hand: Hand) -> Vec<Vec<CardJson>> {
+    // The bots' grading (loose cards at 1 each), so the grouping shows what
+    // they would see in the same hand.
+    let layout = Solver::new(rules.concealed, Some(1))
+        .layout(hand)
+        .expect("layouts with loose cards always exist");
+    let mut groups: Vec<_> = layout.melds.iter().map(cards).collect();
+    if !layout.loose.is_empty() {
+        groups.push(layout.loose.iter().map(CardJson::from).collect());
+    }
+    groups
+}
+
 #[derive(Serialize)]
 struct SeatJson {
     seat: char,
     concealed: usize,
     exposed: Vec<Vec<CardJson>>,
-    /// The human's hand always; a bot's only once the round is over
-    hand: Option<Vec<CardJson>>,
+    /// The human's hand always; a bot's only once the round is over.
+    /// Grouped by [`arrange`]: the melds, then the loose cards.
+    hand: Option<Vec<Vec<CardJson>>>,
 }
 
 #[derive(Serialize)]
@@ -139,8 +154,7 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
                 seat: seat.letter(),
                 concealed: round.hand(seat).len(),
                 exposed: round.exposed(seat).iter().map(cards).collect(),
-                hand: (seat == HUMAN || finished)
-                    .then(|| round.hand(seat).iter().map(CardJson::from).collect()),
+                hand: (seat == HUMAN || finished).then(|| arrange(game.rules(), round.hand(seat))),
             })
             .collect(),
         offer: round.offer().map(|offer| OfferJson {
@@ -313,6 +327,17 @@ mod tests {
             let json = core.snapshot();
             let value: serde_json::Value = serde_json::from_str(&json).unwrap();
             assert_eq!(value["human"], "E");
+            let grouped: usize = value["seats"][0]["hand"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|group| group.as_array().unwrap().len())
+                .sum();
+            assert_eq!(
+                grouped,
+                core.table.round().hand(HUMAN).len(),
+                "arranging keeps every card"
+            );
             match core.table.round().phase() {
                 Phase::Finished => {
                     assert!(value["result"].is_object());

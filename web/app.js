@@ -111,7 +111,7 @@ function render() {
     box.append(name);
     const fan = document.createElement('div');
     fan.className = 'fan';
-    if (finished && s.hand) for (const c of s.hand) fan.append(cardEl(c));
+    if (finished && s.hand) for (const c of s.hand.flat()) fan.append(cardEl(c));
     else for (let i = 0; i < s.concealed; i++) fan.append(backEl());
     box.append(fan);
     if (s.exposed.length) box.append(meldsEl(s.exposed));
@@ -149,11 +149,17 @@ function render() {
   const hand = id('hand');
   hand.replaceChildren();
   const myDiscard = !finished && state.phase === 'discard' && state.actor === state.human;
-  for (const c of me.hand) {
-    const locked = c.code === state.locked;
-    const el = cardEl(c, locked ? 'locked' : myDiscard ? 'clickable' : '');
-    if (myDiscard && !locked) el.onclick = () => show(game.discard(c.code));
-    hand.append(el);
+  // Grouped by the engine: the best melds, then the loose cards.
+  for (const group of me.hand) {
+    const box = document.createElement('div');
+    box.className = 'group';
+    for (const c of group) {
+      const locked = c.code === state.locked;
+      const el = cardEl(c, locked ? 'locked' : myDiscard ? 'clickable' : '');
+      if (myDiscard && !locked) el.onclick = () => show(game.discard(c.code));
+      box.append(el);
+    }
+    hand.append(box);
   }
 
   // Claim buttons.
