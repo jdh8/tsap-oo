@@ -437,7 +437,17 @@ impl Round {
         } else {
             Vec::new()
         };
-        ClaimOptions { pong: n == 2, eats }
+        // A claim must leave a card to discard other than the locked one;
+        // a hand fully melded below the threshold has no legal claim.
+        let leaves_discard = |meld: &Meld| {
+            (hand - meld.cards().without(card))
+                .distinct()
+                .any(|(c, _)| c != card)
+        };
+        ClaimOptions {
+            pong: n == 2 && leaves_discard(&Meld::Triplet(card)),
+            eats: eats.into_iter().filter(leaves_discard).collect(),
+        }
     }
 
     /// The best winning layout of `seat`'s cards plus `card`, if it reaches

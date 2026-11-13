@@ -31,7 +31,8 @@ Play it in the browser at [jdh8.github.io/tsap-oo][web]; the front end in
   or four colours, or a pair.  Win beats kong beats pong beats eat; equal
   claims go to the earlier seat in turn order.  Winning is compulsory.
 - A concealed triplet is never split for a claim, and the card just claimed
-  cannot be discarded in the same turn.
+  cannot be discarded in the same turn.  A claim must leave another card to
+  discard, so a hand cannot meld itself out below ten.
 - 胡: lone general 1, 將士象 2, 車馬包 1, soldiers of three colours 3 and of
   four 5, a triplet 3 concealed or 1 ponged, a quad 8 concealed or 6 konged,
   a pair 0.  "Concealed" means dealt and never shown; every meld formed with

@@ -191,7 +191,7 @@ mod playouts {
     use super::conserved;
     use rand::SeedableRng as _;
     use rand::rngs::SmallRng;
-    use tsap_oo::{Game, HeuristicBot, Rules, Seat, Step, Table};
+    use tsap_oo::{Game, HeuristicBot, Phase, Rules, Seat, Step, Table};
 
     /// Bots play out whole rounds; cards are conserved after every step and
     /// every win reaches the threshold.
@@ -206,7 +206,15 @@ mod playouts {
             let mut table = Table::new(game.deal(&mut rng), bots);
             loop {
                 match table.step().unwrap() {
-                    Step::Acted(_) => conserved(table.round()),
+                    Step::Acted(seat) => {
+                        let round = table.round();
+                        conserved(round);
+                        // A claim never strands a seat without a discard.
+                        if round.phase() == Phase::Discard(seat) {
+                            let mut cards = round.hand(seat).distinct();
+                            assert!(cards.any(|(card, _)| Some(card) != round.locked()));
+                        }
+                    }
                     Step::Human(_) => unreachable!("every seat has a bot"),
                     Step::Finished => break,
                 }

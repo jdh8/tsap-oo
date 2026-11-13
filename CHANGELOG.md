@@ -15,7 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   locked claimed cards, dead cards, 天胡.
 - `Game`: the scoreboard and dealer rotation.
 - `View`, `Strategy`, `Table`, `HeuristicBot`: the bot framework and a greedy
-  bot.
+  bot.  The bot plays for the ten: a hand short of the threshold keeps the
+  melds that can still reach it, and a hand that has its ten races to meld
+  its loose cards.
+- A claim that would leave no card to discard is not offered: a hand fully
+  melded below ten cannot win, and used to strand the seat.
 - `web/`: the browser front end, one human, sitting south, against three bots.  Your hand
   is arranged into its best melds automatically, loose cards last.  A `?`
   button (or the `?` key) opens a how-to-play sheet with the 胡 of each meld.

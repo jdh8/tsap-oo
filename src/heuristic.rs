@@ -6,15 +6,28 @@ use crate::strategy::Strategy;
 use crate::view::View;
 use susik::{Card, Hand, Meld, Solver, Values};
 
-/// A greedy bot: grades a hand by its best layout with loose cards at a
-/// cost, and takes whichever claim or discard grades highest
+/// What a loose card, or a 胡 short of the threshold, costs a hand.
+const WEIGHT: i32 = 4;
+
+/// Loose-card costs of the two solvers: the first lays a hand out for 胡,
+/// the second for the fewest loose cards.
+// ponytail: two points of the 胡/loose trade-off, found by arena play; a
+// solver returning the whole frontier would be exact.
+const COSTS: [u32; 2] = [1, 16];
+
+/// A greedy bot: grades a hand by its 胡 less a cost for every loose card
+/// and every 胡 short of the threshold, and takes whichever claim or discard
+/// grades highest
 ///
-/// It is deterministic and looks one decision ahead.  It never reasons
-/// about other seats or the pile.
+/// A hand that already holds its ten races to meld its loose cards; one
+/// that does not keeps the melds that can still reach ten.  It is
+/// deterministic and looks one decision ahead.  It never reasons about
+/// other seats or the pile.
 #[derive(Debug, Clone)]
 pub struct HeuristicBot {
-    solver: Solver,
+    solvers: [Solver; 2],
     exposed: Values,
+    threshold: u32,
 }
 
 impl HeuristicBot {
@@ -22,36 +35,67 @@ impl HeuristicBot {
     #[must_use]
     pub fn new(rules: &Rules) -> Self {
         Self {
-            solver: Solver::new(rules.concealed, Some(1)),
+            solvers: COSTS.map(|cost| Solver::new(rules.concealed, Some(cost))),
             exposed: rules.exposed,
+            threshold: rules.threshold,
         }
     }
 
-    fn value(&mut self, hand: Hand) -> i32 {
-        self.solver
-            .best(hand)
-            .expect("layouts with loose cards always exist")
+    /// Forget the memos and count the 胡 the seat still needs from its hand
+    fn start(&mut self, view: &View<'_>) -> i32 {
+        for solver in &mut self.solvers {
+            solver.clear();
+        }
+        let have: u32 = view
+            .exposed(view.seat())
+            .iter()
+            .map(|meld| self.exposed.score(meld))
+            .sum();
+        to_i32(self.threshold) - to_i32(have)
+    }
+
+    /// Grade `hand` when its melds must be worth `need` to win
+    fn value(&mut self, hand: Hand, need: i32) -> i32 {
+        self.solvers
+            .iter_mut()
+            .zip(COSTS)
+            .map(|(solver, cost)| {
+                let layout = solver
+                    .layout(hand)
+                    .expect("layouts with loose cards always exist");
+                let loose = to_i32(layout.loose.len());
+                let hu = layout.score + to_i32(cost) * loose;
+                hu - WEIGHT * (loose + (need - hu).max(0))
+            })
+            .max()
+            .expect("two solvers")
     }
 
     /// The hand's value after its best discard other than `locked`
-    fn after_discard(&mut self, hand: Hand, locked: Card) -> i32 {
+    fn after_discard(&mut self, hand: Hand, locked: Card, need: i32) -> i32 {
         hand.distinct()
             .filter(|&(card, _)| card != locked)
-            .map(|(card, _)| self.value(hand.without(card)))
+            .map(|(card, _)| self.value(hand.without(card), need))
             .max()
-            .unwrap_or(0)
+            .expect("claims leave a card to discard")
     }
+}
+
+/// Card counts and 胡 are far below `i32::MAX`.
+fn to_i32(n: impl TryInto<i32>) -> i32 {
+    n.try_into().unwrap_or(i32::MAX / 4)
 }
 
 impl Strategy for HeuristicBot {
     fn claim(&mut self, view: &View<'_>, options: &ClaimOptions) -> Claim {
-        self.solver.clear();
+        let need = self.start(view);
         let hand = view.hand();
         let card = view.offer().expect("claims answer an offer").card;
-        let mut best = (self.value(hand), Claim::Pass);
+        let mut best = (self.value(hand, need), Claim::Pass);
         let mut consider = |bot: &mut Self, meld: Meld, claim: Claim| {
-            let gain = i32::try_from(bot.exposed.score(&meld)).unwrap_or(i32::MAX / 4);
-            let score = gain + bot.after_discard(hand - meld.cards().without(card), card);
+            let gain = to_i32(bot.exposed.score(&meld));
+            let score =
+                gain + bot.after_discard(hand - meld.cards().without(card), card, need - gain);
             if score > best.0 {
                 best = (score, claim);
             }
@@ -66,13 +110,13 @@ impl Strategy for HeuristicBot {
     }
 
     fn discard(&mut self, view: &View<'_>) -> Card {
-        self.solver.clear();
+        let need = self.start(view);
         let hand = view.hand();
         let locked = view.locked();
         hand.distinct()
             .map(|(card, _)| card)
             .filter(|&card| Some(card) != locked)
-            .max_by_key(|&card| self.value(hand.without(card)))
+            .max_by_key(|&card| self.value(hand.without(card), need))
             .expect("a hand to discard from")
     }
 
