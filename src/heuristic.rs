@@ -4,7 +4,7 @@ use crate::round::{Claim, ClaimOptions, discardable};
 use crate::rules::Rules;
 use crate::strategy::Strategy;
 use crate::view::View;
-use susik::{Card, Hand, Meld, Solver, Values};
+use susik::{Card, Hand, Layout, Meld, Rank, Solver, Values};
 
 /// What a loose card, or a 胡 short of the threshold, costs a hand.
 const WEIGHT: i32 = 4;
@@ -15,6 +15,12 @@ const WEIGHT: i32 = 4;
 // solver returning the whole frontier would be exact.
 const COSTS: [u32; 2] = [1, 16];
 
+/// How many times a 胡 outweighs a 胡 of [`HeuristicBot::prospects`]: the
+/// loose cards only settle what the melds leave open.
+// ponytail: one knob found by arena play, like `COSTS`; counting the live
+// cards that would finish each 搭子 is the upgrade.
+const SCALE: i32 = 8;
+
 /// What a dead hand costs: more than any hand is worth, so one is kept only
 /// when every choice is dead.
 const DEAD: i32 = 1000;
@@ -24,7 +30,10 @@ const DEAD: i32 = 1000;
 /// grades highest
 ///
 /// A hand that already holds its ten races to meld its loose cards; one
-/// that does not keeps the melds that can still reach ten.  It is
+/// that does not keeps the melds that can still reach ten.  Among loose
+/// cards it keeps the 搭子, two cards one short of a meld, dearest meld
+/// first, and sheds the cards that go with nothing, starting with the ones
+/// another seat would most like to pick up late.  It is
 /// deterministic and looks one decision ahead.  It never reasons about
 /// other seats or the pile.
 #[derive(Debug, Clone)]
@@ -37,6 +46,8 @@ pub struct HeuristicBot {
     surplus: Solver,
     /// 胡 of a general
     general: i32,
+    /// 胡 of the meld a loose card of each [`family`] would be eaten into
+    eaten: [i32; 3],
 }
 
 impl HeuristicBot {
@@ -49,6 +60,12 @@ impl HeuristicBot {
             threshold: rules.threshold,
             surplus: Solver::new(surplus(rules.concealed), Some(0)),
             general: to_i32(rules.concealed.single),
+            eaten: [
+                rules.exposed.court,
+                rules.exposed.field,
+                rules.exposed.three_soldiers,
+            ]
+            .map(to_i32),
         }
     }
 
@@ -86,7 +103,7 @@ impl HeuristicBot {
     /// Grade `hand` when its melds must be worth `need` to win
     fn value(&mut self, hand: Hand, need: i32) -> i32 {
         if self.dead(hand, need) {
-            return -DEAD;
+            return -SCALE * DEAD;
         }
         self.solvers
             .iter_mut()
@@ -97,7 +114,8 @@ impl HeuristicBot {
                     .expect("layouts with loose cards always exist");
                 let loose = to_i32(layout.loose.len());
                 let hu = layout.score + to_i32(cost) * loose;
-                hu - WEIGHT * (loose + (need - hu).max(0))
+                SCALE * (hu - WEIGHT * (loose + (need - hu).max(0)))
+                    + prospects(hand, &layout, self.eaten)
             })
             .max()
             .expect("two solvers")
@@ -111,6 +129,46 @@ impl HeuristicBot {
             .max()
             .expect("claims leave a card to discard")
     }
+}
+
+/// 將士象, 車馬包 or soldiers: the cards that meld together
+const fn family(rank: Rank) -> usize {
+    match rank {
+        Rank::General | Rank::Advisor | Rank::Elephant => 0,
+        Rank::Chariot | Rank::Horse | Rank::Cannon => 1,
+        Rank::Soldier => 2,
+    }
+}
+
+/// What the loose cards of `layout` promise: for each, the 胡 of the meld
+/// it would be eaten into (`eaten`, by [`family`]), added if the hand holds
+/// a second card of that meld and taken off if it does not
+///
+/// So a 搭子 is kept, soldiers before 將士象 before 車馬包, and of the cards
+/// that go with nothing the dearest goes first, before it can finish
+/// another seat's hand.  The second card may be a lone general or one of a
+/// pair — 車車 馬 still eats a 包 — but not one of three or four alike,
+/// which are locked and never eat.
+fn prospects(hand: Hand, layout: &Layout, eaten: [i32; 3]) -> i32 {
+    let free = layout
+        .melds
+        .iter()
+        .filter(|meld| meld.size() >= 3)
+        .fold(hand, |rest, meld| rest - meld.cards());
+    layout
+        .loose
+        .iter()
+        .map(|card| {
+            let kin = family(card.rank);
+            let paired = free.distinct().any(|(other, _)| {
+                other != card
+                    && family(other.rank) == kin
+                    && (card.rank == Rank::Soldier || other.color == card.color)
+                    && hand.count(other) < 3
+            });
+            if paired { eaten[kin] } else { -eaten[kin] }
+        })
+        .sum()
 }
 
 /// What each meld is worth beyond a general for every card in it
@@ -146,8 +204,8 @@ impl Strategy for HeuristicBot {
         };
         let mut consider = |bot: &mut Self, meld: Meld, claim: Claim| {
             let gain = to_i32(bot.exposed.score(&meld));
-            let score =
-                gain + bot.after_discard(hand - meld.cards().without(card), card, need - gain);
+            let score = SCALE * gain
+                + bot.after_discard(hand - meld.cards().without(card), card, need - gain);
             if score > best.0 {
                 best = (score, claim);
             }
@@ -195,6 +253,28 @@ mod tests {
             let hand: Hand = hand.parse().unwrap();
             assert!(!bot.dead(hand, most), "{hand} can make {most}");
             assert!(bot.dead(hand, most + 1), "{hand} cannot make {}", most + 1);
+        }
+    }
+
+    #[test]
+    fn loose_cards() {
+        let rules = Rules::new();
+        let bot = HeuristicBot::new(&rules);
+        let mut solver = Solver::new(rules.concealed, Some(1));
+        for (hand, worth) in [
+            ("俥傌...", 2),      // a 搭子, counted once a card
+            ("俥俥傌...", 1),    // one of a pair still eats
+            ("俥俥俥傌...", -1), // three alike are locked
+            ("兵兵..卒.", 3),    // soldiers work the same way
+            ("兵兵兵..卒.", -3),
+            ("帥仕...", 2), // a general is company
+            ("仕...", -2),  // alone, the dearer card goes first
+            ("傌...", -1),
+            ("兵...", -3),
+        ] {
+            let hand: Hand = hand.parse().unwrap();
+            let layout = solver.layout(hand).unwrap();
+            assert_eq!(prospects(hand, &layout, bot.eaten), worth, "{hand}");
         }
     }
 }
