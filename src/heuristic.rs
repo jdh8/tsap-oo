@@ -148,7 +148,9 @@ const fn family(rank: Rank) -> usize {
 /// that go with nothing the dearest goes first, before it can finish
 /// another seat's hand.  The second card may be a lone general or one of a
 /// pair — 車車 馬 still eats a 包 — but not one of three or four alike,
-/// which are locked and never eat.
+/// which are locked and never eat.  Nor does the pair count when the hand
+/// holds three of every card that would finish the meld: the fourth can
+/// only come as a kong.
 fn prospects(hand: Hand, layout: &Layout, eaten: [i32; 3]) -> i32 {
     let free = layout
         .melds
@@ -160,11 +162,17 @@ fn prospects(hand: Hand, layout: &Layout, eaten: [i32; 3]) -> i32 {
         .iter()
         .map(|card| {
             let kin = family(card.rank);
-            let paired = free.distinct().any(|(other, _)| {
+            let mate = |other: Card| {
                 other != card
                     && family(other.rank) == kin
                     && (card.rank == Rank::Soldier || other.color == card.color)
                     && hand.count(other) < 3
+            };
+            let paired = free.distinct().any(|(other, _)| {
+                mate(other)
+                    && Hand::FULL
+                        .distinct()
+                        .any(|(third, _)| third != other && mate(third))
             });
             if paired { eaten[kin] } else { -eaten[kin] }
         })
@@ -262,10 +270,11 @@ mod tests {
         let bot = HeuristicBot::new(&rules);
         let mut solver = Solver::new(rules.concealed, Some(1));
         for (hand, worth) in [
-            ("俥傌...", 2),      // a 搭子, counted once a card
-            ("俥俥傌...", 1),    // one of a pair still eats
-            ("俥俥俥傌...", -1), // three alike are locked
-            ("兵兵..卒.", 3),    // soldiers work the same way
+            ("俥傌...", 2),          // a 搭子, counted once a card
+            ("俥俥傌...", 1),        // one of a pair still eats
+            ("俥俥俥傌...", -1),     // three alike are locked
+            ("俥俥傌炮炮炮...", -1), // and so is the 炮 this would eat
+            ("兵兵..卒.", 3),        // soldiers work the same way
             ("兵兵兵..卒.", -3),
             ("帥仕...", 2), // a general is company
             ("仕...", -2),  // alone, the dearer card goes first

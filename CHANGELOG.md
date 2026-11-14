@@ -23,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   different colours, then 將士象, then 車馬包.  It sheds the cards that go
   with nothing first, 兵卒 and 士象 before 車馬包, so they are not left to
   finish another seat's hand late.  A card beside three or four alike is
-  alone, since those never eat: 車車 馬 is a 搭子, 車車車 馬 is not.  Against
+  alone, since those never eat: 車車 馬 is a 搭子, 車車車 馬 is not, and
+  neither is 車車 馬 beside 包包包, whose fourth 包 can only kong.  Against
   the previous bot, two seats each, it wins about 57% of the decided rounds.
 - `HeuristicBot` no longer melds itself dead: it refuses any claim or
   discard after which the hand could not reach the threshold even with a
