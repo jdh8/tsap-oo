@@ -101,6 +101,16 @@ function backEl() {
   return el;
 }
 
+// The 胡 in the cards you can see of a seat: its melds on the table, and the
+// hand too where it shows (yours, and everyone's once the round is over).
+function huEl(seat) {
+  const el = document.createElement('span');
+  el.className = 'hu';
+  el.textContent = `${seat.hu} 胡`;
+  el.title = '看得到的牌目前的胡數';
+  return el;
+}
+
 function meldEl(cards) {
   const el = document.createElement('div');
   el.className = 'meld';
@@ -142,6 +152,7 @@ function render() {
     label.className = 'name' + (state.actor === seat ? ' acting' : '');
     label.textContent = name(seat);
     if (seat === state.dealer) label.insertAdjacentHTML('beforeend', '<span class="dealer">莊</span>');
+    label.append(huEl(s));
     box.append(label);
     const fan = document.createElement('div');
     fan.className = 'fan';
@@ -178,6 +189,7 @@ function render() {
   } else {
     status.textContent = `等${name(state.actor)}行動…`;
   }
+  status.append(huEl(me));
   const exposed = id('exposed');
   exposed.replaceChildren();
   if (me.exposed.length) exposed.append(meldsEl(me.exposed));

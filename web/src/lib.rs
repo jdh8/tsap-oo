@@ -113,9 +113,35 @@ fn arrange(rules: &Rules, hand: Hand) -> Vec<Vec<CardJson>> {
     groups
 }
 
+/// The most 胡 the melds within `hand` make, the rest left loose
+fn hand_hu(rules: &Rules, hand: Hand) -> u32 {
+    let best = Solver::new(rules.concealed, Some(0)).best(hand);
+    best.and_then(|hu| hu.try_into().ok()).unwrap_or(0)
+}
+
+/// The 胡 of the cards the human sees at `seat`: the melds on the table,
+/// plus the best melds of the hand where it `shown`.  A winner's is the
+/// winning count, which has the winning card too.
+fn visible_hu(rules: &Rules, round: &Round, seat: Seat, shown: bool) -> u32 {
+    if let Some(result) = round.result()
+        && result.winner == Some(seat)
+    {
+        return result.hu;
+    }
+    let exposed = round.exposed(seat).iter();
+    exposed.map(|meld| rules.exposed.score(meld)).sum::<u32>()
+        + if shown {
+            hand_hu(rules, round.hand(seat))
+        } else {
+            0
+        }
+}
+
 #[derive(Serialize)]
 struct SeatJson {
     name: &'static str,
+    /// 胡 so far in the cards the human sees here: see [`visible_hu`]
+    hu: u32,
     concealed: usize,
     exposed: Vec<Vec<CardJson>>,
     /// The human's hand always; a bot's only once the round is over.
@@ -235,11 +261,15 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
         scores: game.scores(),
         seats: Seat::ALL
             .into_iter()
-            .map(|seat| SeatJson {
-                name: name(seat),
-                concealed: round.hand(seat).len(),
-                exposed: round.exposed(seat).iter().map(cards).collect(),
-                hand: (seat == HUMAN || finished).then(|| arrange(game.rules(), round.hand(seat))),
+            .map(|seat| {
+                let shown = seat == HUMAN || finished;
+                SeatJson {
+                    name: name(seat),
+                    hu: visible_hu(game.rules(), round, seat, shown),
+                    concealed: round.hand(seat).len(),
+                    exposed: round.exposed(seat).iter().map(cards).collect(),
+                    hand: shown.then(|| arrange(game.rules(), round.hand(seat))),
+                }
             })
             .collect(),
         offer: round.offer().map(|offer| OfferJson {
@@ -478,6 +508,10 @@ mod tests {
             .collect();
         let code = |card: Card| CardJson::from(card).code;
         assert_eq!(codes, [[code(stray), code(general), code(advisor)]]);
+        // The general alone is 1 胡; its 象 makes 將士象 for 2.
+        assert_eq!(hand_hu(&Rules::new(), hand), 1);
+        let elephant = Card::new(Color::Green, Rank::Elephant);
+        assert_eq!(hand_hu(&Rules::new(), hand.with(elephant)), 2);
     }
 
     /// Drive whole rounds: the bots step, the human passes every claim and
@@ -501,6 +535,20 @@ mod tests {
                 core.table.round().hand(HUMAN).len(),
                 "arranging keeps every card"
             );
+            let rules = core.game.rules();
+            for seat in Seat::ALL {
+                let round = core.table.round();
+                let exposed = round.exposed(seat).iter();
+                let table: u32 = exposed.map(|meld| rules.exposed.score(meld)).sum();
+                let hu = value["seats"][seat.index()]["hu"].as_u64().unwrap();
+                if value["result"]["winner"] == seat.index() {
+                    assert_eq!(hu, value["result"]["hu"], "a winner shows the win");
+                } else if seat == HUMAN || round.phase() == Phase::Finished {
+                    assert!(hu >= u64::from(table), "a shown hand only adds");
+                } else {
+                    assert_eq!(hu, u64::from(table), "a hidden hand counts nothing");
+                }
+            }
             match core.table.round().phase() {
                 Phase::Finished => {
                     let result = &value["result"];

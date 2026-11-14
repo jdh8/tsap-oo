@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   starts a new game; the choice is kept in the browser.  The game is still
   titled 十胡; a 滿 N 胡 mark beside the title, the how-to-play sheet and
   the 相公 message follow the table in play.
+- `web/`: each seat shows the 胡 in the cards you can see of it: the melds on
+  the table for the bots, and those plus the best melds within your hand for
+  you.  Once a round is over the bots' revealed hands count too, and the
+  winner shows the winning count.
 
 ### Changed
 

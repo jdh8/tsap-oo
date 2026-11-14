@@ -103,6 +103,7 @@ main {
 .opp .name { opacity: 0.85; font-weight: 600; }
 .opp .name.acting { color: var(--gold); }
 .opp .name .dealer { color: var(--gold); font-size: 0.75rem; margin-left: 0.2rem; }
+.hu { margin-left: 0.5rem; font-size: 0.85rem; font-weight: 400; opacity: 0.85; }
 .fan { display: flex; }
 .fan .card { margin-left: calc(var(--card-w) * -0.6); box-shadow: -1px 1px 2px rgba(0, 0, 0, 0.3); }
 .fan .card:first-child { margin-left: 0; }

@@ -42,6 +42,11 @@ happen by themselves.  A general (將帥) you draw must be eaten and goes to
 the table: by itself when that is the only way, otherwise you choose between
 a bare 吃 (the general alone) and 吃 仕相, with no 過.
 
+Beside each name is the 胡 in the cards you can see there: the melds on the
+table for a bot, and those plus the best melds within your hand for you.
+Once a round is over the bots' hands are shown and counted too, and the
+winner shows the winning count.
+
 設定 (or the `s` key) picks the table: 十胡, ten to win, or 八胡, eight.
 Applying it starts a new game, and the choice is remembered in the browser.
 
