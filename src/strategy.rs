@@ -10,8 +10,8 @@ use susik::Card;
 /// the only decisions.  Implementations see the round only through a
 /// [`View`].
 pub trait Strategy {
-    /// Answer the offered card; the reply must be [`Claim::Pass`] or one of
-    /// `options`
+    /// Answer the offered card; the reply must be one of `options`, or
+    /// [`Claim::Pass`] unless they are [`ClaimOptions::forced`]
     fn claim(&mut self, view: &View<'_>, options: &ClaimOptions) -> Claim;
 
     /// Choose one of the hand's [`discardable`](crate::discardable) cards,

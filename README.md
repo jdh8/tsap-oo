@@ -24,16 +24,20 @@ Play it in the browser at [jdh8.github.io/tsap-oo][web]; the front end in
 - 112 cards; the dealer gets 21, the others 20, and the dealer discards
   first.  Play runs counterclockwise.  The last six cards of the pile are
   dead: reaching them ends the round with no winner and the same dealer.
-- A draw is turned face up.  Any public card — a draw or a discard — can
+- A draw is turned face up and never enters a hand: only dealt cards are
+  concealed, and a meld laid on the table is never added to or rearranged.
+  Any public card — a draw or a discard — can
   be won on by anyone, must be konged by whoever holds its concealed
   triplet, may be ponged by anyone holding its pair, and may be eaten by
   the drawer or by the next player into 將士象, 車馬包, soldiers of three
   or four colours, or a pair.  Win beats kong beats pong beats eat; equal
   claims go to the earlier seat in turn order.  Winning is compulsory.
 - Generals (將帥) are each a meld by themselves, one 胡 apiece however many
-  are held.  A drawn general that nobody wins on or kongs is kept by its
-  drawer; generals are never ponged or eaten into a pair, and may not be
-  discarded.
+  are held.  A drawn general that nobody wins on or kongs must be eaten by
+  its drawer, who lays it on the table alone or, holding the 士象, as 將士象
+  if they prefer (`ClaimOptions::forced`: no pass).  Generals are never
+  ponged or eaten into a pair, and may not be discarded.  Only three
+  generals in hand kong the fourth; ones on the table do not count.
 - A seat with nothing to discard is a 相公: the round ends, they pay the
   threshold, ten 胡, to each other seat, and the same dealer deals again.
   No claim that would lead there is allowed (`ClaimOptions::blocked`), so it
@@ -64,8 +68,11 @@ Open questions, played provisionally:
   that the round then ends and the dealer stays is a guess, as they do not
   say.
 - A fourth general drawn by another seat is konged by the holder of the
-  triplet (the forced kong outranks the drawer keeping it) and scores as an
+  triplet (the forced kong outranks the drawer eating it) and scores as an
   exposed kong.
+- That the drawer of a general may choose between the lone general and
+  將士象 is from Board Game Arena, which lists both as eats; the Taiwanese
+  write-ups only say it must be eaten.
 
 ## Modules
 

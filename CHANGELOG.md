@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   discard after which the hand could not reach the threshold even with a
   general for every card it gave up.  Every 相公 came from such a hand; four
   bots fouled about once in 1,500 rounds before.
+- A drawn general no longer goes into its drawer's hand: nothing drawn ever
+  does.  It is eaten onto the table, alone (`Meld::Single`) or, when the
+  drawer holds the 士象 and chooses so, as 將士象.  With no choice it
+  happens unasked; otherwise the drawer is asked and may not pass
+  (`ClaimOptions::forced`).  `Event::Keep` is gone; the event is an
+  `Event::Eat`.  Generals on the table do not count towards a kong.
+- `web/`: a drawn general with a choice shows a bare 吃 (the general alone)
+  and 吃 with the 士象, and no 過.
 - `Seat` is no longer the compass enum 東南西北 but a seat number in turn
   order: `Seat::ALL[i]`, `Seat::index`, and `Seat::COUNT` for the number of
   players.  It displays as its number counted from 1.  `Seat::letter` and

@@ -165,7 +165,7 @@ fn eat_pong_kong_and_win() {
 }
 
 #[test]
-fn a_drawn_general_is_kept() {
+fn a_drawn_general_is_eaten() {
     // The hands of `eat_pong_kong_and_win`, with a green general on top of
     // the pile: First holds its pair and Second the 士象 to eat it with.
     let first = hand("帥帥帥仕仕仕相相相俥傌兵兵.帥仕仕炮.將將.將將");
@@ -182,24 +182,32 @@ fn a_drawn_general_is_kept() {
         round.discard(FIRST, card("紅帥")),
         Err(RoundError::General(card("紅帥")))
     );
-    // Nobody wants the red soldier, so Second draws the general and keeps
-    // it: no eat for Second, no pong for First.
+    // Nobody wants the red soldier, so Second draws the general and must
+    // eat it, alone or with the 士象: no pass, no pong for First.
     round.discard(FIRST, card("紅兵")).unwrap();
+    assert_eq!(round.phase(), Phase::Claim(SECOND));
+    let options = round.claim_options(SECOND);
+    let court = Meld::Court(general.color);
+    assert_eq!(options.eats, [Meld::Single(general), court]);
+    assert!(options.forced());
+    assert_eq!(
+        round.claim(SECOND, Claim::Pass),
+        Err(RoundError::NotAllowed)
+    );
+    round.claim(SECOND, Claim::Eat(court)).unwrap();
     assert_eq!(round.phase(), Phase::Discard(SECOND));
     assert_eq!(
         round.events().last(),
-        Some(&Event::Keep {
+        Some(&Event::Eat {
             seat: SECOND,
+            meld: court,
             card: general
         })
     );
-    assert_eq!(round.hand(SECOND), second.with(general));
-    assert!(round.exposed(SECOND).is_empty());
-    assert_eq!(round.locked(), None);
-    assert_eq!(
-        round.discard(SECOND, general),
-        Err(RoundError::General(general))
-    );
+    // The general went to the table, never into the hand.
+    assert_eq!(round.hand(SECOND), second - hand("..士象."));
+    assert_eq!(round.exposed(SECOND), [court]);
+    assert_eq!(round.locked(), Some(general));
     conserved(&round);
 
     // Neither generals nor the locked card are ever discardable.
@@ -242,6 +250,7 @@ mod playouts {
     use super::{FIRST, conserved};
     use rand::SeedableRng as _;
     use rand::rngs::SmallRng;
+    use susik::Meld;
     use tsap_oo::{Event, Game, HeuristicBot, Phase, Rules, Seat, Step, Table};
 
     /// Bots play out whole rounds; cards are conserved after every step and
@@ -293,11 +302,15 @@ mod playouts {
                     assert_eq!(game.dealer(), winner);
                 }
                 None if result.foul.is_some() => {
-                    // Only a draw or a forced kong strands a seat.
+                    // Only a drawn general eaten alone or a forced kong
+                    // strands a seat.
                     let events = table.round().events();
                     assert!(matches!(
                         events[events.len() - 2],
-                        Event::Keep { .. } | Event::Kong { .. }
+                        Event::Eat {
+                            meld: Meld::Single(_),
+                            ..
+                        } | Event::Kong { .. }
                     ));
                     game.settle(result);
                     fouls += 1;

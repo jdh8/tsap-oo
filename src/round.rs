@@ -18,10 +18,13 @@
 //! 4. Unclaimed, the card joins the discard pile and the next player
 //!    draws.
 //!
+//! Nothing drawn ever enters a hand: only dealt cards are concealed.
+//!
 //! Generals (將帥) stand apart: each is a meld by itself, so a drawn general
-//! that nobody wins on or kongs is kept by its drawer without asking, a
-//! general is never ponged or eaten into a pair, and a general may not be
-//! discarded.  A seat left with nothing to discard — only by drawing a
+//! that nobody wins on or kongs must be eaten by its drawer — laid down
+//! alone, or as 將士象 with the 士象 from the hand, asked only when both
+//! are possible.  A general is never ponged or eaten into a pair, and may
+//! not be discarded.  A seat left with nothing to discard — only by drawing a
 //! general or by a forced kong, since no such claim is allowed — is a 相公:
 //! the round ends and they pay; see [`RoundResult::foul`].
 //!
@@ -40,7 +43,8 @@ use thiserror::Error;
 /// Whose decision the round waits for
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Phase {
-    /// This seat may claim the offered card or pass
+    /// This seat may claim the offered card, or pass unless
+    /// [`ClaimOptions::forced`]
     Claim(Seat),
     /// This seat must discard
     Discard(Seat),
@@ -62,7 +66,7 @@ pub struct Offer {
 /// A seat's answer to an offer
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Claim {
-    /// Decline
+    /// Decline; not allowed when [`ClaimOptions::forced`]
     Pass,
     /// Pong with a pair from the hand
     Pong,
@@ -89,6 +93,13 @@ impl ClaimOptions {
     pub fn is_empty(&self) -> bool {
         !self.pong && self.eats.is_empty() && self.blocked.is_empty()
     }
+
+    /// Whether the seat must claim: it drew a general, which is eaten alone
+    /// or into 將士象 but never passed
+    #[must_use]
+    pub fn forced(&self) -> bool {
+        self.eats.iter().any(|meld| matches!(meld, Meld::Single(_)))
+    }
 }
 
 /// Something that happened, in order; see [`Round::events`]
@@ -108,14 +119,7 @@ pub enum Event {
         /// The card
         card: Card,
     },
-    /// A drawn general was kept by its drawer
-    Keep {
-        /// Who drew and kept it
-        seat: Seat,
-        /// The general
-        card: Card,
-    },
-    /// A card was eaten
+    /// A card was eaten; a drawn general eaten alone is a [`Meld::Single`]
     Eat {
         /// Who ate
         seat: Seat,
@@ -388,6 +392,9 @@ impl Round {
         let options = self.options_for(offer, seat);
         match claim {
             Claim::Pass => {
+                if options.forced() {
+                    return Err(RoundError::NotAllowed);
+                }
                 self.queue.pop_front();
             }
             Claim::Pong => {
@@ -458,7 +465,9 @@ impl Round {
         let hand = self.hands[seat.index()];
         let card = offer.card;
         let n = hand.count(card);
-        let eater = seat == offer.source.next() || (offer.drawn && seat == offer.source);
+        let drawer = offer.drawn && seat == offer.source;
+        // Only its drawer eats a general.
+        let eater = drawer || (seat == offer.source.next() && card.rank != Rank::General);
         let eats = if eater {
             completions(hand, card)
                 .into_iter()
@@ -467,7 +476,9 @@ impl Round {
                     // singles, which outscore a pair.
                     Meld::Pair(_) => n == 1 && card.rank != Rank::General,
                     Meld::Court(_) | Meld::Field(_) | Meld::Soldiers(_) => true,
-                    Meld::Single(_) | Meld::Triplet(_) | Meld::Quad(_) => false,
+                    // `completions` lists a single only for a general.
+                    Meld::Single(_) => true,
+                    Meld::Triplet(_) | Meld::Quad(_) => false,
                 })
                 // A concealed triplet is locked: none of its cards may be
                 // split off into a claim.
@@ -483,7 +494,7 @@ impl Round {
         };
         // A claim must leave a card to discard other than the locked one
         // and the generals; a hand fully melded below the threshold has no
-        // legal claim.
+        // legal claim.  A general eaten alone is compulsory and exempt.
         let leaves_discard = |meld: &Meld| {
             (hand - meld.cards().without(card))
                 .distinct()
@@ -491,7 +502,9 @@ impl Round {
         };
         let pong = n == 2 && card.rank != Rank::General;
         let can_pong = pong && leaves_discard(&Meld::Triplet(card));
-        let (eats, blocked): (Vec<Meld>, Vec<Meld>) = eats.into_iter().partition(leaves_discard);
+        let (eats, blocked): (Vec<Meld>, Vec<Meld>) = eats
+            .into_iter()
+            .partition(|meld| matches!(meld, Meld::Single(_)) || leaves_discard(meld));
         ClaimOptions {
             pong: can_pong,
             eats,
@@ -548,14 +561,18 @@ impl Round {
                 return;
             }
         }
-        // A drawn general is its drawer's: it goes into the hand, where it
-        // scores as a single or a court just as it would on the table, and
-        // still counts towards a kong of the fourth.
-        if drawn && card.rank == Rank::General {
-            self.hands[source.index()].insert(card);
-            self.offer = None;
-            self.events.push(Event::Keep { seat: source, card });
-            self.turn(source, None);
+        // A drawn general is its drawer's and never enters the hand: with
+        // no 士象 to choose it is eaten alone at once, otherwise the queue
+        // below asks the drawer, who cannot pass.
+        if card.rank == Rank::General
+            && let [meld] = self.options_for(offer, source).eats[..]
+        {
+            let event = Event::Eat {
+                seat: source,
+                meld,
+                card,
+            };
+            self.take(source, meld, card, event);
             return;
         }
         self.queue = Self::order(offer)
@@ -678,6 +695,9 @@ mod tests {
         round.resolve("綠將".parse().unwrap(), Seat::ALL[1], true);
 
         assert_eq!(round.phase(), Phase::Finished);
+        // Eaten alone without asking, onto the table.
+        assert_eq!(round.exposed[1], [Meld::Single("綠將".parse().unwrap())]);
+        assert_eq!(round.hands[1].len(), 2);
         assert_eq!(
             round.events().last(),
             Some(&Event::Foul { seat: Seat::ALL[1] })

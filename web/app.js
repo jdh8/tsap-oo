@@ -174,7 +174,8 @@ function render() {
     status.textContent = '本局結束';
   } else if (state.actor === state.human) {
     status.classList.add('acting');
-    status.textContent = state.phase === 'claim' ? '要吃碰嗎？' : '請打一張牌';
+    status.textContent =
+      state.phase !== 'claim' ? '請打一張牌' : state.options?.forced ? '將帥一定要吃' : '要吃碰嗎？';
   } else {
     status.textContent = `等${name(state.actor)}行動…`;
   }
@@ -225,7 +226,8 @@ function render() {
     state.options.eats.forEach((meld, i) => claim('吃', held(meld), () => show(game.eat(i)), `eat${i}`));
     if (state.options.blocked_pong) claim('碰', pair, null);
     for (const meld of state.options.blocked_eats) claim('吃', held(meld), null);
-    actions.append(button('過', () => show(game.pass()), 'pass', 'pass'));
+    // A drawn general must be eaten: alone (a bare 吃) or with the 士象.
+    if (!state.options.forced) actions.append(button('過', () => show(game.pass()), 'pass', 'pass'));
   }
   if (!finished && state.actor === state.human) {
     const b = button('提示', showHint, 'pass');

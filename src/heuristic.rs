@@ -138,7 +138,12 @@ impl Strategy for HeuristicBot {
         let need = self.start(view);
         let hand = view.hand();
         let card = view.offer().expect("claims answer an offer").card;
-        let mut best = (self.value(hand, need), Claim::Pass);
+        // A drawn general cannot be passed: any eat beats the placeholder.
+        let mut best = if options.forced() {
+            (i32::MIN, Claim::Pass)
+        } else {
+            (self.value(hand, need), Claim::Pass)
+        };
         let mut consider = |bot: &mut Self, meld: Meld, claim: Claim| {
             let gain = to_i32(bot.exposed.score(&meld));
             let score =

@@ -240,10 +240,11 @@ Wei-Hwa Huang:
   general scores the claimed card as an exposed single, 1 + 1 + 1, since
   `Round::win` takes the best completion and an exposed triplet is only 1.
 - A general is never ponged or eaten into a pair (`options_for`), and a
-  drawn general that nobody wins on or kongs goes into its drawer's hand
-  (`Event::Keep`).
+  drawn general that nobody wins on or kongs is eaten by its drawer onto
+  the table, alone or as 將士象 (`Event::Eat`; `ClaimOptions::forced`).
+  Table melds are frozen, so exposed generals never count towards a kong.
 - The fourth general is a forced kong for whoever holds three, the drawer
-  included, and scores as an exposed quad, 6 (`resolve`, before the keep).
+  included, and scores as an exposed quad, 6 (`resolve`, before the eat).
 - Four generals in hand can therefore only be dealt; the solver scores them
   as a concealed quad, 8.
 

@@ -38,7 +38,9 @@ your right plays after you, then 對家 across, then 上家 to your left.  When 
 yours to claim, the buttons under your hand offer 碰, each possible 吃, and
 過.  A claim button shows only the cards that leave your hand, not the card
 on the table: 吃 帥相 takes a 仕.  When it is your discard, click a card.  Wins and kongs are compulsory and
-happen by themselves, and so does keeping a general (將帥) you draw.
+happen by themselves.  A general (將帥) you draw must be eaten and goes to
+the table: by itself when that is the only way, otherwise you choose between
+a bare 吃 (the general alone) and 吃 仕相, with no 過.
 
 設定 (or the `s` key) picks the table: 十胡, ten to win, or 八胡, eight.
 Applying it starts a new game, and the choice is remembered in the browser.

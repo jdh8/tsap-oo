@@ -133,6 +133,8 @@ struct OfferJson {
 #[derive(Serialize)]
 struct OptionsJson {
     pong: bool,
+    /// A drawn general: one of `eats` must be taken, there is no pass
+    forced: bool,
     eats: Vec<Vec<CardJson>>,
     /// Claims shown disabled: taking them would leave nothing to discard
     blocked_pong: bool,
@@ -181,7 +183,11 @@ fn describe(event: &Event) -> String {
     match *event {
         Event::Draw { seat, card } => format!("{}摸 {card}", name(seat)),
         Event::Discard { seat, card } => format!("{}打 {card}", name(seat)),
-        Event::Keep { seat, card } => format!("{}收 {card}", name(seat)),
+        Event::Eat {
+            seat,
+            meld: Meld::Single(_),
+            card,
+        } => format!("{}吃 {card}", name(seat)),
         Event::Eat { seat, meld, card } => format!("{}吃 {card}：{meld}", name(seat)),
         Event::Pong { seat, card } => format!("{}碰 {card}", name(seat)),
         Event::Kong { seat, card } => format!("{}槓 {card}", name(seat)),
@@ -202,6 +208,7 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
         let options = round.claim_options(HUMAN);
         OptionsJson {
             pong: options.pong,
+            forced: options.forced(),
             eats: options.eats.iter().map(cards).collect(),
             blocked_pong: options.blocked.contains(&Claim::Pong),
             blocked_eats: options
@@ -335,6 +342,7 @@ impl Core {
             Phase::Claim(HUMAN) => {
                 let options = round.claim_options(HUMAN);
                 Some(match bot.claim(&view, &options) {
+                    // A forced claim has no pass; the bot never passes one.
                     Claim::Pass => "pass".to_owned(),
                     Claim::Pong => "pong".to_owned(),
                     Claim::Eat(meld) => {
@@ -502,7 +510,13 @@ mod tests {
                             || (0..eats).any(|i| hint == format!("eat{i}")),
                         "the hint is an offered claim: {hint}"
                     );
-                    core.claim(Claim::Pass);
+                    // A drawn general cannot be passed.
+                    if value["options"]["forced"] == true {
+                        assert_ne!(hint, "pass");
+                        core.eat(0);
+                    } else {
+                        core.claim(Claim::Pass);
+                    }
                 }
                 Phase::Discard(HUMAN) => {
                     let round = core.table.round();
