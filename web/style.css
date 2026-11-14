@@ -132,7 +132,7 @@ main {
 .pile { font-size: 0.85rem; opacity: 0.8; }
 
 /* You: status line, exposed melds, the hand, and the claim buttons. */
-.me { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+section.me { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
 .status { min-height: 1.4rem; font-weight: 600; }
 .status.acting { color: var(--gold); }
 .hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.9rem; }
