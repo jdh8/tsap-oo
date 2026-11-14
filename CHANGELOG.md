@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `HeuristicBot` no longer melds itself dead: it refuses any claim or
+  discard after which the hand could not reach the threshold even with a
+  general for every card it gave up.  Every 相公 came from such a hand; four
+  bots fouled about once in 1,500 rounds before.
 - `Seat` is no longer the compass enum 東南西北 but a seat number in turn
   order: `Seat::ALL[i]`, `Seat::index`, and `Seat::COUNT` for the number of
   players.  It displays as its number counted from 1.  `Seat::letter` and

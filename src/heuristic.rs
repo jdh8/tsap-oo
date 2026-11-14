@@ -15,6 +15,10 @@ const WEIGHT: i32 = 4;
 // solver returning the whole frontier would be exact.
 const COSTS: [u32; 2] = [1, 16];
 
+/// What a dead hand costs: more than any hand is worth, so one is kept only
+/// when every choice is dead.
+const DEAD: i32 = 1000;
+
 /// A greedy bot: grades a hand by its 胡 less a cost for every loose card
 /// and every 胡 short of the threshold, and takes whichever claim or discard
 /// grades highest
@@ -28,6 +32,11 @@ pub struct HeuristicBot {
     solvers: [Solver; 2],
     exposed: Values,
     threshold: u32,
+    /// Lays a hand out for the 胡 its melds are worth beyond a general a
+    /// card
+    surplus: Solver,
+    /// 胡 of a general
+    general: i32,
 }
 
 impl HeuristicBot {
@@ -38,12 +47,14 @@ impl HeuristicBot {
             solvers: COSTS.map(|cost| Solver::new(rules.concealed, Some(cost))),
             exposed: rules.exposed,
             threshold: rules.threshold,
+            surplus: Solver::new(surplus(rules.concealed), Some(0)),
+            general: to_i32(rules.concealed.single),
         }
     }
 
     /// Forget the memos and count the 胡 the seat still needs from its hand
     fn start(&mut self, view: &View<'_>) -> i32 {
-        for solver in &mut self.solvers {
+        for solver in self.solvers.iter_mut().chain([&mut self.surplus]) {
             solver.clear();
         }
         let have: u32 = view
@@ -54,8 +65,29 @@ impl HeuristicBot {
         to_i32(self.threshold) - to_i32(have)
     }
 
+    /// Whether `hand` cannot be worth `need` even if a general came for
+    /// every card it gave up, and one more to win on
+    ///
+    /// A general is the only card that comes unasked, and it pushes another
+    /// card out.  A hand that falls short at that rate can be walked, one
+    /// drawn general at a time, down to nothing but generals and then to a
+    /// 相公; a hand that does not can always answer a general by discarding
+    /// and stay so, or win.  Only the melds worth more than a general a card
+    /// — a concealed quad, soldiers of four colours — are worth keeping
+    /// through that, which is what `surplus` counts.
+    fn dead(&mut self, hand: Hand, need: i32) -> bool {
+        let surplus = self
+            .surplus
+            .layout(hand)
+            .expect("layouts with loose cards always exist");
+        (to_i32(hand.len()) + 1) * self.general + surplus.score < need
+    }
+
     /// Grade `hand` when its melds must be worth `need` to win
     fn value(&mut self, hand: Hand, need: i32) -> i32 {
+        if self.dead(hand, need) {
+            return -DEAD;
+        }
         self.solvers
             .iter_mut()
             .zip(COSTS)
@@ -78,6 +110,21 @@ impl HeuristicBot {
             .map(|(card, _)| self.value(hand.without(card), need))
             .max()
             .expect("claims leave a card to discard")
+    }
+}
+
+/// What each meld is worth beyond a general for every card in it
+fn surplus(values: Values) -> Values {
+    let over = |value: u32, cards: u32| value.saturating_sub(cards * values.single);
+    Values {
+        single: 0,
+        pair: over(values.pair, 2),
+        triplet: over(values.triplet, 3),
+        quad: over(values.quad, 4),
+        court: over(values.court, 3),
+        field: over(values.field, 3),
+        three_soldiers: over(values.three_soldiers, 3),
+        four_soldiers: over(values.four_soldiers, 4),
     }
 }
 
@@ -121,5 +168,28 @@ impl Strategy for HeuristicBot {
 
     fn name(&self) -> &str {
         "greedy"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dead_hands() {
+        let mut bot = HeuristicBot::new(&Rules::new());
+        // (hand, the most it is sure of)
+        for (hand, most) in [
+            ("帥.帥..", 3),        // two generals and a third to win on
+            ("帥仕...", 3),        // the advisor goes when a general comes
+            ("帥仕相...", 4),      // three more generals beat 將士象 and one
+            ("帥兵兵兵...", 5),    // a triplet is worth no more than generals
+            ("帥兵.兵.卒.卒", 7),  // soldiers of four colours are
+            ("帥兵兵兵兵...", 10), // and a concealed quad
+        ] {
+            let hand: Hand = hand.parse().unwrap();
+            assert!(!bot.dead(hand, most), "{hand} can make {most}");
+            assert!(bot.dead(hand, most + 1), "{hand} cannot make {}", most + 1);
+        }
     }
 }
