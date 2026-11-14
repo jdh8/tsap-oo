@@ -12,8 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Rules::eight`: 八胡, the same table with eight to win (and eight for a
   相公), at the same four seats and deal.
 - `web/`: a 設定 dialog (or the `s` key) to choose 十胡 or 八胡.  Applying it
-  starts a new game; the choice is kept in the browser.  The title, the
-  how-to-play sheet and the 相公 message follow the table in play.
+  starts a new game; the choice is kept in the browser.  The game is still
+  titled 十胡; a 滿 N 胡 mark beside the title, the how-to-play sheet and
+  the 相公 message follow the table in play.
 
 ### Changed
 

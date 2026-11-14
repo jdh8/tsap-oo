@@ -120,8 +120,7 @@ function render() {
   const slot = (seat) => SLOTS[(seat - state.human + state.seats.length) % state.seats.length];
   const finished = state.phase === 'finished';
 
-  // The table in force, in the title and the help sheet.
-  id('title').textContent = document.title = state.threshold === 8 ? '八胡' : '十胡';
+  // The threshold in force, beside the title and in the help sheet.
   for (const el of document.querySelectorAll('.threshold')) el.textContent = state.threshold;
 
   // Header: scores, the dealer marked.
