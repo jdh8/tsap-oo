@@ -73,6 +73,11 @@ Open questions, played provisionally:
 - That the drawer of a general may choose between the lone general and
   將士象 is from Board Game Arena, which lists both as eats; the Taiwanese
   write-ups only say it must be eaten.
+- No 加槓: a ponged triplet never takes its fourth card.  Board Game Arena
+  ("Once a meld has been played to the table, it cannot be added to or
+  changed") and the family rules of T. N. Truong and Wei-Hwa Huang say so
+  outright; the Taiwanese write-ups only ever kong a triplet held in hand.
+  The few pages that add to a pong mix in mahjong rules.
 
 ## Modules
 
