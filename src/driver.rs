@@ -19,13 +19,13 @@ pub enum Step {
 /// A round with a [`Strategy`] in each bot seat
 pub struct Table {
     round: Round,
-    seats: [Option<Box<dyn Strategy>>; 4],
+    seats: [Option<Box<dyn Strategy>>; Seat::COUNT],
 }
 
 impl Table {
     /// Seat the strategies; `None` seats are played from outside
     #[must_use]
-    pub fn new(round: Round, seats: [Option<Box<dyn Strategy>>; 4]) -> Self {
+    pub fn new(round: Round, seats: [Option<Box<dyn Strategy>>; Seat::COUNT]) -> Self {
         Self { round, seats }
     }
 
@@ -54,7 +54,7 @@ impl Table {
             Phase::Discard(seat) => (seat, false),
             Phase::Finished => return Ok(Step::Finished),
         };
-        let Some(bot) = self.seats[seat as usize].as_mut() else {
+        let Some(bot) = self.seats[seat.index()].as_mut() else {
             return Ok(Step::Human(seat));
         };
         let view = View::new(&self.round, seat);

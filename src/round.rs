@@ -217,8 +217,8 @@ pub struct DealError;
 pub struct Round {
     rules: Rules,
     dealer: Seat,
-    hands: [Hand; 4],
-    exposed: [Vec<Meld>; 4],
+    hands: [Hand; Seat::COUNT],
+    exposed: [Vec<Meld>; Seat::COUNT],
     pile: Vec<Card>,
     discards: Vec<(Seat, Card)>,
     events: Vec<Event>,
@@ -245,14 +245,14 @@ impl Round {
         if pile.len() != 112 || pile.iter().copied().collect::<Hand>() != Hand::FULL {
             return Err(DealError);
         }
-        let mut hands = [Hand::EMPTY; 4];
-        for i in 0..4 {
-            let hand = &mut hands[dealer.advance(i) as usize];
+        let mut hands = [Hand::EMPTY; Seat::COUNT];
+        for i in 0..Seat::COUNT {
+            let hand = &mut hands[dealer.advance(i).index()];
             for _ in 0..20 {
                 hand.insert(pile.pop().expect("112 cards suffice"));
             }
         }
-        hands[dealer as usize].insert(pile.pop().expect("112 cards suffice"));
+        hands[dealer.index()].insert(pile.pop().expect("112 cards suffice"));
 
         let mut round = Self {
             rules,
@@ -269,7 +269,7 @@ impl Round {
             locked: None,
             result: None,
         };
-        if let Some(layout) = Solver::new(rules.concealed, None).layout(hands[dealer as usize])
+        if let Some(layout) = Solver::new(rules.concealed, None).layout(hands[dealer.index()])
             && let Ok(hu) = u32::try_from(layout.score)
             && hu >= rules.threshold
         {
@@ -318,14 +318,14 @@ impl Round {
     #[must_use]
     #[inline]
     pub const fn hand(&self, seat: Seat) -> Hand {
-        self.hands[seat as usize]
+        self.hands[seat.index()]
     }
 
     /// A seat's exposed melds, in the order they were formed
     #[must_use]
     #[inline]
     pub fn exposed(&self, seat: Seat) -> &[Meld] {
-        &self.exposed[seat as usize]
+        &self.exposed[seat.index()]
     }
 
     /// Unclaimed public cards, oldest first, with who put each down
@@ -432,10 +432,10 @@ impl Round {
         if self.locked == Some(card) {
             return Err(RoundError::Locked(card));
         }
-        if card.rank == Rank::General && self.hands[seat as usize].contains(card) {
+        if card.rank == Rank::General && self.hands[seat.index()].contains(card) {
             return Err(RoundError::General(card));
         }
-        if !self.hands[seat as usize].remove(card) {
+        if !self.hands[seat.index()].remove(card) {
             return Err(RoundError::NotInHand(card));
         }
         self.locked = None;
@@ -447,15 +447,15 @@ impl Round {
     /// The seats a public card is offered to, in priority order
     fn order(offer: Offer) -> impl Iterator<Item = Seat> {
         let (start, n) = if offer.drawn {
-            (offer.source, 4)
+            (offer.source, Seat::COUNT)
         } else {
-            (offer.source.next(), 3)
+            (offer.source.next(), Seat::COUNT - 1)
         };
         (0..n).map(move |i| start.advance(i))
     }
 
     fn options_for(&self, offer: Offer, seat: Seat) -> ClaimOptions {
-        let hand = self.hands[seat as usize];
+        let hand = self.hands[seat.index()];
         let card = offer.card;
         let n = hand.count(card);
         let eater = seat == offer.source.next() || (offer.drawn && seat == offer.source);
@@ -506,8 +506,8 @@ impl Round {
     /// The best winning layout of `seat`'s cards plus `card`, if it reaches
     /// the threshold
     fn win(&self, seat: Seat, card: Card) -> Option<(u32, Vec<Meld>)> {
-        let hand = self.hands[seat as usize];
-        let exposed = &self.exposed[seat as usize];
+        let hand = self.hands[seat.index()];
+        let exposed = &self.exposed[seat.index()];
         let base: u32 = exposed.iter().map(|m| self.rules.exposed.score(m)).sum();
         let mut solver = Solver::new(self.rules.concealed, None);
         let mut best: Option<(u32, Vec<Meld>)> = None;
@@ -543,7 +543,7 @@ impl Round {
             }
         }
         for seat in Self::order(offer) {
-            if self.hands[seat as usize].count(card) == 3 {
+            if self.hands[seat.index()].count(card) == 3 {
                 self.take(seat, Meld::Quad(card), card, Event::Kong { seat, card });
                 return;
             }
@@ -552,7 +552,7 @@ impl Round {
         // scores as a single or a court just as it would on the table, and
         // still counts towards a kong of the fourth.
         if drawn && card.rank == Rank::General {
-            self.hands[source as usize].insert(card);
+            self.hands[source.index()].insert(card);
             self.offer = None;
             self.events.push(Event::Keep { seat: source, card });
             self.turn(source, None);
@@ -568,8 +568,8 @@ impl Round {
     /// Move the rest of `meld` out of `seat`'s hand, expose it with the
     /// claimed `card`, record `event`, and hand `seat` the discard.
     fn take(&mut self, seat: Seat, meld: Meld, card: Card, event: Event) {
-        self.hands[seat as usize] -= meld.cards().without(card);
-        self.exposed[seat as usize].push(meld);
+        self.hands[seat.index()] -= meld.cards().without(card);
+        self.exposed[seat.index()].push(meld);
         self.offer = None;
         self.queue.clear();
         self.eat = None;
@@ -580,7 +580,7 @@ impl Round {
     /// Hand `seat` the discard, or end the round on their foul when they
     /// have nothing to discard.
     fn turn(&mut self, seat: Seat, locked: Option<Card>) {
-        if discardable(self.hands[seat as usize], locked).is_empty() {
+        if discardable(self.hands[seat.index()], locked).is_empty() {
             self.finish(None, Some(seat), 0, Vec::new(), None, None);
         } else {
             self.locked = locked;
@@ -672,22 +672,22 @@ mod tests {
     #[test]
     fn stranded_generals_foul() {
         let rules = Rules::new();
-        let mut round = Round::from_pile(rules, Seat::East, Hand::FULL.iter().collect()).unwrap();
-        round.hands = [Hand::EMPTY; 4];
-        round.hands[Seat::South as usize] = "帥.帥..".parse().unwrap();
-        round.resolve("綠將".parse().unwrap(), Seat::South, true);
+        let mut round = Round::from_pile(rules, Seat::ALL[0], Hand::FULL.iter().collect()).unwrap();
+        round.hands = [Hand::EMPTY; Seat::COUNT];
+        round.hands[1] = "帥.帥..".parse().unwrap();
+        round.resolve("綠將".parse().unwrap(), Seat::ALL[1], true);
 
         assert_eq!(round.phase(), Phase::Finished);
         assert_eq!(
             round.events().last(),
-            Some(&Event::Foul { seat: Seat::South })
+            Some(&Event::Foul { seat: Seat::ALL[1] })
         );
         let result = round.result().unwrap();
-        assert_eq!((result.winner, result.foul), (None, Some(Seat::South)));
+        assert_eq!((result.winner, result.foul), (None, Some(Seat::ALL[1])));
 
-        let mut game = Game::new(rules, Seat::East);
+        let mut game = Game::new(rules, Seat::ALL[0]);
         game.settle(result);
         assert_eq!(game.scores(), [10, -30, 10, 10]);
-        assert_eq!(game.dealer(), Seat::East);
+        assert_eq!(game.dealer(), Seat::ALL[0]);
     }
 }

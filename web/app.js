@@ -6,11 +6,9 @@ import init, { WebGame } from './pkg/tsap_oo_web.js';
 
 const PACE_MS = 550; // pause between bot steps, so they can be followed
 
-// Seats run counterclockwise, so the next player (下家) sits to your right.
-const SEATS = ['E', 'S', 'W', 'N'];
-const NAMES = { E: '東', S: '南', W: '西', N: '北' };
-const RELATION = { S: '你', W: '下家', N: '對家', E: '上家' };
-const SLOT = { W: 'west', N: 'north', E: 'east' };
+// Seats are numbers in turn order.  Play runs counterclockwise, so counting
+// on from you, the next player (下家) sits to your right.
+const SLOTS = [null, 'right', 'top', 'left'];
 
 let game;
 let state;
@@ -88,37 +86,37 @@ function meldsEl(melds) {
 }
 
 function render() {
-  const bySeat = Object.fromEntries(state.seats.map((s) => [s.seat, s]));
+  const name = (seat) => state.seats[seat].name;
+  const slot = (seat) => SLOTS[(seat - state.human + state.seats.length) % state.seats.length];
   const finished = state.phase === 'finished';
 
   // Header: scores, the dealer marked.
   const scores = id('scores');
   scores.replaceChildren();
-  SEATS.forEach((seat, i) => {
+  state.scores.forEach((score, seat) => {
     const span = document.createElement('span');
     span.className = (seat === state.dealer ? 'dealer ' : '') + (seat === state.human ? 'me' : '');
-    span.textContent = `${NAMES[seat]}${seat === state.human ? '(你)' : ''} ${state.scores[i]}`;
+    span.textContent = `${name(seat)} ${score}`;
     scores.append(span);
   });
 
   // Opponents.
-  for (const seat of SEATS) {
-    if (seat === state.human) continue;
-    const s = bySeat[seat];
-    const box = id(SLOT[seat]);
+  state.seats.forEach((s, seat) => {
+    if (seat === state.human) return;
+    const box = id(slot(seat));
     box.replaceChildren();
-    const name = document.createElement('div');
-    name.className = 'name' + (state.actor === seat ? ' acting' : '');
-    name.textContent = `${NAMES[seat]}・${RELATION[seat]}`;
-    if (seat === state.dealer) name.insertAdjacentHTML('beforeend', '<span class="dealer">莊</span>');
-    box.append(name);
+    const label = document.createElement('div');
+    label.className = 'name' + (state.actor === seat ? ' acting' : '');
+    label.textContent = name(seat);
+    if (seat === state.dealer) label.insertAdjacentHTML('beforeend', '<span class="dealer">莊</span>');
+    box.append(label);
     const fan = document.createElement('div');
     fan.className = 'fan';
     if (finished && s.hand) for (const c of s.hand.flat()) fan.append(cardEl(c));
     else for (let i = 0; i < s.concealed; i++) fan.append(backEl());
     box.append(fan);
     if (s.exposed.length) box.append(meldsEl(s.exposed));
-  }
+  });
 
   // The table: the card on offer, the discards, the pile.
   const offer = id('offer');
@@ -126,7 +124,7 @@ function render() {
   if (state.offer) {
     const who = document.createElement('span');
     who.className = 'who';
-    who.textContent = `${NAMES[state.offer.source]}${state.offer.drawn ? '摸' : '打'}`;
+    who.textContent = `${name(state.offer.source)}${state.offer.drawn ? '摸' : '打'}`;
     offer.append(who, cardEl(state.offer.card));
   }
   const discards = id('discards');
@@ -135,7 +133,7 @@ function render() {
   id('pile').textContent = `牌堆 ${state.pile} 張（尾 6 張廢牌）`;
 
   // You.
-  const me = bySeat[state.human];
+  const me = state.seats[state.human];
   const status = id('status');
   status.className = 'status';
   if (finished) {
@@ -144,7 +142,7 @@ function render() {
     status.classList.add('acting');
     status.textContent = state.phase === 'claim' ? '要吃碰嗎？' : '請打一張牌';
   } else {
-    status.textContent = `等 ${NAMES[state.actor]} 行動…`;
+    status.textContent = `等${name(state.actor)}行動…`;
   }
   const exposed = id('exposed');
   exposed.replaceChildren();
@@ -209,12 +207,12 @@ function render() {
     result.replaceChildren();
     const h2 = document.createElement('h2');
     const r = state.result;
-    if (r.winner) {
-      const how = r.from ? `${NAMES[r.from]}${r.winning_card ? '放' : ''}` : r.winning_card ? '自摸' : '天胡';
-      h2.textContent = `${NAMES[r.winner]}${r.winner === state.human ? '（你）' : ''}胡牌，${r.hu} 胡（${how}）`;
+    if (r.winner != null) {
+      const how = r.from != null ? `${name(r.from)}${r.winning_card ? '放' : ''}` : r.winning_card ? '自摸' : '天胡';
+      h2.textContent = `${name(r.winner)}胡牌，${r.hu} 胡（${how}）`;
       result.append(h2, meldsEl(r.layout));
-    } else if (r.foul) {
-      h2.textContent = `${NAMES[r.foul]}${r.foul === state.human ? '（你）' : ''}相公：沒有牌可打，賠每家 10 胡`;
+    } else if (r.foul != null) {
+      h2.textContent = `${name(r.foul)}相公：沒有牌可打，賠每家 10 胡`;
       result.append(h2);
     } else {
       h2.textContent = '流局';

@@ -33,7 +33,8 @@ python3 -m http.server
 # open http://localhost:8000/
 ```
 
-You sit south; the bots take the other three seats.  When a public card is
+You play against three bots, named by where they sit from you: 下家 to
+your right plays after you, then 對家 across, then 上家 to your left.  When a public card is
 yours to claim, the buttons under your hand offer 碰, each possible 吃, and
 過; when it is your discard, click a card.  Wins and kongs are compulsory and
 happen by themselves, and so does keeping a general (將帥) you draw.

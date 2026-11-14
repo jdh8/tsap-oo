@@ -3,6 +3,11 @@
 use susik::{Card, Color, Hand, Meld};
 use tsap_oo::{Claim, ClaimOptions, Event, Phase, Round, RoundError, Rules, Seat, discardable};
 
+const FIRST: Seat = Seat::ALL[0];
+const SECOND: Seat = Seat::ALL[1];
+const THIRD: Seat = Seat::ALL[2];
+const FOURTH: Seat = Seat::ALL[3];
+
 fn hand(s: &str) -> Hand {
     s.parse().unwrap()
 }
@@ -13,7 +18,7 @@ fn card(s: &str) -> Card {
 
 /// A pile dealing exactly `hands`: `hands[0]` (21 cards) to `dealer`, then
 /// 20 each to the seats after in turn order.  The undealt cards sit below.
-fn pile(hands: [Hand; 4]) -> Vec<Card> {
+fn pile(hands: [Hand; Seat::COUNT]) -> Vec<Card> {
     assert_eq!(hands[0].len(), 21);
     let dealt = hands.iter().fold(Hand::EMPTY, |a, &b| a + b);
     let mut pile: Vec<Card> = (Hand::FULL - dealt).iter().collect();
@@ -23,7 +28,7 @@ fn pile(hands: [Hand; 4]) -> Vec<Card> {
     let extra = dealer.first().unwrap();
     dealer.remove(extra);
     pile.push(extra);
-    for seat in (1..4).rev() {
+    for seat in (1..Seat::COUNT).rev() {
         pile.extend(hands[seat]);
     }
     pile.extend(dealer);
@@ -48,100 +53,97 @@ fn conserved(round: &Round) {
 
 #[test]
 fn eat_pong_kong_and_win() {
-    // East: concealed triplets of the red court (9) and a lone yellow
+    // First: concealed triplets of the red court (9) and a lone yellow
     // general (1), pairs, and a loose 俥傌 waiting for a red cannon.
-    let east = hand("帥帥帥仕仕仕相相相俥傌兵兵.帥仕仕炮.將將.將將");
-    // South eats East's yellow cannon into a field; West could pong it.
-    let south = hand(".俥傌炮.士士象象車車馬馬包包.將將士士象象卒");
-    let west = hand("俥俥傌傌.相相相炮炮兵兵兵.卒卒.車車馬馬包包");
-    // North holds three white soldiers and the red cannon East wants.
-    let north = hand("相炮.帥帥帥.士士車車馬馬包包.士士象象卒卒卒");
+    let first = hand("帥帥帥仕仕仕相相相俥傌兵兵.帥仕仕炮.將將.將將");
+    // Second eats First's yellow cannon into a field; Third could pong it.
+    let second = hand(".俥傌炮.士士象象車車馬馬包包.將將士士象象卒");
+    let third = hand("俥俥傌傌.相相相炮炮兵兵兵.卒卒.車車馬馬包包");
+    // Fourth holds three white soldiers and the red cannon First wants.
+    let fourth = hand("相炮.帥帥帥.士士車車馬馬包包.士士象象卒卒卒");
     let mut round =
-        Round::from_pile(Rules::new(), Seat::East, pile([east, south, west, north])).unwrap();
-    assert_eq!(round.phase(), Phase::Discard(Seat::East));
-    assert_eq!(round.hand(Seat::East), east);
-    assert_eq!(round.hand(Seat::North), north);
+        Round::from_pile(Rules::new(), FIRST, pile([first, second, third, fourth])).unwrap();
+    assert_eq!(round.phase(), Phase::Discard(FIRST));
+    assert_eq!(round.hand(FIRST), first);
+    assert_eq!(round.hand(FOURTH), fourth);
     assert_eq!(round.pile_len(), 31);
     conserved(&round);
 
     assert_eq!(
-        round.discard(Seat::South, card("黃炮")),
+        round.discard(SECOND, card("黃炮")),
         Err(RoundError::WrongPhase)
     );
-    round.discard(Seat::East, card("黃炮")).unwrap();
-    assert_eq!(round.phase(), Phase::Claim(Seat::South));
+    round.discard(FIRST, card("黃炮")).unwrap();
+    assert_eq!(round.phase(), Phase::Claim(SECOND));
     assert_eq!(
-        round.claim_options(Seat::South),
+        round.claim_options(SECOND),
         ClaimOptions {
             pong: false,
             eats: vec![Meld::Pair(card("黃炮")), Meld::Field(Color::Yellow)],
             blocked: vec![],
         }
     );
+    assert_eq!(round.claim(THIRD, Claim::Pong), Err(RoundError::WrongPhase));
     assert_eq!(
-        round.claim(Seat::West, Claim::Pong),
-        Err(RoundError::WrongPhase)
-    );
-    assert_eq!(
-        round.claim(Seat::South, Claim::Pong),
+        round.claim(SECOND, Claim::Pong),
         Err(RoundError::NotAllowed)
     );
     conserved(&round);
 
-    // South stakes an eat; West, holding a pair, is still asked and passes.
+    // Second stakes an eat; Third, holding a pair, is still asked and passes.
     round
-        .claim(Seat::South, Claim::Eat(Meld::Field(Color::Yellow)))
+        .claim(SECOND, Claim::Eat(Meld::Field(Color::Yellow)))
         .unwrap();
-    assert_eq!(round.phase(), Phase::Claim(Seat::West));
+    assert_eq!(round.phase(), Phase::Claim(THIRD));
     assert_eq!(
-        round.claim_options(Seat::West),
+        round.claim_options(THIRD),
         ClaimOptions {
             pong: true,
             eats: vec![],
             blocked: vec![],
         }
     );
-    round.claim(Seat::West, Claim::Pass).unwrap();
-    assert_eq!(round.phase(), Phase::Discard(Seat::South));
-    assert_eq!(round.exposed(Seat::South), [Meld::Field(Color::Yellow)]);
-    assert_eq!(round.hand(Seat::South).len(), 18);
+    round.claim(THIRD, Claim::Pass).unwrap();
+    assert_eq!(round.phase(), Phase::Discard(SECOND));
+    assert_eq!(round.exposed(SECOND), [Meld::Field(Color::Yellow)]);
+    assert_eq!(round.hand(SECOND).len(), 18);
     assert_eq!(round.locked(), Some(card("黃炮")));
     assert_eq!(
-        round.discard(Seat::South, card("黃炮")),
+        round.discard(SECOND, card("黃炮")),
         Err(RoundError::Locked(card("黃炮")))
     );
     assert_eq!(
-        round.discard(Seat::South, card("紅帥")),
+        round.discard(SECOND, card("紅帥")),
         Err(RoundError::NotInHand(card("紅帥")))
     );
     conserved(&round);
 
-    // South's white soldier is the fourth of North's triplet: a forced kong.
-    round.discard(Seat::South, card("白卒")).unwrap();
-    assert_eq!(round.phase(), Phase::Discard(Seat::North));
-    assert_eq!(round.exposed(Seat::North), [Meld::Quad(card("白卒"))]);
+    // Second's white soldier completes Fourth's triplet: a forced kong.
+    round.discard(SECOND, card("白卒")).unwrap();
+    assert_eq!(round.phase(), Phase::Discard(FOURTH));
+    assert_eq!(round.exposed(FOURTH), [Meld::Quad(card("白卒"))]);
     assert_eq!(
         round.events().last(),
         Some(&Event::Kong {
-            seat: Seat::North,
+            seat: FOURTH,
             card: card("白卒")
         })
     );
     assert_eq!(
-        round.discard(Seat::North, card("白卒")),
+        round.discard(FOURTH, card("白卒")),
         Err(RoundError::Locked(card("白卒")))
     );
     conserved(&round);
 
-    // North's red cannon completes East's field (1): with the concealed
+    // Fourth's red cannon completes First's field (1): with the concealed
     // triplets (9), the lone yellow general (1), and the four generals of
     // the green and white pairs scored as singles (4), that is 15.
-    round.discard(Seat::North, card("紅炮")).unwrap();
+    round.discard(FOURTH, card("紅炮")).unwrap();
     assert_eq!(round.phase(), Phase::Finished);
     let result = round.result().unwrap();
-    assert_eq!(result.winner, Some(Seat::East));
+    assert_eq!(result.winner, Some(FIRST));
     assert_eq!(result.hu, 15);
-    assert_eq!(result.from, Some(Seat::North));
+    assert_eq!(result.from, Some(FOURTH));
     assert_eq!(result.winning_card, Some(card("紅炮")));
     assert_eq!(result.layout[0], Meld::Field(Color::Red));
     assert_eq!(
@@ -151,12 +153,12 @@ fn eat_pong_kong_and_win() {
     assert_eq!(
         round.events().last(),
         Some(&Event::Win {
-            seat: Seat::East,
+            seat: FIRST,
             hu: 15
         })
     );
     assert_eq!(
-        round.discard(Seat::East, card("紅帥")),
+        round.discard(FIRST, card("紅帥")),
         Err(RoundError::WrongPhase)
     );
     conserved(&round);
@@ -165,37 +167,37 @@ fn eat_pong_kong_and_win() {
 #[test]
 fn a_drawn_general_is_kept() {
     // The hands of `eat_pong_kong_and_win`, with a green general on top of
-    // the pile: East holds its pair and South the 士象 to eat it with.
-    let east = hand("帥帥帥仕仕仕相相相俥傌兵兵.帥仕仕炮.將將.將將");
-    let south = hand(".俥傌炮.士士象象車車馬馬包包.將將士士象象卒");
-    let west = hand("俥俥傌傌.相相相炮炮兵兵兵.卒卒.車車馬馬包包");
-    let north = hand("相炮.帥帥帥.士士車車馬馬包包.士士象象卒卒卒");
-    let mut pile = pile([east, south, west, north]);
+    // the pile: First holds its pair and Second the 士象 to eat it with.
+    let first = hand("帥帥帥仕仕仕相相相俥傌兵兵.帥仕仕炮.將將.將將");
+    let second = hand(".俥傌炮.士士象象車車馬馬包包.將將士士象象卒");
+    let third = hand("俥俥傌傌.相相相炮炮兵兵兵.卒卒.車車馬馬包包");
+    let fourth = hand("相炮.帥帥帥.士士車車馬馬包包.士士象象卒卒卒");
+    let mut pile = pile([first, second, third, fourth]);
     let general = card("綠將");
     let at = pile[..31].iter().position(|&c| c == general).unwrap();
     pile.swap(at, 30);
-    let mut round = Round::from_pile(Rules::new(), Seat::East, pile).unwrap();
+    let mut round = Round::from_pile(Rules::new(), FIRST, pile).unwrap();
 
     assert_eq!(
-        round.discard(Seat::East, card("紅帥")),
+        round.discard(FIRST, card("紅帥")),
         Err(RoundError::General(card("紅帥")))
     );
-    // Nobody wants the red soldier, so South draws the general and keeps
-    // it: no eat for South, no pong for East.
-    round.discard(Seat::East, card("紅兵")).unwrap();
-    assert_eq!(round.phase(), Phase::Discard(Seat::South));
+    // Nobody wants the red soldier, so Second draws the general and keeps
+    // it: no eat for Second, no pong for First.
+    round.discard(FIRST, card("紅兵")).unwrap();
+    assert_eq!(round.phase(), Phase::Discard(SECOND));
     assert_eq!(
         round.events().last(),
         Some(&Event::Keep {
-            seat: Seat::South,
+            seat: SECOND,
             card: general
         })
     );
-    assert_eq!(round.hand(Seat::South), south.with(general));
-    assert!(round.exposed(Seat::South).is_empty());
+    assert_eq!(round.hand(SECOND), second.with(general));
+    assert!(round.exposed(SECOND).is_empty());
     assert_eq!(round.locked(), None);
     assert_eq!(
-        round.discard(Seat::South, general),
+        round.discard(SECOND, general),
         Err(RoundError::General(general))
     );
     conserved(&round);
@@ -216,11 +218,10 @@ fn dealer_wins_on_the_deal() {
     let filler = hand("俥俥俥俥傌傌傌傌炮炮炮炮兵兵兵兵.帥俥俥俥..");
     let more = hand(".傌傌傌傌炮炮炮炮兵兵兵兵.將將將將士士士士.");
     let rest = hand("..象象象象車車車車馬馬馬馬包包包包卒卒卒卒.");
-    let round =
-        Round::from_pile(Rules::new(), Seat::West, pile([dream, filler, more, rest])).unwrap();
+    let round = Round::from_pile(Rules::new(), THIRD, pile([dream, filler, more, rest])).unwrap();
     assert_eq!(round.phase(), Phase::Finished);
     let result = round.result().unwrap();
-    assert_eq!(result.winner, Some(Seat::West));
+    assert_eq!(result.winner, Some(THIRD));
     assert_eq!(result.hu, 33);
     assert_eq!(result.winning_card, None);
     assert_eq!(result.from, None);
@@ -229,16 +230,16 @@ fn dealer_wins_on_the_deal() {
 
 #[test]
 fn a_short_pile_is_rejected() {
-    assert!(Round::from_pile(Rules::new(), Seat::East, Vec::new()).is_err());
+    assert!(Round::from_pile(Rules::new(), FIRST, Vec::new()).is_err());
     // A fifth white soldier in place of a red general.
     let mut twice = Hand::FULL.iter().collect::<Vec<_>>();
     twice[0] = twice[111];
-    assert!(Round::from_pile(Rules::new(), Seat::East, twice).is_err());
+    assert!(Round::from_pile(Rules::new(), FIRST, twice).is_err());
 }
 
 #[cfg(feature = "rand")]
 mod playouts {
-    use super::conserved;
+    use super::{FIRST, conserved};
     use rand::SeedableRng as _;
     use rand::rngs::SmallRng;
     use tsap_oo::{Event, Game, HeuristicBot, Phase, Rules, Seat, Step, Table};
@@ -248,7 +249,7 @@ mod playouts {
     #[test]
     fn bots_finish_rounds() {
         let rules = Rules::new();
-        let mut game = Game::new(rules, Seat::East);
+        let mut game = Game::new(rules, FIRST);
         let mut rng = SmallRng::seed_from_u64(2026);
         let (mut wins, mut exhausted, mut fouls) = (0, 0, 0);
         for _ in 0..200 {

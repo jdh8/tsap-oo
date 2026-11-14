@@ -63,7 +63,7 @@ Open questions, played provisionally:
 
 ## Modules
 
-- the crate root: [`Seat`]
+- the crate root: [`Seat`], numbered in turn order
 - [`rules`][mod-rules]: [`Rules`], the scoring table
 - [`round`][mod-round]: one deal — [`Round`], [`Phase`], [`Offer`],
   [`Claim`], [`ClaimOptions`], [`Event`], [`RoundResult`]
@@ -83,7 +83,7 @@ use tsap_oo::{Game, HeuristicBot, Rules, Seat, Step, Table};
 
 # #[cfg(feature = "rand")] {
 let rules = Rules::new();
-let mut game = Game::new(rules, Seat::East);
+let mut game = Game::new(rules, Seat::ALL[0]);
 let mut rng = rand::rng();
 let bots = Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as _));
 let mut table = Table::new(game.deal(&mut rng), bots);
@@ -91,7 +91,7 @@ while table.step()? != Step::Finished {}
 let result = table.round().result().expect("finished");
 game.settle(result);
 match result.winner {
-    Some(seat) => println!("{seat} wins with {} 胡", result.hu),
+    Some(seat) => println!("seat {seat} wins with {} 胡", result.hu),
     None => println!("exhausted"),
 }
 # }
@@ -110,7 +110,7 @@ match result.winner {
 [mod-strategy]: https://docs.rs/tsap-oo/latest/tsap_oo/strategy/index.html
 [mod-driver]: https://docs.rs/tsap-oo/latest/tsap_oo/driver/index.html
 [mod-heuristic]: https://docs.rs/tsap-oo/latest/tsap_oo/heuristic/index.html
-[`Seat`]: https://docs.rs/tsap-oo/latest/tsap_oo/enum.Seat.html
+[`Seat`]: https://docs.rs/tsap-oo/latest/tsap_oo/struct.Seat.html
 [`Rules`]: https://docs.rs/tsap-oo/latest/tsap_oo/struct.Rules.html
 [`Round`]: https://docs.rs/tsap-oo/latest/tsap_oo/struct.Round.html
 [`Phase`]: https://docs.rs/tsap-oo/latest/tsap_oo/enum.Phase.html

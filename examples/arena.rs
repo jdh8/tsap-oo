@@ -14,9 +14,9 @@ fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(100);
     let rules = Rules::new();
-    let mut game = Game::new(rules, Seat::East);
+    let mut game = Game::new(rules, Seat::ALL[0]);
     let mut rng = SmallRng::seed_from_u64(0);
-    let mut wins = [0; 4];
+    let mut wins = [0; Seat::COUNT];
     let (mut exhausted, mut fouls) = (0, 0);
     let mut hu_total = 0;
     for _ in 0..rounds {
@@ -26,7 +26,7 @@ fn main() {
         let result = table.round().result().expect("finished");
         match result.winner {
             Some(seat) => {
-                wins[seat as usize] += 1;
+                wins[seat.index()] += 1;
                 hu_total += result.hu;
             }
             None if result.foul.is_some() => fouls += 1,
@@ -39,8 +39,8 @@ fn main() {
     for seat in Seat::ALL {
         println!(
             "  {seat}: {} wins, score {}",
-            wins[seat as usize],
-            game.scores()[seat as usize]
+            wins[seat.index()],
+            game.scores()[seat.index()]
         );
     }
     if won > 0 {

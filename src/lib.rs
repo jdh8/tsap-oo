@@ -21,34 +21,43 @@ pub use strategy::Strategy;
 pub use susik;
 pub use view::View;
 
-use core::fmt::{self, Write as _};
+use core::fmt;
 
-/// A seat at the table
+/// A seat at the table, numbered from 0 in turn order
 ///
-/// Play runs counterclockwise, east, south, west, north, as in mahjong: the
-/// next player (下家) sits to the right.
+/// Seats carry no compass points: the next player (下家) is the next number,
+/// wrapping around after the last.  The only table size modelled is
+/// [`Seat::COUNT`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(u8)]
-pub enum Seat {
-    /// 東
-    East,
-    /// 南
-    South,
-    /// 西
-    West,
-    /// 北
-    North,
-}
+pub struct Seat(u8);
 
 impl Seat {
+    /// Players at the table
+    pub const COUNT: usize = 4;
+
     /// Seats in turn order
-    pub const ALL: [Self; 4] = [Self::East, Self::South, Self::West, Self::North];
+    pub const ALL: [Self; Self::COUNT] = {
+        let mut all = [Self(0); Self::COUNT];
+        let mut i = 0;
+        while i < Self::COUNT {
+            all[i] = Self(i as u8);
+            i += 1;
+        }
+        all
+    };
+
+    /// The position in turn order, an index into [`Seat::ALL`]
+    #[must_use]
+    #[inline]
+    pub const fn index(self) -> usize {
+        self.0 as usize
+    }
 
     /// The seat `n` places along in turn order
     #[must_use]
     #[inline]
     pub const fn advance(self, n: usize) -> Self {
-        Self::ALL[(self as usize + n) % 4]
+        Self::ALL[(self.index() + n) % Self::COUNT]
     }
 
     /// The next player, 下家
@@ -57,34 +66,11 @@ impl Seat {
     pub const fn next(self) -> Self {
         self.advance(1)
     }
-
-    /// Uppercase ASCII letter
-    #[must_use]
-    #[inline]
-    pub const fn letter(self) -> char {
-        match self {
-            Self::East => 'E',
-            Self::South => 'S',
-            Self::West => 'W',
-            Self::North => 'N',
-        }
-    }
-
-    /// Chinese name
-    #[must_use]
-    #[inline]
-    pub const fn name(self) -> char {
-        match self {
-            Self::East => '東',
-            Self::South => '南',
-            Self::West => '西',
-            Self::North => '北',
-        }
-    }
 }
 
+/// The seat number counted from 1
 impl fmt::Display for Seat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_char(self.name())
+        write!(f, "{}", self.index() + 1)
     }
 }

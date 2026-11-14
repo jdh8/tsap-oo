@@ -1,4 +1,4 @@
-//! Browser front end for 十胡: one human (south) against three greedy bots.
+//! Browser front end for 十胡: one human against three greedy bots.
 //!
 //! The engine holds the whole game; JS is a thin renderer that calls one
 //! method per user action or bot step and redraws from the JSON snapshot
@@ -13,7 +13,13 @@ use tsap_oo::{
 };
 use wasm_bindgen::prelude::*;
 
-const HUMAN: Seat = Seat::South;
+const HUMAN: Seat = Seat::ALL[0];
+
+/// What the human calls each seat, counting on from them in turn order
+fn name(seat: Seat) -> &'static str {
+    const NAMES: [&str; Seat::COUNT] = ["你", "下家", "對家", "上家"];
+    NAMES[(seat.index() + Seat::COUNT - HUMAN.index()) % Seat::COUNT]
+}
 
 // ---------------------------------------------------------------------------
 // Snapshot: what the page draws
@@ -63,7 +69,7 @@ fn arrange(rules: &Rules, hand: Hand) -> Vec<Vec<CardJson>> {
 
 #[derive(Serialize)]
 struct SeatJson {
-    seat: char,
+    name: &'static str,
     concealed: usize,
     exposed: Vec<Vec<CardJson>>,
     /// The human's hand always; a bot's only once the round is over.
@@ -74,7 +80,7 @@ struct SeatJson {
 #[derive(Serialize)]
 struct OfferJson {
     card: CardJson,
-    source: char,
+    source: usize,
     drawn: bool,
 }
 
@@ -89,28 +95,28 @@ struct OptionsJson {
 
 #[derive(Serialize)]
 struct DiscardJson {
-    seat: char,
+    seat: usize,
     card: CardJson,
 }
 
 #[derive(Serialize)]
 struct ResultJson {
-    winner: Option<char>,
-    foul: Option<char>,
+    winner: Option<usize>,
+    foul: Option<usize>,
     hu: u32,
     layout: Vec<Vec<CardJson>>,
     winning_card: Option<CardJson>,
-    from: Option<char>,
+    from: Option<usize>,
 }
 
 #[derive(Serialize)]
 struct Snapshot {
     phase: &'static str,
-    actor: Option<char>,
-    human: char,
-    dealer: char,
+    actor: Option<usize>,
+    human: usize,
+    dealer: usize,
     pile: usize,
-    scores: [i32; 4],
+    scores: [i32; Seat::COUNT],
     seats: Vec<SeatJson>,
     offer: Option<OfferJson>,
     /// The human's claim options while the round waits on their claim
@@ -125,14 +131,14 @@ struct Snapshot {
 
 fn describe(event: &Event) -> String {
     match *event {
-        Event::Draw { seat, card } => format!("{seat}摸 {card}"),
-        Event::Discard { seat, card } => format!("{seat}打 {card}"),
-        Event::Keep { seat, card } => format!("{seat}收 {card}"),
-        Event::Eat { seat, meld, card } => format!("{seat}吃 {card}：{meld}"),
-        Event::Pong { seat, card } => format!("{seat}碰 {card}"),
-        Event::Kong { seat, card } => format!("{seat}槓 {card}"),
-        Event::Win { seat, hu } => format!("{seat}胡牌，{hu} 胡"),
-        Event::Foul { seat } => format!("{seat}相公"),
+        Event::Draw { seat, card } => format!("{}摸 {card}", name(seat)),
+        Event::Discard { seat, card } => format!("{}打 {card}", name(seat)),
+        Event::Keep { seat, card } => format!("{}收 {card}", name(seat)),
+        Event::Eat { seat, meld, card } => format!("{}吃 {card}：{meld}", name(seat)),
+        Event::Pong { seat, card } => format!("{}碰 {card}", name(seat)),
+        Event::Kong { seat, card } => format!("{}槓 {card}", name(seat)),
+        Event::Win { seat, hu } => format!("{}胡牌，{hu} 胡", name(seat)),
+        Event::Foul { seat } => format!("{}相公", name(seat)),
         Event::Exhausted => "流局".to_owned(),
     }
 }
@@ -140,8 +146,8 @@ fn describe(event: &Event) -> String {
 fn snapshot(game: &Game, round: &Round) -> Snapshot {
     let finished = round.phase() == Phase::Finished;
     let (phase, actor) = match round.phase() {
-        Phase::Claim(seat) => ("claim", Some(seat.letter())),
-        Phase::Discard(seat) => ("discard", Some(seat.letter())),
+        Phase::Claim(seat) => ("claim", Some(seat.index())),
+        Phase::Discard(seat) => ("discard", Some(seat.index())),
         Phase::Finished => ("finished", None),
     };
     let options = (round.phase() == Phase::Claim(HUMAN)).then(|| {
@@ -163,14 +169,14 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
     Snapshot {
         phase,
         actor,
-        human: HUMAN.letter(),
-        dealer: round.dealer().letter(),
+        human: HUMAN.index(),
+        dealer: round.dealer().index(),
         pile: round.pile_len(),
         scores: game.scores(),
         seats: Seat::ALL
             .into_iter()
             .map(|seat| SeatJson {
-                seat: seat.letter(),
+                name: name(seat),
                 concealed: round.hand(seat).len(),
                 exposed: round.exposed(seat).iter().map(cards).collect(),
                 hand: (seat == HUMAN || finished).then(|| arrange(game.rules(), round.hand(seat))),
@@ -178,7 +184,7 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
             .collect(),
         offer: round.offer().map(|offer| OfferJson {
             card: offer.card.into(),
-            source: offer.source.letter(),
+            source: offer.source.index(),
             drawn: offer.drawn,
         }),
         options,
@@ -195,18 +201,18 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
             .discards()
             .iter()
             .map(|&(seat, card)| DiscardJson {
-                seat: seat.letter(),
+                seat: seat.index(),
                 card: card.into(),
             })
             .collect(),
         log: round.events().iter().map(describe).collect(),
         result: round.result().map(|result| ResultJson {
-            winner: result.winner.map(Seat::letter),
-            foul: result.foul.map(Seat::letter),
+            winner: result.winner.map(Seat::index),
+            foul: result.foul.map(Seat::index),
             hu: result.hu,
             layout: result.layout.iter().map(cards).collect(),
             winning_card: result.winning_card.map(CardJson::from),
-            from: result.from.map(Seat::letter),
+            from: result.from.map(Seat::index),
         }),
     }
 }
@@ -384,8 +390,8 @@ mod tests {
         while rounds < 5 {
             let json = core.snapshot();
             let value: serde_json::Value = serde_json::from_str(&json).unwrap();
-            assert_eq!(value["human"], HUMAN.letter().to_string());
-            let grouped: usize = value["seats"][HUMAN as usize]["hand"]
+            assert_eq!(value["human"], HUMAN.index());
+            let grouped: usize = value["seats"][HUMAN.index()]["hand"]
                 .as_array()
                 .unwrap()
                 .iter()
@@ -400,7 +406,7 @@ mod tests {
                 Phase::Finished => {
                     assert!(value["result"].is_object());
                     assert!(
-                        value["seats"][Seat::East as usize]["hand"].is_array(),
+                        value["seats"][HUMAN.next().index()]["hand"].is_array(),
                         "bots reveal at the end"
                     );
                     core.next_round();
@@ -429,7 +435,7 @@ mod tests {
                 _ => {
                     assert!(core.hint().is_none());
                     assert!(
-                        value["seats"][Seat::East as usize]["hand"].is_null(),
+                        value["seats"][HUMAN.next().index()]["hand"].is_null(),
                         "bots stay concealed"
                     );
                     assert!(matches!(core.table.step(), Ok(Step::Acted(_))));

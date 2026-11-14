@@ -6,14 +6,14 @@ use susik::Card;
 
 /// Scores and the dealer across rounds
 ///
-/// The winner collects their 胡 from each of the other three seats and deals
-/// next; after an exhausted pile the same dealer deals again, as after a
-/// foul (相公), whose seat pays the threshold to each of the other three.
+/// The winner collects their 胡 from each other seat and deals next; after an
+/// exhausted pile the same dealer deals again, as after a foul (相公), whose
+/// seat pays the threshold to each other seat.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Game {
     rules: Rules,
     dealer: Seat,
-    scores: [i32; 4],
+    scores: [i32; Seat::COUNT],
 }
 
 impl Game {
@@ -23,7 +23,7 @@ impl Game {
         Self {
             rules,
             dealer,
-            scores: [0; 4],
+            scores: [0; Seat::COUNT],
         }
     }
 
@@ -44,7 +44,7 @@ impl Game {
     /// Scores in [`Seat::ALL`] order
     #[must_use]
     #[inline]
-    pub const fn scores(&self) -> [i32; 4] {
+    pub const fn scores(&self) -> [i32; Seat::COUNT] {
         self.scores
     }
 
@@ -73,8 +73,9 @@ impl Game {
             (None, Some(foul)) => (foul, -to_i32(self.rules.threshold)),
             (None, None) => return,
         };
+        let others = Seat::COUNT as i32 - 1;
         for seat in Seat::ALL {
-            self.scores[seat as usize] += if seat == collector { 3 * hu } else { -hu };
+            self.scores[seat.index()] += if seat == collector { others * hu } else { -hu };
         }
         if let Some(winner) = result.winner {
             self.dealer = winner;

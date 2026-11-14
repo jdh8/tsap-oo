@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `Seat` is no longer the compass enum 東南西北 but a seat number in turn
+  order: `Seat::ALL[i]`, `Seat::index`, and `Seat::COUNT` for the number of
+  players.  It displays as its number counted from 1.  `Seat::letter` and
+  `Seat::name` are gone.
+- `web/`: seats are named from where you sit — 你, 下家, 對家, 上家 —
+  instead of by wind.
+
 ## [0.1.0] - 2026-11-14
 
 ### Added
