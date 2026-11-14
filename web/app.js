@@ -202,22 +202,29 @@ function render() {
   const actions = id('actions');
   actions.replaceChildren();
   if (state.options) {
-    if (state.options.pong) actions.append(button('碰', () => show(game.pong()), '', 'pong'));
-    state.options.eats.forEach((cards, i) => {
-      const b = button('吃', () => show(game.eat(i)), '', `eat${i}`);
+    // As in Tenhou, a button shows only the cards leaving your hand: the
+    // meld minus the offered card.
+    const offered = state.offer.card;
+    const held = (meld) => {
+      const rest = [...meld];
+      rest.splice(rest.findIndex((c) => c.code === offered.code), 1);
+      return rest;
+    };
+    const claim = (label, cards, onclick, key) => {
+      const b = button(label, onclick, '', key);
       for (const c of cards) b.append(cardEl(c));
-      actions.append(b);
-    });
-    // Claims the rules forbid, shown so the reason is visible.
-    const blocked = (label, cards = []) => {
-      const b = button(label, null);
-      for (const c of cards) b.append(cardEl(c));
-      b.disabled = true;
-      b.title = '吃碰後會沒有牌可打（將帥不能打），所以不行';
+      // Claims the rules forbid, shown so the reason is visible.
+      if (!onclick) {
+        b.disabled = true;
+        b.title = '吃碰後會沒有牌可打（將帥不能打），所以不行';
+      }
       actions.append(b);
     };
-    if (state.options.blocked_pong) blocked('碰');
-    for (const cards of state.options.blocked_eats) blocked('吃', cards);
+    const pair = [offered, offered];
+    if (state.options.pong) claim('碰', pair, () => show(game.pong()), 'pong');
+    state.options.eats.forEach((meld, i) => claim('吃', held(meld), () => show(game.eat(i)), `eat${i}`));
+    if (state.options.blocked_pong) claim('碰', pair, null);
+    for (const meld of state.options.blocked_eats) claim('吃', held(meld), null);
     actions.append(button('過', () => show(game.pass()), 'pass', 'pass'));
   }
   if (!finished && state.actor === state.human) {

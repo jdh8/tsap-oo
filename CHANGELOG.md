@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the head of their colour, so 將士 and 將象 sit side by side.  Generals
   carry a coin mark under the piece wherever they appear, as on the printed
   cards.
+- `web/`: the 吃 and 碰 buttons show only the cards that leave your hand,
+  never the card on the table: 吃 帥相 takes a 仕, 碰 shows your pair.
 
 ## [0.1.0] - 2026-11-14
 

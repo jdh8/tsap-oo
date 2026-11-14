@@ -36,7 +36,8 @@ python3 -m http.server
 You play against three bots, named by where they sit from you: 下家 to
 your right plays after you, then 對家 across, then 上家 to your left.  When a public card is
 yours to claim, the buttons under your hand offer 碰, each possible 吃, and
-過; when it is your discard, click a card.  Wins and kongs are compulsory and
+過.  A claim button shows only the cards that leave your hand, not the card
+on the table: 吃 帥相 takes a 仕.  When it is your discard, click a card.  Wins and kongs are compulsory and
 happen by themselves, and so does keeping a general (將帥) you draw.
 
 設定 (or the `s` key) picks the table: 十胡, ten to win, or 八胡, eight.
