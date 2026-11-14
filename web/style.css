@@ -163,6 +163,24 @@ main {
   border-radius: 2px;
   pointer-events: none;
 }
+/* Generals carry the coin printed on the real card.  Not dots: two dots are
+   the horse's ornament. */
+.card[data-code$="K"]::after {
+  content: "";
+  position: absolute;
+  top: calc(50% + 0.6em);
+  left: 50%;
+  width: 0.4em;
+  height: 0.4em;
+  translate: -50% 0;
+  rotate: 45deg;
+  box-sizing: border-box;
+  border: 0.06em solid currentColor;
+  border-radius: 50%;
+  /* the square hole, standing on its corner */
+  background: linear-gradient(currentColor, currentColor) center / 35% 35% no-repeat;
+  pointer-events: none;
+}
 .card.red { background: var(--red); }
 .card.yellow { background: var(--yellow); }
 .card.green { background: var(--green); }

@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Seat::name` are gone.
 - `web/`: seats are named from where you sit — 你, 下家, 對家, 上家 —
   instead of by wind.
+- `web/`: lone generals in your hand are shown among the loose cards, at
+  the head of their colour, so 將士 and 將象 sit side by side.  Generals
+  carry a coin mark under the piece wherever they appear, as on the printed
+  cards.
 
 ## [0.1.0] - 2026-11-14
 

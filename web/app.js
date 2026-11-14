@@ -184,7 +184,8 @@ function render() {
   const hand = id('hand');
   hand.replaceChildren();
   const myDiscard = !finished && state.phase === 'discard' && state.actor === state.human;
-  // Grouped by the engine: the best melds, then the loose cards.
+  // Grouped by the engine: the best melds, then the loose cards with the
+  // lone generals among them.
   for (const group of me.hand) {
     const box = document.createElement('div');
     box.className = 'group';

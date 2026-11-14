@@ -88,16 +88,27 @@ fn cards(meld: &Meld) -> Vec<CardJson> {
     meld.cards().iter().map(CardJson::from).collect()
 }
 
-/// A hand sorted into its best melds, with the loose cards as a last group
+/// A hand sorted into its best melds, with the loose cards as a last group.
+///
+/// Lone generals go with the loose cards although each is a meld: there
+/// they head their colour, right beside any loose 士 or 象, so the 將士 and
+/// 將象 waits read at a glance.  The page marks them with a coin instead.
 fn arrange(rules: &Rules, hand: Hand) -> Vec<Vec<CardJson>> {
     // The bots' grading (loose cards at 1 each), so the grouping shows what
     // they would see in the same hand.
     let layout = Solver::new(rules.concealed, Some(1))
         .layout(hand)
         .expect("layouts with loose cards always exist");
-    let mut groups: Vec<_> = layout.melds.iter().map(cards).collect();
-    if !layout.loose.is_empty() {
-        groups.push(layout.loose.iter().map(CardJson::from).collect());
+    let mut loose = layout.loose;
+    let mut groups = Vec::new();
+    for meld in &layout.melds {
+        match meld {
+            Meld::Single(_) => loose += meld.cards(),
+            _ => groups.push(cards(meld)),
+        }
+    }
+    if !loose.is_empty() {
+        groups.push(loose.iter().map(CardJson::from).collect());
     }
     groups
 }
@@ -432,6 +443,22 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&core.snapshot()).unwrap();
         assert_eq!(value["threshold"], 8);
         assert_eq!(core.game.rules(), &Rules::eight());
+    }
+
+    /// A lone general heads its colour among the loose cards.
+    #[test]
+    fn lone_general_sits_with_the_loose_cards() {
+        use tsap_oo::susik::Rank;
+        let stray = Card::new(Color::Red, Rank::Elephant);
+        let general = Card::new(Color::Green, Rank::General);
+        let advisor = Card::new(Color::Green, Rank::Advisor);
+        let hand = Hand::from_iter([general, advisor, stray]);
+        let codes: Vec<Vec<String>> = arrange(&Rules::new(), hand)
+            .into_iter()
+            .map(|group| group.into_iter().map(|card| card.code).collect())
+            .collect();
+        let code = |card: Card| CardJson::from(card).code;
+        assert_eq!(codes, [[code(stray), code(general), code(advisor)]]);
     }
 
     /// Drive whole rounds: the bots step, the human passes every claim and
