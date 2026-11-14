@@ -97,6 +97,7 @@ fn arrange(rules: &Rules, hand: Hand) -> Vec<Vec<CardJson>> {
     // The bots' grading (loose cards at 1 each), so the grouping shows what
     // they would see in the same hand.
     let layout = Solver::new(rules.concealed, Some(1))
+        .locked()
         .layout(hand)
         .expect("layouts with loose cards always exist");
     let mut loose = layout.loose;
@@ -115,7 +116,7 @@ fn arrange(rules: &Rules, hand: Hand) -> Vec<Vec<CardJson>> {
 
 /// The most 胡 the melds within `hand` make, the rest left loose
 fn hand_hu(rules: &Rules, hand: Hand) -> u32 {
-    let best = Solver::new(rules.concealed, Some(0)).best(hand);
+    let best = Solver::new(rules.concealed, Some(0)).locked().best(hand);
     best.and_then(|hu| hu.try_into().ok()).unwrap_or(0)
 }
 
@@ -492,6 +493,14 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&core.snapshot()).unwrap();
         assert_eq!(value["threshold"], 8);
         assert_eq!(core.game.rules(), &Rules::eight());
+    }
+
+    /// 大肚: three alike stay a triplet, with the rest of 俥傌炮 loose.
+    #[test]
+    fn three_alike_stay_together() {
+        let hand: Hand = ".俥俥俥傌炮..".parse().unwrap();
+        let sizes: Vec<usize> = arrange(&Rules::new(), hand).iter().map(Vec::len).collect();
+        assert_eq!(sizes, [3, 2]);
     }
 
     /// A lone general heads its colour among the loose cards.

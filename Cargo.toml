@@ -23,7 +23,7 @@ default = ["rand"]
 rand = ["dep:rand", "susik/rand"]
 
 [dependencies]
-susik = "0.1.0"
+susik = "0.1.1"
 rand = { version = "0.10", optional = true }
 thiserror = "2"
 

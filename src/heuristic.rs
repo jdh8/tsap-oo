@@ -66,10 +66,10 @@ impl HeuristicBot {
     #[must_use]
     pub fn new(rules: &Rules) -> Self {
         Self {
-            solvers: COSTS.map(|cost| Solver::new(rules.concealed, Some(cost))),
+            solvers: COSTS.map(|cost| Solver::new(rules.concealed, Some(cost)).locked()),
             exposed: rules.exposed,
             threshold: rules.threshold,
-            surplus: Solver::new(surplus(rules.concealed), Some(0)),
+            surplus: Solver::new(surplus(rules.concealed), Some(0)).locked(),
             general: to_i32(rules.concealed.single),
             eaten: [
                 rules.exposed.court,
@@ -313,7 +313,7 @@ mod tests {
     fn loose_cards() {
         let rules = Rules::new();
         let bot = HeuristicBot::new(&rules);
-        let mut solver = Solver::new(rules.concealed, Some(1));
+        let mut solver = Solver::new(rules.concealed, Some(1)).locked();
         let mut prospects = |hand: &str, seen: &str| {
             let hand: Hand = hand.parse().unwrap();
             let live = Hand::FULL - hand - seen.parse().unwrap();

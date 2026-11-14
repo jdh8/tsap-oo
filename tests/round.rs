@@ -236,6 +236,19 @@ fn dealer_wins_on_the_deal() {
     conserved(&round);
 }
 
+/// 大肚: 俥俥俥傌炮 is a triplet and two loose cards, never 俥俥 and 俥傌炮.
+#[test]
+fn a_concealed_triplet_is_not_split_to_win() {
+    let belly = hand("帥帥帥帥仕仕仕仕相相相相.仕仕相相俥俥俥傌炮..");
+    let filler = hand("俥俥俥俥傌傌傌傌炮炮炮炮兵兵兵兵.帥帥帥帥..");
+    let more = hand(".傌傌傌炮炮炮兵兵兵兵.將將將將士士士士象象.");
+    let rest = hand("..象象車車車車馬馬馬馬包包包包卒卒卒卒.將將");
+    assert!(susik::partition(belly, Rules::new().concealed).is_some());
+    let round = Round::from_pile(Rules::new(), THIRD, pile([belly, filler, more, rest])).unwrap();
+    assert_eq!(round.phase(), Phase::Discard(THIRD));
+    conserved(&round);
+}
+
 #[test]
 fn a_short_pile_is_rejected() {
     assert!(Round::from_pile(Rules::new(), FIRST, Vec::new()).is_err());

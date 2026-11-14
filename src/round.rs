@@ -37,7 +37,7 @@
 
 use crate::{Rules, Seat};
 use std::collections::VecDeque;
-use susik::{Card, Hand, Meld, Rank, Solver, completions};
+use susik::{Card, Hand, Meld, Rank, Solver, locked_completions};
 use thiserror::Error;
 
 /// Whose decision the round waits for
@@ -273,7 +273,9 @@ impl Round {
             locked: None,
             result: None,
         };
-        if let Some(layout) = Solver::new(rules.concealed, None).layout(hands[dealer.index()])
+        if let Some(layout) = Solver::new(rules.concealed, None)
+            .locked()
+            .layout(hands[dealer.index()])
             && let Ok(hu) = u32::try_from(layout.score)
             && hu >= rules.threshold
         {
@@ -469,7 +471,7 @@ impl Round {
         // Only its drawer eats a general.
         let eater = drawer || (seat == offer.source.next() && card.rank != Rank::General);
         let eats = if eater {
-            completions(hand, card)
+            locked_completions(hand, card)
                 .into_iter()
                 .filter(|meld| match meld {
                     // Holding a pair, one pongs instead; generals stay
@@ -479,14 +481,6 @@ impl Round {
                     // `completions` lists a single only for a general.
                     Meld::Single(_) => true,
                     Meld::Triplet(_) | Meld::Quad(_) => false,
-                })
-                // A concealed triplet is locked: none of its cards may be
-                // split off into a claim.
-                .filter(|meld| {
-                    meld.cards()
-                        .without(card)
-                        .distinct()
-                        .all(|(c, _)| hand.count(c) < 3)
                 })
                 .collect()
         } else {
@@ -522,9 +516,9 @@ impl Round {
         let hand = self.hands[seat.index()];
         let exposed = &self.exposed[seat.index()];
         let base: u32 = exposed.iter().map(|m| self.rules.exposed.score(m)).sum();
-        let mut solver = Solver::new(self.rules.concealed, None);
+        let mut solver = Solver::new(self.rules.concealed, None).locked();
         let mut best: Option<(u32, Vec<Meld>)> = None;
-        for meld in completions(hand, card) {
+        for meld in locked_completions(hand, card) {
             let Some(layout) = solver.layout(hand - meld.cards().without(card)) else {
                 continue;
             };

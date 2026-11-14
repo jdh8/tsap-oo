@@ -42,7 +42,9 @@ Play it in the browser at [jdh8.github.io/tsap-oo][web]; the front end in
   threshold, ten 胡, to each other seat, and the same dealer deals again.
   No claim that would lead there is allowed (`ClaimOptions::blocked`), so it
   only follows a drawn general or a forced kong.
-- A concealed triplet is never split for a claim, and the card just claimed
+- Three or four identical cards in hand are never split, for a claim or in
+  the winning layout: 車車車馬包 (大肚) is a triplet with 馬包 loose, and wins
+  only on the fourth 車, as 車馬包 beside the triplet.  The card just claimed
   cannot be discarded in the same turn.  A claim must leave another card to
   discard that is not a general, so a hand cannot meld itself out below the
   threshold.
