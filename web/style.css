@@ -139,7 +139,7 @@ section.me { display: flex; flex-direction: column; align-items: center; gap: 0.
 .hand .group { display: flex; gap: 0.25rem; }
 .exposed { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; }
 
-/* Cards: dyed strips, piece in black, a thin inner border like the print. */
+/* Cards: dyed strips, piece in black. */
 .card {
   width: var(--card-w);
   height: var(--card-h);
@@ -154,14 +154,6 @@ section.me { display: flex; flex-direction: column; align-items: center; gap: 0.
   font-weight: 700;
   flex: none;
   position: relative;
-}
-.card::before {
-  content: "";
-  position: absolute;
-  inset: 3px;
-  border: 1px solid rgba(0, 0, 0, 0.35);
-  border-radius: 2px;
-  pointer-events: none;
 }
 /* Generals carry the coin printed on the real card.  Not dots: two dots are
    the horse's ornament. */
@@ -191,7 +183,6 @@ section.me { display: flex; flex-direction: column; align-items: center; gap: 0.
     45deg, rgba(255, 255, 255, 0.18) 0 4px, transparent 4px 8px);
   border: 2px solid #fff;
 }
-.card.back::before { display: none; }
 .card.clickable { cursor: pointer; transition: transform 0.08s; }
 .card.clickable:hover { transform: translateY(-0.4rem); }
 .card.locked { opacity: 0.5; }
@@ -227,7 +218,6 @@ button.action {
 button.action:hover { background: #ffd83a; }
 button.action:disabled { opacity: 0.45; cursor: not-allowed; background: var(--gold); }
 button.action .card { --card-w: 0.95rem; --card-h: 2.4rem; font-size: 0.85rem; box-shadow: none; }
-button.action .card::before { inset: 2px; }
 button.action.pass { background: transparent; color: inherit; border: 1px solid rgba(255, 255, 255, 0.35); }
 button.action.pass:hover { background: rgba(255, 255, 255, 0.12); }
 

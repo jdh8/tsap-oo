@@ -41,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cards.
 - `web/`: the 吃 and 碰 buttons show only the cards that leave your hand,
   never the card on the table: 吃 帥相 takes a 仕, 碰 shows your pair.
+- `web/`: cards no longer draw a thin inner frame.  On the small cards
+  (opponents, discards, claim buttons) it ran through the piece.
 
 ### Fixed
 
