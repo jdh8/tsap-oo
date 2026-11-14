@@ -43,7 +43,8 @@ the table: by itself when that is the only way, otherwise you choose between
 a bare 吃 (the general alone) and 吃 仕相, with no 過.
 
 Beside each name is the 胡 in the cards you can see there: the melds on the
-table for a bot, and those plus the best melds within your hand for you.
+table for a bot, and those plus the best melds within your hand for you,
+out of the 胡 to win (3/10 胡).
 Once a round is over the bots' hands are shown and counted too, and the
 winner shows the winning count.
 

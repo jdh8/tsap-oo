@@ -13,12 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   相公), at the same four seats and deal.
 - `web/`: a 設定 dialog (or the `s` key) to choose 十胡 or 八胡.  Applying it
   starts a new game; the choice is kept in the browser.  The game is still
-  titled 十胡; a 滿 N 胡 mark beside the title, the how-to-play sheet and
-  the 相公 message follow the table in play.
+  titled 十胡; the how-to-play sheet and the 相公 message follow the table
+  in play.
 - `web/`: each seat shows the 胡 in the cards you can see of it: the melds on
   the table for the bots, and those plus the best melds within your hand for
-  you.  Once a round is over the bots' revealed hands count too, and the
-  winner shows the winning count.
+  you, out of the 胡 to win.  Once a round is over the bots' revealed hands
+  count too, and the winner shows the winning count.
 
 ### Changed
 

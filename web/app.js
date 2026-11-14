@@ -103,10 +103,11 @@ function backEl() {
 
 // The 胡 in the cards you can see of a seat: its melds on the table, and the
 // hand too where it shows (yours, and everyone's once the round is over).
-function huEl(seat) {
+// Yours also shows the 胡 to win.
+function huEl(seat, goal) {
   const el = document.createElement('span');
   el.className = 'hu';
-  el.textContent = `${seat.hu} 胡`;
+  el.textContent = goal ? `${seat.hu}/${goal} 胡` : `${seat.hu} 胡`;
   el.title = '看得到的牌目前的胡數';
   return el;
 }
@@ -130,7 +131,7 @@ function render() {
   const slot = (seat) => SLOTS[(seat - state.human + state.seats.length) % state.seats.length];
   const finished = state.phase === 'finished';
 
-  // The threshold in force, beside the title and in the help sheet.
+  // The threshold in force, in the help sheet.
   for (const el of document.querySelectorAll('.threshold')) el.textContent = state.threshold;
 
   // Header: scores, the dealer marked.
@@ -189,7 +190,7 @@ function render() {
   } else {
     status.textContent = `等${name(state.actor)}行動…`;
   }
-  status.append(huEl(me));
+  status.append(huEl(me, state.threshold));
   const exposed = id('exposed');
   exposed.replaceChildren();
   if (me.exposed.length) exposed.append(meldsEl(me.exposed));
