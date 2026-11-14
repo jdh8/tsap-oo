@@ -212,7 +212,7 @@ function render() {
       return rest;
     };
     const claim = (label, cards, onclick, key) => {
-      const b = button(label, onclick, '', key);
+      const b = button(label, onclick, 'claim', key);
       for (const c of cards) b.append(cardEl(c));
       // Claims the rules forbid, shown so the reason is visible.
       if (!onclick) {
@@ -227,10 +227,10 @@ function render() {
     if (state.options.blocked_pong) claim('碰', pair, null);
     for (const meld of state.options.blocked_eats) claim('吃', held(meld), null);
     // A drawn general must be eaten: alone (a bare 吃) or with the 士象.
-    if (!state.options.forced) actions.append(button('過', () => show(game.pass()), 'pass', 'pass'));
+    if (!state.options.forced) actions.append(button('過', () => show(game.pass()), '', 'pass'));
   }
   if (!finished && state.actor === state.human) {
-    const b = button('提示', showHint, 'pass');
+    const b = button('提示', showHint);
     b.title = '電腦會怎麼做（h）';
     actions.append(b);
   }

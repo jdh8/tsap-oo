@@ -218,8 +218,9 @@ button.action {
 button.action:hover { background: #ffd83a; }
 button.action:disabled { opacity: 0.45; cursor: not-allowed; background: var(--gold); }
 button.action .card { --card-w: 0.95rem; --card-h: 2.4rem; font-size: 0.85rem; box-shadow: none; }
-button.action.pass { background: transparent; color: inherit; border: 1px solid rgba(255, 255, 255, 0.35); }
-button.action.pass:hover { background: rgba(255, 255, 255, 0.12); }
+/* Claims are outlined so their gold and white cards stand out; 過 and 提示 keep the gold. */
+button.action.claim { background: transparent; color: inherit; border: 1px solid rgba(255, 255, 255, 0.35); }
+button.action.claim:enabled:hover { background: rgba(255, 255, 255, 0.12); }
 
 /* The result sheet: a plain card of paper over the felt. */
 .result {
