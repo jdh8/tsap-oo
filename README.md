@@ -34,13 +34,14 @@ Play it in the browser at [jdh8.github.io/tsap-oo][web]; the front end in
   are held.  A drawn general that nobody wins on or kongs is kept by its
   drawer; generals are never ponged or eaten into a pair, and may not be
   discarded.
-- A seat with nothing to discard is a 相公: the round ends, they pay ten 胡
-  to each other seat, and the same dealer deals again.  No claim that would
-  lead there is allowed (`ClaimOptions::blocked`), so it only follows a
-  drawn general or a forced kong.
+- A seat with nothing to discard is a 相公: the round ends, they pay the
+  threshold, ten 胡, to each other seat, and the same dealer deals again.
+  No claim that would lead there is allowed (`ClaimOptions::blocked`), so it
+  only follows a drawn general or a forced kong.
 - A concealed triplet is never split for a claim, and the card just claimed
   cannot be discarded in the same turn.  A claim must leave another card to
-  discard that is not a general, so a hand cannot meld itself out below ten.
+  discard that is not a general, so a hand cannot meld itself out below the
+  threshold.
 - 胡: lone general 1, 將士象 2, 車馬包 1, soldiers of three colours 3 and of
   four 5, a triplet 3 concealed or 1 ponged, a quad 8 concealed or 6 konged,
   a pair 0.  "Concealed" means dealt and never shown; every meld formed with
@@ -49,8 +50,13 @@ Play it in the browser at [jdh8.github.io/tsap-oo][web]; the front end in
 
 These follow the mainstream Taiwanese table (the Chinese Wikipedia article
 and the common Taiwanese write-ups agree on it).  House variants — a
-different value for four-colour soldiers, the 將 parity rule, five-player
-八胡 — are not modelled; all values are fields of `Rules`.
+different value for four-colour soldiers, the 將 parity rule — are not
+modelled; all values are fields of `Rules`.
+
+八胡 is `Rules::eight()`: the same table with eight to win, and so eight for
+a 相公.  It is played here at the same table of four with the same deal; the
+five-player game it is often named for is not modelled, as the table size is
+fixed (`Seat::COUNT`).
 
 Open questions, played provisionally:
 

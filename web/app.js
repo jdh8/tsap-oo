@@ -17,6 +17,33 @@ let logged = 0; // log lines already rendered
 
 const id = (x) => document.getElementById(x);
 
+// Settings are whatever the form in #settings holds: `{name: value}` per
+// control, kept in localStorage and handed to the engine as JSON, which
+// defaults anything missing or unreadable.  A new setting is one control
+// there and one field of `Settings` in src/lib.rs.
+const SETTINGS_KEY = 'tsap-oo-settings'; // github.io shares its storage across pages
+let settings = {};
+try {
+  settings = JSON.parse(localStorage.getItem(SETTINGS_KEY)) ?? {};
+} catch {} // no storage or junk in it: the defaults
+
+function openSettings() {
+  const form = id('settings').querySelector('form');
+  for (const [name, value] of Object.entries(settings)) {
+    if (form.elements[name]) form.elements[name].value = value;
+  }
+  id('settings').showModal();
+}
+
+function applySettings(e) {
+  // ponytail: every setting is a number; parse per control when one is not
+  settings = Object.fromEntries([...new FormData(e.target)].map(([k, v]) => [k, Number(v)]));
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch {} // still applies to this visit
+  newGame();
+}
+
 async function main() {
   await init();
   id('new').onclick = newGame;
@@ -28,9 +55,12 @@ async function main() {
   id('logtoggle').onclick = toggleLog;
   id('logtoggle').textContent = '顯示紀錄';
   id('help').onclick = () => id('rules').showModal();
+  id('config').onclick = openSettings;
+  id('settings').querySelector('form').onsubmit = applySettings;
   document.addEventListener('keydown', (e) => {
-    if (e.metaKey || e.ctrlKey || id('rules').open) return;
+    if (e.metaKey || e.ctrlKey || document.querySelector('dialog[open]')) return;
     if (e.key === '?') id('rules').showModal();
+    if (e.key === 's') openSettings();
     if (e.key === 'n') newGame();
     if (e.key === 'l') toggleLog();
     if (e.key === 'h') showHint();
@@ -39,7 +69,7 @@ async function main() {
 }
 
 function newGame() {
-  game = new WebGame(String(Math.floor(Math.random() * 2 ** 53)));
+  game = new WebGame(String(Math.floor(Math.random() * 2 ** 53)), JSON.stringify(settings));
   id('log').innerHTML = '<h2>紀錄</h2>';
   logged = 0;
   show(game.snapshot());
@@ -89,6 +119,10 @@ function render() {
   const name = (seat) => state.seats[seat].name;
   const slot = (seat) => SLOTS[(seat - state.human + state.seats.length) % state.seats.length];
   const finished = state.phase === 'finished';
+
+  // The table in force, in the title and the help sheet.
+  id('title').textContent = document.title = state.threshold === 8 ? '八胡' : '十胡';
+  for (const el of document.querySelectorAll('.threshold')) el.textContent = state.threshold;
 
   // Header: scores, the dealer marked.
   const scores = id('scores');
@@ -212,7 +246,7 @@ function render() {
       h2.textContent = `${name(r.winner)}胡牌，${r.hu} 胡（${how}）`;
       result.append(h2, meldsEl(r.layout));
     } else if (r.foul != null) {
-      h2.textContent = `${name(r.foul)}相公：沒有牌可打，賠每家 10 胡`;
+      h2.textContent = `${name(r.foul)}相公：沒有牌可打，賠每家 ${state.threshold} 胡`;
       result.append(h2);
     } else {
       h2.textContent = '流局';

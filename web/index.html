@@ -9,14 +9,29 @@
 </head>
 <body class="log-hidden">
   <header>
-    <h1>十胡</h1>
+    <h1 id="title">十胡</h1>
     <div id="scores" class="scores"></div>
     <button id="new" class="quiet" title="重新發牌（n）">新局</button>
+    <button id="config" class="quiet" title="玩法設定（s）">設定</button>
     <button id="logtoggle" class="quiet" title="顯示／隱藏紀錄（l）"></button>
     <button id="help" class="quiet" title="玩法與胡數（?）">?</button>
     <a class="quiet" href="https://jdh8.github.io/">arcade</a>
   </header>
-  <!-- The values mirror `Rules::new`; the page plays no other table. -->
+  <!-- One control per setting, named for its field of `Settings` in
+       src/lib.rs.  Applying deals a new game, since scores under different
+       tables do not add up. -->
+  <dialog id="settings" class="rules" closedby="any">
+    <h2>設定</h2>
+    <form method="dialog">
+      <div class="setting"><label>玩法
+        <select name="threshold">
+          <option value="10">十胡（滿 10 胡）</option>
+          <option value="8">八胡（滿 8 胡）</option>
+        </select></label></div>
+      <button class="action">開新局</button>
+    </form>
+  </dialog>
+  <!-- The values mirror `Rules::new`; app.js fills in the threshold. -->
   <dialog id="rules" class="rules" closedby="any">
     <h2>玩法</h2>
     <ul>
@@ -28,10 +43,10 @@
       <li><b>吃</b>：只有摸牌的人和下家可以，湊成下表的組合或一對。</li>
       <li>剛吃、碰進來的牌，這一回合不能打出去（變暗的那張）。</li>
       <li><b>將帥</b>每張自成一組：摸到就自己收下，不能碰、不能吃成對，也不能打出去。</li>
-      <li><b>相公</b>：沒有牌可打（手上只剩將帥）就是相公，該局結束，賠每家 10 胡。
+      <li><b>相公</b>：沒有牌可打（手上只剩將帥）就是相公，該局結束，賠每家 <span class="threshold">10</span> 胡。
         會讓你相公的吃碰按鈕是灰的，按不下去。</li>
       <li>不知道怎麼打？按<b>提示</b>（或 <kbd>h</kbd>）看電腦在你的位置會怎麼做。</li>
-      <li>21 張牌全部排成組合，合計滿 <b>10 胡</b>就胡牌；贏家向其他三家各收自己的胡數，並當下一局的莊。</li>
+      <li>21 張牌全部排成組合，合計滿 <b><span class="threshold">10</span> 胡</b>就胡牌；贏家向其他三家各收自己的胡數，並當下一局的莊。</li>
       <li>牌堆剩最後 6 張時流局，莊家連莊。</li>
     </ul>
     <h2>胡數</h2>

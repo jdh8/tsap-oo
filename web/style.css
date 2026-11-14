@@ -260,6 +260,8 @@ button.action.pass:hover { background: rgba(255, 255, 255, 0.12); }
 .rules .card { display: inline-flex; margin-right: 0.15rem; --card-w: 1.1rem; --card-h: 2.8rem; font-size: 0.9rem; }
 .rules p { font-size: 0.85rem; opacity: 0.8; }
 .rules form { text-align: center; }
+.rules .setting { margin: 0 0 0.8rem; }
+.rules select { font: inherit; }
 
 .log {
   grid-area: log;

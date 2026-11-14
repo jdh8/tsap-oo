@@ -248,7 +248,16 @@ mod playouts {
     /// every win reaches the threshold.
     #[test]
     fn bots_finish_rounds() {
-        let rules = Rules::new();
+        playout(Rules::new());
+    }
+
+    /// The same under 八胡: nothing in the engine assumes ten.
+    #[test]
+    fn bots_finish_rounds_of_eight() {
+        playout(Rules::eight());
+    }
+
+    fn playout(rules: Rules) {
         let mut game = Game::new(rules, FIRST);
         let mut rng = SmallRng::seed_from_u64(2026);
         let (mut wins, mut exhausted, mut fouls) = (0, 0, 0);

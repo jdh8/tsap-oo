@@ -1,4 +1,4 @@
-//! Browser front end for 十胡: one human against three greedy bots.
+//! Browser front end for 十胡 and 八胡: one human against three greedy bots.
 //!
 //! The engine holds the whole game; JS is a thin renderer that calls one
 //! method per user action or bot step and redraws from the JSON snapshot
@@ -6,7 +6,7 @@
 
 use rand::rngs::StdRng;
 use rand::{RngExt as _, SeedableRng as _};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tsap_oo::susik::{Card, Color, Hand, Meld, Solver};
 use tsap_oo::{
     Claim, Event, Game, HeuristicBot, Phase, Round, Rules, Seat, Strategy, Table, View, discardable,
@@ -19,6 +19,41 @@ const HUMAN: Seat = Seat::ALL[0];
 fn name(seat: Seat) -> &'static str {
     const NAMES: [&str; Seat::COUNT] = ["你", "下家", "對家", "上家"];
     NAMES[(seat.index() + Seat::COUNT - HUMAN.index()) % Seat::COUNT]
+}
+
+// ---------------------------------------------------------------------------
+// Settings: what the page's settings form sends
+// ---------------------------------------------------------------------------
+
+/// One field per control of the page's settings form, named alike.  Absent
+/// fields take their defaults, so a stored settings object from an older
+/// page still loads.
+#[derive(Deserialize)]
+#[serde(default)]
+struct Settings {
+    /// 胡 to win: 10 for 十胡, 8 for 八胡
+    threshold: u32,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            threshold: Rules::new().threshold,
+        }
+    }
+}
+
+impl Settings {
+    /// From the page's JSON; anything unreadable is the default table
+    fn parse(json: &str) -> Self {
+        serde_json::from_str(json).unwrap_or_default()
+    }
+
+    fn rules(&self) -> Rules {
+        let mut rules = Rules::new();
+        rules.threshold = self.threshold;
+        rules
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -115,6 +150,8 @@ struct Snapshot {
     actor: Option<usize>,
     human: usize,
     dealer: usize,
+    /// 胡 to win, for the page's wording
+    threshold: u32,
     pile: usize,
     scores: [i32; Seat::COUNT],
     seats: Vec<SeatJson>,
@@ -171,6 +208,7 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
         actor,
         human: HUMAN.index(),
         dealer: round.dealer().index(),
+        threshold: game.rules().threshold,
         pile: round.pile_len(),
         scores: game.scores(),
         seats: Seat::ALL
@@ -228,9 +266,12 @@ struct Core {
 }
 
 impl Core {
-    fn new(seed: u64) -> Self {
+    fn new(seed: u64, settings: &Settings) -> Self {
         let mut rng = StdRng::seed_from_u64(seed);
-        let game = Game::new(Rules::new(), Seat::ALL[rng.random_range(..Seat::ALL.len())]);
+        let game = Game::new(
+            settings.rules(),
+            Seat::ALL[rng.random_range(..Seat::ALL.len())],
+        );
         let table = Self::seat(&game, &mut rng);
         Self { game, table, rng }
     }
@@ -317,12 +358,13 @@ pub struct WebGame {
 
 #[wasm_bindgen]
 impl WebGame {
-    /// `seed` is a decimal string from JS (wasm has no entropy)
+    /// `seed` is a decimal string from JS (wasm has no entropy); `settings`
+    /// is the settings form as JSON, e.g. `{"threshold":8}`
     #[wasm_bindgen(constructor)]
     #[must_use]
-    pub fn new(seed: &str) -> Self {
+    pub fn new(seed: &str, settings: &str) -> Self {
         Self {
-            core: Core::new(seed.parse().unwrap_or(0)),
+            core: Core::new(seed.parse().unwrap_or(0), &Settings::parse(settings)),
         }
     }
 
@@ -381,11 +423,22 @@ mod tests {
     use super::*;
     use tsap_oo::Step;
 
+    /// The settings JSON picks the table; junk and absent fields default.
+    #[test]
+    fn settings_pick_the_threshold() {
+        assert_eq!(Settings::parse("junk").threshold, 10);
+        assert_eq!(Settings::parse("{}").threshold, 10);
+        let core = Core::new(7, &Settings::parse(r#"{"threshold":8}"#));
+        let value: serde_json::Value = serde_json::from_str(&core.snapshot()).unwrap();
+        assert_eq!(value["threshold"], 8);
+        assert_eq!(core.game.rules(), &Rules::eight());
+    }
+
     /// Drive whole rounds: the bots step, the human passes every claim and
     /// discards their first legal card, and every snapshot serializes.
     #[test]
     fn human_can_muddle_through() {
-        let mut core = Core::new(7);
+        let mut core = Core::new(7, &Settings::default());
         let mut rounds = 0;
         while rounds < 5 {
             let json = core.snapshot();

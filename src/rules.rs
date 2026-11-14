@@ -9,7 +9,7 @@ use susik::Values;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct Rules {
-    /// Minimum 胡 to win, the eponymous ten
+    /// Minimum 胡 to win: the eponymous ten, or eight in 八胡
     pub threshold: u32,
     /// Cards at the bottom of the pile that are never drawn (廢牌); a round
     /// that reaches them is exhausted
@@ -49,6 +49,18 @@ impl Rules {
                 ..concealed
             },
         }
+    }
+}
+
+impl Rules {
+    /// 八胡: the same table with eight to win
+    ///
+    /// A 相公 pays the threshold, so eight here too.
+    #[must_use]
+    pub const fn eight() -> Self {
+        let mut rules = Self::new();
+        rules.threshold = 8;
+        rules
     }
 }
 
