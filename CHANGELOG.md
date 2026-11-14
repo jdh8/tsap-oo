@@ -49,6 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `web/`: the 莊 mark beside your own score no longer drops below it.
+- `web/`: the result sheet shows the winner's melds in two rows: the exposed
+  melds ending with the winning card's meld, then the concealed ones.  A
+  single wrapping row could put a concealed meld among the exposed.
 
 ## [0.1.0] - 2026-11-14
 

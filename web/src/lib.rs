@@ -152,7 +152,11 @@ struct ResultJson {
     winner: Option<usize>,
     foul: Option<usize>,
     hu: u32,
-    layout: Vec<Vec<CardJson>>,
+    /// The winner's melds on the table, ending with the meld of the winning
+    /// card: that card is public whoever turned it up
+    exposed: Vec<Vec<CardJson>>,
+    /// The winner's melds from the hand
+    concealed: Vec<Vec<CardJson>>,
     winning_card: Option<CardJson>,
     from: Option<usize>,
 }
@@ -262,13 +266,20 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
             })
             .collect(),
         log: round.events().iter().map(describe).collect(),
-        result: round.result().map(|result| ResultJson {
-            winner: result.winner.map(Seat::index),
-            foul: result.foul.map(Seat::index),
-            hu: result.hu,
-            layout: result.layout.iter().map(cards).collect(),
-            winning_card: result.winning_card.map(CardJson::from),
-            from: result.from.map(Seat::index),
+        result: round.result().map(|result| {
+            let public = result.winner.map_or(0, |seat| {
+                round.exposed(seat).len() + usize::from(result.winning_card.is_some())
+            });
+            let (exposed, concealed) = result.layout.split_at(public);
+            ResultJson {
+                winner: result.winner.map(Seat::index),
+                foul: result.foul.map(Seat::index),
+                hu: result.hu,
+                exposed: exposed.iter().map(cards).collect(),
+                concealed: concealed.iter().map(cards).collect(),
+                winning_card: result.winning_card.map(CardJson::from),
+                from: result.from.map(Seat::index),
+            }
         }),
     }
 }
@@ -492,7 +503,17 @@ mod tests {
             );
             match core.table.round().phase() {
                 Phase::Finished => {
-                    assert!(value["result"].is_object());
+                    let result = &value["result"];
+                    if let Some(card) = result["winning_card"].as_object() {
+                        let last = result["exposed"].as_array().unwrap().last().unwrap();
+                        assert!(
+                            last.as_array()
+                                .unwrap()
+                                .iter()
+                                .any(|c| c["code"] == card["code"]),
+                            "the winning card's meld closes the exposed row"
+                        );
+                    }
                     assert!(
                         value["seats"][HUMAN.next().index()]["hand"].is_array(),
                         "bots reveal at the end"

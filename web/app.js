@@ -254,7 +254,7 @@ function render() {
     if (r.winner != null) {
       const how = r.from != null ? `${name(r.from)}${r.winning_card ? '放' : ''}` : r.winning_card ? '自摸' : '天胡';
       h2.textContent = `${name(r.winner)}胡牌，${r.hu} 胡（${how}）`;
-      result.append(h2, meldsEl(r.layout));
+      result.append(h2, meldsEl(r.exposed), meldsEl(r.concealed));
     } else if (r.foul != null) {
       h2.textContent = `${name(r.foul)}相公：沒有牌可打，賠每家 ${state.threshold} 胡`;
       result.append(h2);
