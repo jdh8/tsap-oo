@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with nothing first, 兵卒 and 士象 before 車馬包, so they are not left to
   finish another seat's hand late.  A card beside three or four alike is
   alone, since those never eat: 車車 馬 is a 搭子, 車車車 馬 is not.  Against
-  the previous bot, two seats each, it wins about 54% of the decided rounds.
+  the previous bot, two seats each, it wins about 57% of the decided rounds.
 - `HeuristicBot` no longer melds itself dead: it refuses any claim or
   discard after which the hand could not reach the threshold even with a
   general for every card it gave up.  Every 相公 came from such a hand; four
