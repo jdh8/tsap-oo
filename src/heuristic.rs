@@ -1,5 +1,6 @@
 //! A greedy bot.
 
+use crate::Seat;
 use crate::round::{Claim, ClaimOptions, discardable};
 use crate::rules::Rules;
 use crate::strategy::Strategy;
@@ -15,11 +16,17 @@ const WEIGHT: i32 = 4;
 // solver returning the whole frontier would be exact.
 const COSTS: [u32; 2] = [1, 16];
 
-/// How many times a 胡 outweighs a 胡 of [`HeuristicBot::prospects`]: the
-/// loose cards only settle what the melds leave open.
-// ponytail: one knob found by arena play, like `COSTS`; counting the live
-// cards that would finish each 搭子 is the upgrade.
-const SCALE: i32 = 8;
+/// What a 胡 is worth in the units of [`prospects`]: the loose cards only
+/// settle what the melds leave open.
+// ponytail: one knob found by arena play, like `COSTS` and `OWN`.
+const SCALE: i32 = 32;
+
+/// What each unseen copy of a loose card adds to its grade.
+const OWN: i32 = 2;
+
+/// Copies of a card in the deck, and the most finishing cards a 搭子 is
+/// graded on.
+const COPIES: i32 = 4;
 
 /// What a dead hand costs: more than any hand is worth, so one is kept only
 /// when every choice is dead.
@@ -30,12 +37,14 @@ const DEAD: i32 = 1000;
 /// grades highest
 ///
 /// A hand that already holds its ten races to meld its loose cards; one
-/// that does not keeps the melds that can still reach ten.  Among loose
-/// cards it keeps the 搭子, two cards one short of a meld, dearest meld
-/// first, and sheds the cards that go with nothing, starting with the ones
-/// another seat would most like to pick up late.  It is
-/// deterministic and looks one decision ahead.  It never reasons about
-/// other seats or the pile.
+/// that does not keeps the melds that can still reach ten, counting the 胡
+/// of each 搭子, two cards one short of a meld, that a card not yet seen
+/// could finish.  Among loose cards it keeps the 搭子, the dearer the meld
+/// and the more cards left to finish it the longer, and sheds the cards that
+/// go with nothing, starting with the ones another seat would most like to
+/// pick up late.  It counts the cards it has seen — its own, the melds on
+/// the table, the discards — but never guesses at another seat's hand.  It
+/// is deterministic and looks one decision ahead.
 #[derive(Debug, Clone)]
 pub struct HeuristicBot {
     solvers: [Solver; 2],
@@ -48,6 +57,8 @@ pub struct HeuristicBot {
     general: i32,
     /// 胡 of the meld a loose card of each [`family`] would be eaten into
     eaten: [i32; 3],
+    /// The cards the seat has not seen: in other hands or the pile
+    live: Hand,
 }
 
 impl HeuristicBot {
@@ -66,6 +77,7 @@ impl HeuristicBot {
                 rules.exposed.three_soldiers,
             ]
             .map(to_i32),
+            live: Hand::EMPTY,
         }
     }
 
@@ -74,6 +86,13 @@ impl HeuristicBot {
         for solver in self.solvers.iter_mut().chain([&mut self.surplus]) {
             solver.clear();
         }
+        let shown = Seat::ALL
+            .into_iter()
+            .flat_map(|seat| view.exposed(seat))
+            .flat_map(|meld| meld.cards())
+            .chain(view.discards().iter().map(|&(_, card)| card))
+            .chain(view.offer().map(|offer| offer.card));
+        self.live = shown.fold(Hand::FULL - view.hand(), Hand::without);
         let have: u32 = view
             .exposed(view.seat())
             .iter()
@@ -114,8 +133,10 @@ impl HeuristicBot {
                     .expect("layouts with loose cards always exist");
                 let loose = to_i32(layout.loose.len());
                 let hu = layout.score + to_i32(cost) * loose;
-                SCALE * (hu - WEIGHT * (loose + (need - hu).max(0)))
-                    + prospects(hand, &layout, self.eaten)
+                let (grade, hope) = prospects(hand, &layout, self.live, self.eaten, self.general);
+                // In half-胡, like `hope`.
+                let short = (2 * (need - hu) - hope).max(0);
+                SCALE * (2 * (hu - WEIGHT * loose) - WEIGHT * short) / 2 + grade
             })
             .max()
             .expect("two solvers")
@@ -140,18 +161,30 @@ const fn family(rank: Rank) -> usize {
     }
 }
 
-/// What the loose cards of `layout` promise: for each, the 胡 of the meld
-/// it would be eaten into (`eaten`, by [`family`]), added if the hand holds
-/// a second card of that meld and taken off if it does not
+/// What the loose cards of `layout` promise: a grade to tell hands of the
+/// same melds apart, and the half-胡 they may yet bring
 ///
-/// So a 搭子 is kept, soldiers before 將士象 before 車馬包, and of the cards
-/// that go with nothing the dearest goes first, before it can finish
-/// another seat's hand.  The second card may be a lone general or one of a
-/// pair — 車車 馬 still eats a 包 — but not one of three or four alike,
-/// which are locked and never eat.  Nor does the pair count when the hand
-/// holds three of every card that would finish the meld: the fourth can
-/// only come as a kong.
-fn prospects(hand: Hand, layout: &Layout, eaten: [i32; 3]) -> i32 {
+/// A loose card is one of a 搭子 when the hand holds a second card of its
+/// meld and a third is `live`, not yet seen.  It is then graded at the 胡
+/// of the meld it would be eaten into (`eaten`, by [`family`]) for each live
+/// card that would finish it, up to [`COPIES`], and promises half that 胡:
+/// the other half is its partner's.  So a 搭子 is kept, soldiers before
+/// 將士象 before 車馬包, and the one with more cards left to come before the
+/// one with fewer.
+///
+/// A card that goes with nothing is graded that far below nothing, so the
+/// dearest goes first, before it can finish another seat's hand.  Either
+/// way a card is worth [`OWN`] more for each live copy of itself, which
+/// would pair it.
+///
+/// The second card may be a lone general or one of a pair — 車車 馬 still
+/// eats a 包 — but not one of three or four alike, which are locked and
+/// never eat; nor does a card finish the meld when the hand holds three of
+/// it, since the fourth can only come as a kong.  士象 without their general
+/// are the poorest 搭子: only the seat's own draw brings a general, so half
+/// the live ones count, and a general is worth `general` alone, so the 士象
+/// add only the rest of the meld.
+fn prospects(hand: Hand, layout: &Layout, live: Hand, eaten: [i32; 3], general: i32) -> (i32, i32) {
     let free = layout
         .melds
         .iter()
@@ -168,15 +201,27 @@ fn prospects(hand: Hand, layout: &Layout, eaten: [i32; 3]) -> i32 {
                     && (card.rank == Rank::Soldier || other.color == card.color)
                     && hand.count(other) < 3
             };
-            let paired = free.distinct().any(|(other, _)| {
-                mate(other)
-                    && Hand::FULL
-                        .distinct()
-                        .any(|(third, _)| third != other && mate(third))
-            });
-            if paired { eaten[kin] } else { -eaten[kin] }
+            let finishers: i32 = Hand::FULL
+                .distinct()
+                .filter(|&(third, _)| {
+                    mate(third)
+                        && free
+                            .distinct()
+                            .any(|(other, _)| other != third && mate(other))
+                })
+                .map(|(third, _)| i32::from(live.count(third)))
+                .sum();
+            let own = OWN * i32::from(live.count(card));
+            if finishers == 0 {
+                (own - COPIES * eaten[kin], 0)
+            } else if kin == 0 && !hand.contains(Card::new(card.color, Rank::General)) {
+                let worth = eaten[kin] - general;
+                (own + ((finishers + 1) / 2).min(COPIES) * worth, worth)
+            } else {
+                (own + finishers.min(COPIES) * eaten[kin], eaten[kin])
+            }
         })
-        .sum()
+        .fold((0, 0), |sum, (grade, hope)| (sum.0 + grade, sum.1 + hope))
 }
 
 /// What each meld is worth beyond a general for every card in it
@@ -269,21 +314,32 @@ mod tests {
         let rules = Rules::new();
         let bot = HeuristicBot::new(&rules);
         let mut solver = Solver::new(rules.concealed, Some(1));
-        for (hand, worth) in [
-            ("俥傌...", 2),          // a 搭子, counted once a card
-            ("俥俥傌...", 1),        // one of a pair still eats
-            ("俥俥俥傌...", -1),     // three alike are locked
-            ("俥俥傌炮炮炮...", -1), // and so is the 炮 this would eat
-            ("兵兵..卒.", 3),        // soldiers work the same way
-            ("兵兵兵..卒.", -3),
-            ("帥仕...", 2), // a general is company
-            ("仕...", -2),  // alone, the dearer card goes first
-            ("傌...", -1),
-            ("兵...", -3),
-        ] {
+        let mut prospects = |hand: &str, seen: &str| {
             let hand: Hand = hand.parse().unwrap();
+            let live = Hand::FULL - hand - seen.parse().unwrap();
             let layout = solver.layout(hand).unwrap();
-            assert_eq!(prospects(hand, &layout, bot.eaten), worth, "{hand}");
+            super::prospects(hand, &layout, live, bot.eaten, bot.general)
+        };
+        // (hand, its grade, the half-胡 it hopes for) with nothing else seen
+        for (hand, grade, hope) in [
+            ("俥傌...", 20, 2),        // a 搭子: four 炮 and three copies each
+            ("俥俥傌...", 10, 1),      // one of a pair still eats
+            ("俥俥俥傌...", 2, 0),     // three alike are locked
+            ("俥俥傌炮炮炮...", 2, 0), // and so is the 炮 this would eat
+            ("兵兵..卒.", 18, 3),      // soldiers work the same way
+            ("兵兵兵..卒.", -6, 0),
+            ("帥仕...", 14, 2), // a general is company
+            ("仕相...", 16, 2), // 士象 beg for theirs, below 車馬
+            ("仕...", -2, 0),   // alone, the dearer card goes first
+            ("傌...", 2, 0),
+            ("兵...", -6, 0),
+        ] {
+            assert_eq!(prospects(hand, "..."), (grade, hope), "{hand}");
         }
+        // A 搭子 fades with its finishing cards and dies with the last.
+        assert_eq!(prospects("俥傌...", "炮炮..."), (16, 2));
+        assert_eq!(prospects("俥傌...", "炮炮炮炮..."), (4, 0));
+        // A copy seen is one fewer to pair with.
+        assert_eq!(prospects("傌...", "傌傌..."), (-2, 0));
     }
 }

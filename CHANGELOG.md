@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   alone, since those never eat: 車車 馬 is a 搭子, 車車車 馬 is not, and
   neither is 車車 馬 beside 包包包, whose fourth 包 can only kong.  Against
   the previous bot, two seats each, it wins about 57% of the decided rounds.
+- `HeuristicBot` counts the cards it has seen: its own, the melds on the
+  table and the discards.  A 搭子 is worth more the more cards are left to
+  finish it and nothing once they are all out; a loose card is worth a
+  little for each copy of itself still to come.  A hand short of the
+  threshold counts the 胡 its live 搭子 would bring towards it.  士象
+  without their general rank below a 車馬包 搭子: only the seat's own draw
+  brings a general, and it is worth a 胡 alone anyway.  Against the
+  previous bot, two seats each, it wins about 52% of the decided rounds.
 - `HeuristicBot` no longer melds itself dead: it refuses any claim or
   discard after which the hand could not reach the threshold even with a
   general for every card it gave up.  Every 相公 came from such a hand; four
