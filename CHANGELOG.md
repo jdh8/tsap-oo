@@ -73,7 +73,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   split when a hand is laid out.  A win could count 俥俥 and 俥傌炮, or take
   傌 with a 俥 and 炮 out of the triplet; the bots graded hands that way, and
   `web/` grouped and counted yours that way.  Needs susik 0.1.1 for
-  `Solver::locked`.
+  `Solver::locked`.  Against the bot that split them, two seats each, the
+  bot wins about 50.6% of the decided rounds; against the 0.1.0 bot, with
+  every change above, about 60%.
 - `web/`: the 莊 mark beside your own score no longer drops below it.
 - `web/`: the result sheet shows the winner's melds in two rows: the exposed
   melds ending with the winning card's meld, then the concealed ones.  A
