@@ -24,6 +24,14 @@ const SCALE: i32 = 32;
 /// What each unseen copy of a loose card adds to its grade.
 const OWN: i32 = 2;
 
+/// What the draw is worth that the next seat gives up by claiming, in the
+/// units of [`prospects`]: without it, eating into a meld the hand already
+/// holds grades as a gain whenever the card set loose is a milder one than
+/// the discard.
+// ponytail: one knob, flat from 2 to 4 胡 on 20000 paired deals; grading
+// every card the draw could be would be exact.
+const DRAW: i32 = 3 * SCALE;
+
 /// Copies of a card in the deck, and the most finishing cards a 搭子 is
 /// graded on.
 const COPIES: i32 = 4;
@@ -44,7 +52,8 @@ const DEAD: i32 = 1000;
 /// go with nothing, starting with the ones another seat would most like to
 /// pick up late.  It counts the cards it has seen — its own, the melds on
 /// the table, the discards — but never guesses at another seat's hand.  It
-/// is deterministic and looks one decision ahead.
+/// is deterministic and looks one decision ahead, but for the draw it would
+/// forgo: the seat next to draw leaves a card that barely helps and draws.
 #[derive(Debug, Clone)]
 pub struct HeuristicBot {
     solvers: [Solver; 2],
@@ -249,9 +258,16 @@ impl HeuristicBot {
     pub(crate) fn claims(&mut self, view: &View<'_>, options: &ClaimOptions) -> Vec<Claim> {
         let need = self.start(view);
         let hand = view.hand();
-        let card = view.offer().expect("claims answer an offer").card;
+        let offer = view.offer().expect("claims answer an offer");
+        let card = offer.card;
         // A drawn general cannot be passed.
-        let pass = (!options.forced()).then(|| (self.value(hand, need), Claim::Pass));
+        // Passing brings the next seat a draw; a claim must beat that too.
+        let draw = if view.seat() == offer.source.next() {
+            DRAW
+        } else {
+            0
+        };
+        let pass = (!options.forced()).then(|| (self.value(hand, need) + draw, Claim::Pass));
         let melds = options
             .pong
             .then_some((Meld::Triplet(card), Claim::Pong))

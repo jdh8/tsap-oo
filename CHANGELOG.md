@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `HeuristicBot`, and so the web hint, no longer eats a card into a meld
+  the hand already holds whole — a 俥 into 俥傌炮 with no second 俥.  Passing
+  was graded as if no draw followed, so trading a loose card for a milder
+  one looked like a gain; the seat next to draw now claims only what beats
+  the draw by 3 胡 of grade.  A/B against `6fc8f21`, the new bot in one
+  seat among three old ones and four old ones on the same 200000 deals
+  (seed base 1794765506): +0.283 ± 0.018 points a deal, 95% CI [+0.249,
+  +0.318], and 25.05% of deals won where the old bot wins 24.50%.
 - `web/`: a meld on the table shows the card it took from the table in the
   middle, as a mahjong table lays out an eat — 車 eaten with 馬包 reads
   馬車包 — and so does the meld of the winning card.  Of four soldiers it is

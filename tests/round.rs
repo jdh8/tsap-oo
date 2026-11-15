@@ -1,7 +1,10 @@
 //! Scripted deals reaching every claim, the forced kong, a win, and 天胡
 
 use susik::{Card, Color, Hand, Meld};
-use tsap_oo::{Claim, ClaimOptions, Event, Phase, Round, RoundError, Rules, Seat, discardable};
+use tsap_oo::{
+    Claim, ClaimOptions, Event, HeuristicBot, Phase, Round, RoundError, Rules, Seat, Strategy,
+    View, discardable,
+};
 
 const FIRST: Seat = Seat::ALL[0];
 const SECOND: Seat = Seat::ALL[1];
@@ -355,4 +358,27 @@ fn a_determinized_round_looks_the_same() {
         assert_eq!(world.hand(seat).len(), round.hand(seat).len());
     }
     assert_ne!(world.hand(THIRD), round.hand(THIRD));
+}
+
+#[test]
+fn the_greedy_bot_draws_rather_than_eat_into_a_meld_it_holds() {
+    // Second holds 俥傌炮 in yellow and nothing else to go with a 炮.  Eating
+    // First's 炮 would only swap a loose card for it and cost the draw.
+    let second = hand("帥仕兵兵.帥仕相相俥傌炮兵.將馬馬包包.將包卒");
+    let offered = card("黃炮");
+    // Deal the rest in turn, so no other seat holds more than two alike.
+    let mut others = [Hand::EMPTY; 3];
+    let rest = Hand::FULL - second - Hand::EMPTY.with(offered);
+    for (i, card) in rest.iter().take(60).enumerate() {
+        others[i % 3].insert(card);
+    }
+    let [first, third, fourth] = others;
+    let hands = [first.with(offered), second, third, fourth];
+    let mut round = Round::from_pile(Rules::new(), FIRST, pile(hands)).unwrap();
+    round.discard(FIRST, offered).unwrap();
+    assert_eq!(round.phase(), Phase::Claim(SECOND));
+    let options = round.claim_options(SECOND);
+    assert!(options.eats.contains(&Meld::Field(Color::Yellow)));
+    let mut bot = HeuristicBot::new(&Rules::new());
+    assert_eq!(bot.claim(&View::new(&round, SECOND), &options), Claim::Pass);
 }
