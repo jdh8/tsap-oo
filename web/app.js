@@ -279,12 +279,18 @@ function render() {
 }
 
 // Ring what a bot would do here: a card in your hand or a claim button.  The
-// ring lasts until the next render, i.e. for this one decision.
+// ring lasts until the next render, i.e. for this one decision.  Of several
+// copies of the card it takes the last: the loose cards are the last group,
+// so a loose copy is ringed before one sitting in a meld.
 function showHint() {
   const hint = game.hint();
   if (!hint) return;
-  document
-    .querySelector(`#hand [data-code="${hint}"]:not(.locked), #actions [data-hint="${hint}"]`)
+  [
+    ...document.querySelectorAll(
+      `#hand [data-code="${hint}"]:not(.locked), #actions [data-hint="${hint}"]`,
+    ),
+  ]
+    .at(-1)
     ?.classList.add('hint');
 }
 

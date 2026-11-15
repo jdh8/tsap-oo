@@ -58,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   middle, as a mahjong table lays out an eat — 車 eaten with 馬包 reads
   馬車包 — and so does the meld of the winning card.  Of four soldiers it is
   the second from the left.
+- `web/`: 提示 rings the loose copy of the card to discard when your hand
+  also holds one in a meld.
 
 ## [0.2.0] - 2026-11-15
 
