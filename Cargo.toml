@@ -1,6 +1,6 @@
 [package]
 name = "tsap-oo"
-version = "0.2.1"
+version = "0.3.0-dev"
 authors = ["Chen-Pang He (https://jdh8.org)"]
 edition = "2024"
 rust-version = "1.93"
