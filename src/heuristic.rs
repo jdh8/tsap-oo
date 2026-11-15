@@ -244,9 +244,10 @@ const fn family(rank: Rank) -> usize {
 /// eats a 包 — but not one of three or four alike, which are locked and
 /// never eat; nor does a card finish the meld when the hand holds three of
 /// it, since the fourth can only come as a kong.  士象 without their general
-/// are the poorest 搭子: only the seat's own draw brings a general, so half
-/// the live ones count, and a general is worth `general` alone, so the 士象
-/// add only the rest of the meld.
+/// are the poorest 搭子: only the seat's own draw brings a general and no
+/// seat ever discards one, so they are graded as if a single card were left
+/// to finish them, and a general is worth `general` alone, so the 士象 add
+/// only the rest of the meld.
 fn prospects(hand: Hand, layout: &Layout, live: Hand, eaten: [i32; 3], general: i32) -> (i32, i32) {
     let free = layout
         .melds
@@ -279,7 +280,7 @@ fn prospects(hand: Hand, layout: &Layout, live: Hand, eaten: [i32; 3], general: 
                 (own - COPIES * eaten[kin], 0)
             } else if kin == 0 && !hand.contains(Card::new(card.color, Rank::General)) {
                 let worth = eaten[kin] - general;
-                (own + ((finishers + 1) / 2).min(COPIES) * worth, worth)
+                (own + worth, worth)
             } else {
                 (own + finishers.min(COPIES) * eaten[kin], eaten[kin])
             }
@@ -429,7 +430,7 @@ mod tests {
             ("兵兵..卒.", 18, 3),      // soldiers work the same way
             ("兵兵兵..卒.", -6, 0),
             ("帥仕...", 14, 2), // a general is company
-            ("仕相...", 16, 2), // 士象 beg for theirs, below 車馬
+            ("仕相...", 14, 2), // 士象 beg for theirs, below 車馬
             ("仕...", -2, 0),   // alone, the dearer card goes first
             ("傌...", 2, 0),
             ("兵...", -6, 0),

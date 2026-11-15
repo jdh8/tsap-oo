@@ -42,6 +42,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   points a deal, 95% CI [+0.049, +0.108], a win; 24.41% of deals won where
   the old bot wins 24.28%.  A round of four such bots takes about six times
   as long, 15 ms where it took 2.3 ms.
+- `HeuristicBot`, and so the web hint, holds 士象 without their general
+  less dearly.  Only the seat's own draw brings a general and no seat
+  discards one, yet the pair was graded on half the generals not yet seen;
+  it is now graded as if one card were left to finish it.  A/B against
+  `d74b170`, the new bot in one seat among three old ones and four old ones
+  on the same 200000 deals (seed base 1794771322): +0.012 ± 0.006 points a
+  deal, 95% CI [+0.001, +0.023], a win; 1538 deals differ, and 24.19% are
+  won where the old bot wins 24.16%.  Tried beside it and dropped: grading
+  the 士 or 象 next to its general for two cards, a loss alone (seed base
+  1794770832: −0.050 ± 0.015, 95% CI [−0.079, −0.020]) and inconclusive
+  with this change (seed base 1794770336: −0.027 ± 0.016, 95% CI [−0.058,
+  +0.004]).
 - `web/`: a meld on the table shows the card it took from the table in the
   middle, as a mahjong table lays out an eat — 車 eaten with 馬包 reads
   馬車包 — and so does the meld of the winning card.  Of four soldiers it is
