@@ -453,6 +453,47 @@ impl Round {
         Ok(())
     }
 
+    /// The round with the cards `seat` cannot see — the other hands and the
+    /// pile — dealt afresh; see [`View::determinize`](crate::View::determinize)
+    #[cfg(feature = "rand")]
+    pub(crate) fn determinize(&self, seat: Seat, rng: &mut (impl rand::Rng + ?Sized)) -> Self {
+        use rand::seq::SliceRandom as _;
+
+        // A staked eat was declared aloud: its cards stay with the eater.
+        let held = |other: Seat| match (self.eat, self.offer) {
+            (Some((eater, meld)), Some(offer)) if eater == other => {
+                meld.cards().without(offer.card)
+            }
+            _ => Hand::EMPTY,
+        };
+        let others = Seat::ALL.into_iter().filter(|&other| other != seat);
+        let mut unseen: Vec<Card> = others
+            .clone()
+            .flat_map(|other| (self.hands[other.index()] - held(other)).iter())
+            .chain(self.pile.iter().copied())
+            .collect();
+        unseen.shuffle(rng);
+        let mut round = self.clone();
+        for other in others {
+            let mut hand = held(other);
+            let n = self.hands[other.index()].len() - hand.len();
+            hand.extend(unseen.drain(..n));
+            round.hands[other.index()] = hand;
+        }
+        round.pile = unseen;
+        // Who is asked after `seat` depends on the hands just dealt.
+        if let (Phase::Claim(_), Some(offer)) = (round.phase, round.offer) {
+            let later: Vec<Seat> = Self::order(offer)
+                .skip_while(|&other| other != seat)
+                .skip(1)
+                .filter(|&other| !round.options_for(offer, other).is_empty())
+                .collect();
+            round.queue.truncate(1);
+            round.queue.extend(later);
+        }
+        round
+    }
+
     /// The seats a public card is offered to, in priority order
     fn order(offer: Offer) -> impl Iterator<Item = Seat> {
         let (start, n) = if offer.drawn {

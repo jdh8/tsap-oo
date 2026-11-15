@@ -91,10 +91,13 @@ Open questions, played provisionally:
 - [`view`][mod-view], [`strategy`][mod-strategy], [`driver`][mod-driver]:
   [`View`], [`Strategy`], [`Table`]
 - [`heuristic`][mod-heuristic]: [`HeuristicBot`]
+- `montecarlo`: `MonteCarloBot`, which samples the unseen cards and plays
+  each choice out (feature `rand`)
 
 ## Feature flags
 
-- `rand` (default): shuffled dealing (`Round::deal`, `Game::deal`)
+- `rand` (default): shuffled dealing (`Round::deal`, `Game::deal`) and the
+  sampling `MonteCarloBot`
 
 ## Quick start
 
@@ -121,7 +124,8 @@ match result.winner {
 ## Examples
 
 - `arena`: bots play many rounds and report the outcomes
-  (`cargo run --release --example arena -- 1000`)
+  (`cargo run --release --example arena -- 1000`); a second argument seats
+  a Monte Carlo bot of that many samples first
 
 [mod-rules]: https://docs.rs/tsap-oo/latest/tsap_oo/rules/index.html
 [mod-round]: https://docs.rs/tsap-oo/latest/tsap_oo/round/index.html

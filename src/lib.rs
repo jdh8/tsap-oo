@@ -4,6 +4,8 @@
 pub mod driver;
 pub mod game;
 pub mod heuristic;
+#[cfg(feature = "rand")]
+pub mod montecarlo;
 pub mod round;
 pub mod rules;
 pub mod strategy;
@@ -12,6 +14,8 @@ pub mod view;
 pub use driver::{Step, Table};
 pub use game::Game;
 pub use heuristic::HeuristicBot;
+#[cfg(feature = "rand")]
+pub use montecarlo::MonteCarloBot;
 pub use round::{
     Claim, ClaimOptions, DealError, Event, Offer, Phase, Round, RoundError, RoundResult,
     discardable,

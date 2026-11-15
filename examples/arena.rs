@@ -3,16 +3,23 @@
 //! ```console
 //! cargo run --release --example arena -- 1000
 //! ```
+//!
+//! A second argument seats a Monte Carlo bot of that many samples first:
+//!
+//! ```console
+//! cargo run --release --example arena -- 100 16
+//! ```
 
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
-use tsap_oo::{Game, HeuristicBot, Rules, Seat, Step, Table};
+use tsap_oo::{Game, HeuristicBot, MonteCarloBot, Rules, Seat, Step, Strategy, Table};
 
 fn main() {
     let rounds: usize = std::env::args()
         .nth(1)
         .and_then(|s| s.parse().ok())
         .unwrap_or(100);
+    let samples: Option<usize> = std::env::args().nth(2).and_then(|s| s.parse().ok());
     let rules = Rules::new();
     let mut game = Game::new(rules, Seat::ALL[0]);
     let mut rng = SmallRng::seed_from_u64(0);
@@ -20,7 +27,12 @@ fn main() {
     let (mut exhausted, mut fouls) = (0, 0);
     let mut hu_total = 0;
     for _ in 0..rounds {
-        let bots = Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as _));
+        let mut bots =
+            Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as Box<dyn Strategy>));
+        if let Some(samples) = samples {
+            let seed = SmallRng::from_rng(&mut rng);
+            bots[0] = Some(Box::new(MonteCarloBot::new(&rules, samples, seed)));
+        }
         let mut table = Table::new(game.deal(&mut rng), bots);
         while table.step().expect("bots act legally") != Step::Finished {}
         let result = table.round().result().expect("finished");

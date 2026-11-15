@@ -97,4 +97,18 @@ impl<'a> View<'a> {
     pub const fn pile_len(&self) -> usize {
         self.round.pile_len()
     }
+
+    /// A round that looks the same from this seat, with the cards it cannot
+    /// see — the other hands and the pile — dealt afresh
+    ///
+    /// The deal is uniform over the unseen cards.  It ignores what the play
+    /// so far says about them: a seat that passed may be dealt the pair to
+    /// pong with, and one that did not win a hand that would have.
+    // ponytail: uniform; reject or weigh deals by the events if a sampling
+    // bot turns out to be fooled by impossible ones.
+    #[cfg(feature = "rand")]
+    #[must_use]
+    pub fn determinize(&self, rng: &mut (impl rand::Rng + ?Sized)) -> Round {
+        self.round.determinize(self.seat, rng)
+    }
 }

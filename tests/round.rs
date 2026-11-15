@@ -336,3 +336,23 @@ mod playouts {
         assert_eq!(game.scores().iter().sum::<i32>(), 0);
     }
 }
+
+/// A determinized round moves only the cards the seat cannot see.
+#[cfg(feature = "rand")]
+#[test]
+fn a_determinized_round_looks_the_same() {
+    use rand::SeedableRng as _;
+    use tsap_oo::View;
+
+    let mut rng = rand::rngs::SmallRng::seed_from_u64(0);
+    let round = Round::deal(Rules::new(), FIRST, &mut rng);
+    let world = View::new(&round, SECOND).determinize(&mut rng);
+    conserved(&world);
+    assert_eq!(world.hand(SECOND), round.hand(SECOND));
+    assert_eq!(world.phase(), round.phase());
+    assert_eq!(world.pile_len(), round.pile_len());
+    for seat in Seat::ALL {
+        assert_eq!(world.hand(seat).len(), round.hand(seat).len());
+    }
+    assert_ne!(world.hand(THIRD), round.hand(THIRD));
+}
