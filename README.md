@@ -44,7 +44,10 @@ Play it in the browser at [jdh8.github.io/tsap-oo][web]; the front end in
   only follows a drawn general or a forced kong.
 - Three or four identical cards in hand are never split, for a claim or in
   the winning layout: 車車車馬包 (大肚) is a triplet with 馬包 loose, and wins
-  only on the fourth 車, as 車馬包 beside the triplet.  The card just claimed
+  only on the fourth 車, as 車馬包 beside the triplet.  One of them may still
+  be discarded, leaving an ordinary pair: no write-up forbids it, and unlike
+  a split for a claim, which the meld on the table gives away, a discard in
+  the river cannot be traced to its hand.  The card just claimed
   cannot be discarded in the same turn.  A claim must leave another card to
   discard that is not a general, so a hand cannot meld itself out below the
   threshold.
