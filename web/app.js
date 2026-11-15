@@ -278,20 +278,31 @@ function render() {
   }
 }
 
-// Ring what a bot would do here: a card in your hand or a claim button.  The
-// ring lasts until the next render, i.e. for this one decision.  Of several
-// copies of the card it takes the last: the loose cards are the last group,
-// so a loose copy is ringed before one sitting in a meld.
+// Ring what a bot would do here, a card in your hand or a claim button, and
+// mark every move with the 胡 it grades behind that pick.  The marks last
+// until the next render, i.e. for this one decision.  Of several copies of
+// the pick it rings the last: the loose cards are the last group, so a loose
+// copy is ringed before one sitting in a meld.
 function showHint() {
-  const hint = game.hint();
-  if (!hint) return;
-  [
+  const rows = JSON.parse(game.hint());
+  if (!rows.length || document.querySelector('.grade')) return;
+  const els = (code) => [
     ...document.querySelectorAll(
-      `#hand [data-code="${hint}"]:not(.locked), #actions [data-hint="${hint}"]`,
+      `#hand [data-code="${code}"]:not(.locked), #actions [data-hint="${code}"]`,
     ),
-  ]
-    .at(-1)
-    ?.classList.add('hint');
+  ];
+  els(rows[0].code).at(-1)?.classList.add('hint');
+  for (const { code, behind } of rows) {
+    for (const el of els(code)) {
+      const mark = document.createElement('span');
+      mark.className = 'grade';
+      // One decimal: a 0.0 trails the pick by less than 0.05 胡, a 0 not at all.
+      mark.textContent = behind == null ? '死' : behind === 0 ? '0' : behind.toFixed(1);
+      mark.title =
+        behind == null ? '走了這步，手牌再也湊不到胡牌要的胡數' : `電腦估這步比它的首選差 ${behind.toFixed(2)} 胡`;
+      el.append(mark);
+    }
+  }
 }
 
 function button(label, onclick, cls = '', hint = '') {

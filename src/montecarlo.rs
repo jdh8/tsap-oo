@@ -110,14 +110,24 @@ fn playout(policy: &mut HeuristicBot, mut round: Round, seat: Seat) -> i32 {
 impl<R: Rng> Strategy for MonteCarloBot<R> {
     fn claim(&mut self, view: &View<'_>, options: &ClaimOptions) -> Claim {
         let seat = view.seat();
-        let mut actions = self.policy.claims(view, options);
+        let mut actions: Vec<_> = self
+            .policy
+            .claims(view, options)
+            .into_iter()
+            .map(|(action, _)| action)
+            .collect();
         actions.truncate(CANDIDATES);
         self.choose(view, &actions, |round, claim| round.claim(seat, claim))
     }
 
     fn discard(&mut self, view: &View<'_>) -> Card {
         let seat = view.seat();
-        let mut actions = self.policy.discards(view);
+        let mut actions: Vec<_> = self
+            .policy
+            .discards(view)
+            .into_iter()
+            .map(|(action, _)| action)
+            .collect();
         actions.truncate(CANDIDATES);
         self.choose(view, &actions, |round, card| round.discard(seat, card))
     }

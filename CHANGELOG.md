@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   melds they come from, and the cards left outside every meld.  No bot
   plays.  Over 100000 deals (seed 20261118) a hand holds 6.63 胡 and 7.28
   loose cards on average.
+- The web hint grades every move: each card in your hand and each claim
+  button shows how many 胡 it falls behind the bot's pick, and 死 marks a
+  move that leaves the hand short of the 胡 to win.  Equal moves show as
+  equal.
+- `HeuristicBot::claims` and `HeuristicBot::discards` are public and return
+  each move with its grade in 胡, best first.  Play is unchanged: on paired
+  deals against fd5b9b2 (`ab/run.sh 20000`, seed base 1794786340), 0 of
+  20000 deals differ.
 
 ### Changed
 

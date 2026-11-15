@@ -60,6 +60,15 @@ impl Settings {
 // Snapshot: what the page draws
 // ---------------------------------------------------------------------------
 
+/// One move the hint rates: a card code to discard, or `pass`, `pong`,
+/// `eat<index>`, and how many 胡 it grades behind the bot's pick, `null`
+/// when it leaves the hand dead
+#[derive(Serialize)]
+struct HintJson {
+    code: String,
+    behind: Option<f64>,
+}
+
 #[derive(Serialize)]
 struct CardJson {
     code: String,
@@ -417,28 +426,51 @@ impl Core {
         }
     }
 
-    /// What a greedy bot would do in the human's place: a card code to
-    /// discard, or `pass`, `pong`, `eat<index>`; `None` when it is not the
-    /// human's decision
-    fn hint(&self) -> Option<String> {
+    /// How a greedy bot rates every move in the human's place, its own pick
+    /// first; empty when it is not the human's decision
+    fn hint(&self) -> Vec<HintJson> {
         let round = self.table.round();
         let mut bot = HeuristicBot::new(self.game.rules());
         let view = View::new(round, HUMAN);
-        match round.phase() {
+        let rated: Vec<(String, f64)> = match round.phase() {
             Phase::Claim(HUMAN) => {
                 let options = round.claim_options(HUMAN);
-                Some(match bot.claim(&view, &options) {
-                    // A forced claim has no pass; the bot never passes one.
-                    Claim::Pass => "pass".to_owned(),
-                    Claim::Pong => "pong".to_owned(),
-                    Claim::Eat(meld) => {
-                        format!("eat{}", options.eats.iter().position(|&m| m == meld)?)
-                    }
-                })
+                bot.claims(&view, &options)
+                    .into_iter()
+                    .map(|(claim, hu)| {
+                        let code = match claim {
+                            Claim::Pass => "pass".to_owned(),
+                            Claim::Pong => "pong".to_owned(),
+                            Claim::Eat(meld) => {
+                                let i = options.eats.iter().position(|&m| m == meld);
+                                format!("eat{}", i.expect("the bot eats an offered meld"))
+                            }
+                        };
+                        (code, hu)
+                    })
+                    .collect()
             }
-            Phase::Discard(HUMAN) => Some(CardJson::from(bot.discard(&view)).code),
-            _ => None,
-        }
+            Phase::Discard(HUMAN) => bot
+                .discards(&view)
+                .into_iter()
+                .map(|(card, hu)| (CardJson::from(card).code, hu))
+                .collect(),
+            _ => Vec::new(),
+        };
+        let best = rated.first().map_or(0.0, |&(_, hu)| hu);
+        rated
+            .into_iter()
+            .map(|(code, hu)| HintJson {
+                code,
+                // The bot's grades are in 1/32 胡.  A dead hand grades about
+                // 1000 胡 down, far below any live one.
+                behind: if best - hu > 500.0 {
+                    None
+                } else {
+                    Some(best - hu)
+                },
+            })
+            .collect()
     }
 
     /// Settle the finished round and deal the next
@@ -509,11 +541,15 @@ impl WebGame {
         self.core.snapshot()
     }
 
-    /// The greedy bot's pick for your decision: a card code, `pass`, `pong`
-    /// or `eat<index>`; empty when it is not your decision
+    /// The greedy bot's rating of your moves as a JSON array, its pick
+    /// first: `[{"code": "RK", "behind": 0}, ...]`, where `code` is a card
+    /// code, `pass`, `pong` or `eat<index>` and `behind` the 胡 it grades
+    /// behind the pick, `null` for a move that leaves the hand dead (short of
+    /// the 胡 to win however the cards come); empty
+    /// when it is not your decision
     #[must_use]
     pub fn hint(&self) -> String {
-        self.core.hint().unwrap_or_default()
+        serde_json::to_string(&self.core.hint()).expect("hints serialize")
     }
 
     /// Settle the round and deal the next
@@ -631,7 +667,9 @@ mod tests {
                 }
                 Phase::Claim(HUMAN) => {
                     assert!(value["options"].is_object());
-                    let hint = core.hint().unwrap();
+                    let hints = core.hint();
+                    assert_eq!(hints[0].behind, Some(0.0), "the pick is the best");
+                    let hint = hints[0].code.clone();
                     let eats = value["options"]["eats"].as_array().unwrap().len();
                     assert!(
                         hint == "pass"
@@ -650,13 +688,16 @@ mod tests {
                 Phase::Discard(HUMAN) => {
                     let round = core.table.round();
                     let legal = discardable(round.hand(HUMAN), round.locked());
-                    let hint: Card = core.hint().unwrap().parse().unwrap();
-                    assert!(legal.contains(hint));
+                    let hints = core.hint();
+                    assert_eq!(hints.len(), legal.distinct().count(), "every move is rated");
+                    for hint in &hints {
+                        assert!(legal.contains(hint.code.parse::<Card>().unwrap()));
+                    }
                     let card = legal.first().unwrap();
                     core.discard(&CardJson::from(card).code);
                 }
                 _ => {
-                    assert!(core.hint().is_none());
+                    assert!(core.hint().is_empty());
                     assert!(
                         value["seats"][HUMAN.next().index()]["hand"].is_null(),
                         "bots stay concealed"

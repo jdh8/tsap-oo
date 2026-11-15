@@ -334,8 +334,13 @@ fn to_i32(n: impl TryInto<i32>) -> i32 {
 }
 
 impl HeuristicBot {
-    /// The answers to the offer, best first: the first is the bot's own
-    pub(crate) fn claims(&mut self, view: &View<'_>, options: &ClaimOptions) -> Vec<Claim> {
+    /// The answers to the offer, best first, each with its grade in 胡: the
+    /// first is the bot's own choice
+    ///
+    /// A grade is the hand's 胡 less its costs, so only the differences
+    /// between grades mean anything.  An answer that leaves the hand dead
+    /// grades near −1000.
+    pub fn claims(&mut self, view: &View<'_>, options: &ClaimOptions) -> Vec<(Claim, f64)> {
         let need = self.start(view);
         let hand = view.hand();
         let offer = view.offer().expect("claims answer an offer");
@@ -362,11 +367,12 @@ impl HeuristicBot {
             .collect();
         // Stable: the earlier of equals stays first, passing before claiming.
         graded.sort_by_key(|&(grade, _)| std::cmp::Reverse(grade));
-        graded.into_iter().map(|(_, claim)| claim).collect()
+        in_hu(graded)
     }
 
-    /// The legal discards, best first: the first is the bot's own
-    pub(crate) fn discards(&mut self, view: &View<'_>) -> Vec<Card> {
+    /// The legal discards, best first, each with its grade in 胡 as for
+    /// [`claims`](Self::claims): the first is the bot's own choice
+    pub fn discards(&mut self, view: &View<'_>) -> Vec<(Card, f64)> {
         let need = self.start(view);
         let hand = view.hand();
         let mut graded: Vec<(i32, Card)> = discardable(hand, view.locked())
@@ -376,17 +382,25 @@ impl HeuristicBot {
         // Stable, and the later of equals goes first.
         graded.reverse();
         graded.sort_by_key(|&(grade, _)| std::cmp::Reverse(grade));
-        graded.into_iter().map(|(_, card)| card).collect()
+        in_hu(graded)
     }
+}
+
+/// Grades in 胡, the actions first
+fn in_hu<T>(graded: Vec<(i32, T)>) -> Vec<(T, f64)> {
+    graded
+        .into_iter()
+        .map(|(grade, action)| (action, f64::from(grade) / f64::from(SCALE)))
+        .collect()
 }
 
 impl Strategy for HeuristicBot {
     fn claim(&mut self, view: &View<'_>, options: &ClaimOptions) -> Claim {
-        self.claims(view, options)[0]
+        self.claims(view, options)[0].0
     }
 
     fn discard(&mut self, view: &View<'_>) -> Card {
-        self.discards(view)[0]
+        self.discards(view)[0].0
     }
 
     fn name(&self) -> &str {
