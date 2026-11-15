@@ -1,0 +1,18 @@
+[package]
+name = "tsap-oo-ab"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.93"
+publish = false
+license = "Apache-2.0"
+description = "A/B harness for tsap-oo: the working tree's bot against a revision's on paired deals"
+
+# Standalone, like `web/`: its own workspace root, so the library never adopts
+# it.  Build it through `run.sh`, which exports the control.
+[workspace]
+
+[dependencies]
+new = { package = "tsap-oo", path = ".." }
+# `run.sh` exports the control revision here under this package name.
+old = { package = "tsap-oo-base", path = "target/base" }
+rand = "0.10"
