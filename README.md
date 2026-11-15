@@ -125,7 +125,7 @@ match result.winner {
 
 - `arena`: bots play many rounds and report the outcomes
   (`cargo run --release --example arena -- 1000`); a second argument seats
-  a Monte Carlo bot of that many samples first
+  a Monte Carlo bot of that many samples first, a third seeds the deals
 
 [mod-rules]: https://docs.rs/tsap-oo/latest/tsap_oo/rules/index.html
 [mod-round]: https://docs.rs/tsap-oo/latest/tsap_oo/round/index.html

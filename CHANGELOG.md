@@ -10,13 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `MonteCarloBot` (feature `rand`): deals the unseen cards at random and
-  plays every legal choice out with greedy bots, leaving the greedy choice
-  only for one that clearly scores better.  It does not yet beat
-  `HeuristicBot` in the arena.
+  plays the three choices `HeuristicBot` grades highest out with greedy
+  bots, leaving the greedy choice only for one that scores better by a
+  standard error.  At 128 samples it wins 26.2% of rounds against three
+  `HeuristicBot`s, where a fourth `HeuristicBot` in its seat wins 23.8% of
+  the same 3200 deals.
 - `View::determinize` (feature `rand`): a round that looks the same from a
   seat, with the other hands and the pile dealt afresh.
 - The `arena` example takes a second argument, the samples of a Monte Carlo
-  bot to seat first.
+  bot to seat first, and a third, the seed of the deals.
 
 ## [0.2.0] - 2026-11-15
 

@@ -244,42 +244,55 @@ fn to_i32(n: impl TryInto<i32>) -> i32 {
     n.try_into().unwrap_or(i32::MAX / 4)
 }
 
-impl Strategy for HeuristicBot {
-    fn claim(&mut self, view: &View<'_>, options: &ClaimOptions) -> Claim {
+impl HeuristicBot {
+    /// The answers to the offer, best first: the first is the bot's own
+    pub(crate) fn claims(&mut self, view: &View<'_>, options: &ClaimOptions) -> Vec<Claim> {
         let need = self.start(view);
         let hand = view.hand();
         let card = view.offer().expect("claims answer an offer").card;
-        // A drawn general cannot be passed: any eat beats the placeholder.
-        let mut best = if options.forced() {
-            (i32::MIN, Claim::Pass)
-        } else {
-            (self.value(hand, need), Claim::Pass)
-        };
-        let mut consider = |bot: &mut Self, meld: Meld, claim: Claim| {
-            let gain = to_i32(bot.exposed.score(&meld));
-            let score = SCALE * gain
-                + bot.after_discard(hand - meld.cards().without(card), card, need - gain);
-            if score > best.0 {
-                best = (score, claim);
-            }
-        };
-        if options.pong {
-            consider(self, Meld::Triplet(card), Claim::Pong);
-        }
-        for &meld in &options.eats {
-            consider(self, meld, Claim::Eat(meld));
-        }
-        best.1
+        // A drawn general cannot be passed.
+        let pass = (!options.forced()).then(|| (self.value(hand, need), Claim::Pass));
+        let melds = options
+            .pong
+            .then_some((Meld::Triplet(card), Claim::Pong))
+            .into_iter()
+            .chain(options.eats.iter().map(|&meld| (meld, Claim::Eat(meld))));
+        let mut graded: Vec<(i32, Claim)> = pass
+            .into_iter()
+            .chain(melds.map(|(meld, claim)| {
+                let gain = to_i32(self.exposed.score(&meld));
+                let rest = hand - meld.cards().without(card);
+                let grade = SCALE * gain + self.after_discard(rest, card, need - gain);
+                (grade, claim)
+            }))
+            .collect();
+        // Stable: the earlier of equals stays first, passing before claiming.
+        graded.sort_by_key(|&(grade, _)| std::cmp::Reverse(grade));
+        graded.into_iter().map(|(_, claim)| claim).collect()
+    }
+
+    /// The legal discards, best first: the first is the bot's own
+    pub(crate) fn discards(&mut self, view: &View<'_>) -> Vec<Card> {
+        let need = self.start(view);
+        let hand = view.hand();
+        let mut graded: Vec<(i32, Card)> = discardable(hand, view.locked())
+            .distinct()
+            .map(|(card, _)| (self.value(hand.without(card), need), card))
+            .collect();
+        // Stable, and the later of equals goes first.
+        graded.reverse();
+        graded.sort_by_key(|&(grade, _)| std::cmp::Reverse(grade));
+        graded.into_iter().map(|(_, card)| card).collect()
+    }
+}
+
+impl Strategy for HeuristicBot {
+    fn claim(&mut self, view: &View<'_>, options: &ClaimOptions) -> Claim {
+        self.claims(view, options)[0]
     }
 
     fn discard(&mut self, view: &View<'_>) -> Card {
-        let need = self.start(view);
-        let hand = view.hand();
-        discardable(hand, view.locked())
-            .distinct()
-            .map(|(card, _)| card)
-            .max_by_key(|&card| self.value(hand.without(card), need))
-            .expect("a hand to discard from")
+        self.discards(view)[0]
     }
 
     fn name(&self) -> &str {

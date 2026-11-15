@@ -9,6 +9,9 @@
 //! ```console
 //! cargo run --release --example arena -- 100 16
 //! ```
+//!
+//! A third argument seeds the deals (0 by default), so that runs can be
+//! spread over the cores and added up.
 
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
@@ -22,7 +25,11 @@ fn main() {
     let samples: Option<usize> = std::env::args().nth(2).and_then(|s| s.parse().ok());
     let rules = Rules::new();
     let mut game = Game::new(rules, Seat::ALL[0]);
-    let mut rng = SmallRng::seed_from_u64(0);
+    let seed: u64 = std::env::args()
+        .nth(3)
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    let mut rng = SmallRng::seed_from_u64(seed);
     let mut wins = [0; Seat::COUNT];
     let (mut exhausted, mut fouls) = (0, 0);
     let mut hu_total = 0;

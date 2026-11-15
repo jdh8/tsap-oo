@@ -1,27 +1,34 @@
 //! A bot that samples the hidden cards and plays every choice out.
 
-use crate::round::{Claim, ClaimOptions, Phase, Round, RoundError, discardable};
+use crate::round::{Claim, ClaimOptions, Phase, Round, RoundError};
 use crate::{Game, HeuristicBot, Rules, Seat, Strategy, View};
 use rand::Rng;
 use susik::Card;
 
 /// How many standard errors a choice must beat the greedy one by.
-// ponytail: one knob, set by arena play; playouts are noisy and the greedy
-// choice is a strong prior.
-const CONFIDENCE: f64 = 2.0;
+// ponytail: one knob, set by paired play at 128 samples (the same deals with
+// and without the bot): 1 gained more than 2, and more than 0, which trusts
+// the uniform deals over the greedy grade.
+const CONFIDENCE: f64 = 1.0;
 
-/// A Monte Carlo bot: deals the cards it cannot see at random, plays each
-/// legal choice to the end of the round with [`HeuristicBot`]s in every
-/// seat, and leaves the greedy choice only for one that clearly scores
-/// better on average
+/// How many choices are played out: the greedy one and the next by the
+/// greedy grade.
+// ponytail: a fixed shortlist.  Playing every choice out found little more
+// at three times the cost.
+const CANDIDATES: usize = 3;
+
+/// A Monte Carlo bot: deals the cards it cannot see at random, plays the
+/// greedy choice and the next best by [`HeuristicBot`]'s grade to the end
+/// of the round with greedy bots in every seat, and leaves the greedy
+/// choice only for one that scores better on average by more than the
+/// samples' noise
 ///
 /// Every choice is tried against the same sampled deals, so luck of the deal
 /// cancels between them.  A decision costs `samples` playouts per choice.
 // ponytail: flat sampling with the deals uniform over the unseen cards (see
 // `View::determinize`) and the round's own score as the payoff.  Next steps,
-// in order of expected gain: drop the choices the greedy grade ranks last,
-// spend the samples where the means are close (UCB), weigh deals by what
-// the other seats did.
+// in order of expected gain: spend the samples where the means are close
+// (UCB), weigh deals by what the other seats did.
 #[derive(Debug, Clone)]
 pub struct MonteCarloBot<R> {
     rng: R,
@@ -103,32 +110,15 @@ fn playout(policy: &mut HeuristicBot, mut round: Round, seat: Seat) -> i32 {
 impl<R: Rng> Strategy for MonteCarloBot<R> {
     fn claim(&mut self, view: &View<'_>, options: &ClaimOptions) -> Claim {
         let seat = view.seat();
-        // The greedy answer first: it stands unless clearly beaten.
-        let greedy = self.policy.claim(view, options);
-        let actions: Vec<Claim> = [greedy]
-            .into_iter()
-            .chain((!options.forced()).then_some(Claim::Pass))
-            .chain(options.pong.then_some(Claim::Pong))
-            .chain(options.eats.iter().copied().map(Claim::Eat))
-            .enumerate()
-            .filter(|&(i, claim)| i == 0 || claim != greedy)
-            .map(|(_, claim)| claim)
-            .collect();
+        let mut actions = self.policy.claims(view, options);
+        actions.truncate(CANDIDATES);
         self.choose(view, &actions, |round, claim| round.claim(seat, claim))
     }
 
     fn discard(&mut self, view: &View<'_>) -> Card {
         let seat = view.seat();
-        let greedy = self.policy.discard(view);
-        let actions: Vec<Card> = [greedy]
-            .into_iter()
-            .chain(
-                discardable(view.hand(), view.locked())
-                    .distinct()
-                    .map(|(card, _)| card)
-                    .filter(|&card| card != greedy),
-            )
-            .collect();
+        let mut actions = self.policy.discards(view);
+        actions.truncate(CANDIDATES);
         self.choose(view, &actions, |round, card| round.discard(seat, card))
     }
 
