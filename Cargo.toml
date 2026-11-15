@@ -33,5 +33,9 @@ thiserror = "2"
 name = "arena"
 required-features = ["rand"]
 
+[[example]]
+name = "danger"
+required-features = ["rand"]
+
 [profile.dev.package."*"]
 opt-level = 2

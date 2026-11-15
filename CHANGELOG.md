@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   seat, with the other hands and the pile dealt afresh.
 - The `arena` example takes a second argument, the samples of a Monte Carlo
   bot to seat first, and a third, the seed of the deals.
+- The `danger` example: how often each kind of card, put down at each stage
+  of a round, would deal in, and into which meld.  Its reading is written up
+  in `research/discard-danger.md`.
 
 ### Changed
 
