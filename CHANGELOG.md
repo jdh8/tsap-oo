@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `arena` example takes a second argument, the samples of a Monte Carlo
   bot to seat first, and a third, the seed of the deals.
 
+### Changed
+
+- `web/`: a meld on the table shows the card it took from the table in the
+  middle, as a mahjong table lays out an eat — 車 eaten with 馬包 reads
+  馬車包 — and so does the meld of the winning card.  Of four soldiers it is
+  the second from the left.
+
 ## [0.2.0] - 2026-11-15
 
 ### Added

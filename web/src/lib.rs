@@ -88,6 +88,39 @@ fn cards(meld: &Meld) -> Vec<CardJson> {
     meld.cards().iter().map(CardJson::from).collect()
 }
 
+/// A meld on the table with the card it took from the table in the middle,
+/// as a mahjong table lays out an eat: 車 eaten with 馬包 reads 馬車包.  Of
+/// four soldiers it is the second from the left.
+fn claimed(meld: &Meld, card: Card) -> Vec<CardJson> {
+    let mut row: Vec<Card> = meld.cards().without(card).iter().collect();
+    row.insert(row.len() / 2, card);
+    row.into_iter().map(CardJson::from).collect()
+}
+
+/// The cards `seat` ate, ponged and konged, one for each of
+/// [`Round::exposed`] in the same order
+fn claims(round: &Round, seat: Seat) -> impl Iterator<Item = Card> {
+    round.events().iter().filter_map(move |event| match *event {
+        Event::Eat { seat: s, card, .. }
+        | Event::Pong { seat: s, card }
+        | Event::Kong { seat: s, card }
+            if s == seat =>
+        {
+            Some(card)
+        }
+        _ => None,
+    })
+}
+
+/// [`Round::exposed`] for the page: each meld through [`claimed`]
+fn exposed(round: &Round, seat: Seat) -> Vec<Vec<CardJson>> {
+    let melds = round.exposed(seat).iter();
+    melds
+        .zip(claims(round, seat))
+        .map(|(meld, card)| claimed(meld, card))
+        .collect()
+}
+
 /// A hand sorted into its best melds, with the loose cards as a last group.
 ///
 /// Lone generals go with the loose cards although each is a meld: there
@@ -268,7 +301,7 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
                     name: name(seat),
                     hu: visible_hu(game.rules(), round, seat, shown),
                     concealed: round.hand(seat).len(),
-                    exposed: round.exposed(seat).iter().map(cards).collect(),
+                    exposed: exposed(round, seat),
                     hand: shown.then(|| arrange(game.rules(), round.hand(seat))),
                 }
             })
@@ -302,11 +335,22 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
                 round.exposed(seat).len() + usize::from(result.winning_card.is_some())
             });
             let (exposed, concealed) = result.layout.split_at(public);
+            // The winning card is claimed like the rest, so it too sits in
+            // the middle of its meld.
+            let taken = result
+                .winner
+                .into_iter()
+                .flat_map(|seat| claims(round, seat));
+            let taken = taken.chain(result.winning_card);
             ResultJson {
                 winner: result.winner.map(Seat::index),
                 foul: result.foul.map(Seat::index),
                 hu: result.hu,
-                exposed: exposed.iter().map(cards).collect(),
+                exposed: exposed
+                    .iter()
+                    .zip(taken)
+                    .map(|(meld, card)| claimed(meld, card))
+                    .collect(),
                 concealed: concealed.iter().map(cards).collect(),
                 winning_card: result.winning_card.map(CardJson::from),
                 from: result.from.map(Seat::index),
@@ -550,6 +594,14 @@ mod tests {
                 let exposed = round.exposed(seat).iter();
                 let table: u32 = exposed.map(|meld| rules.exposed.score(meld)).sum();
                 let hu = value["seats"][seat.index()]["hu"].as_u64().unwrap();
+                assert_eq!(
+                    value["seats"][seat.index()]["exposed"]
+                        .as_array()
+                        .unwrap()
+                        .len(),
+                    round.exposed(seat).len(),
+                    "every exposed meld has its claim"
+                );
                 if value["result"]["winner"] == seat.index() {
                     assert_eq!(hu, value["result"]["hu"], "a winner shows the win");
                 } else if seat == HUMAN || round.phase() == Phase::Finished {
@@ -563,12 +615,11 @@ mod tests {
                     let result = &value["result"];
                     if let Some(card) = result["winning_card"].as_object() {
                         let last = result["exposed"].as_array().unwrap().last().unwrap();
-                        assert!(
-                            last.as_array()
-                                .unwrap()
-                                .iter()
-                                .any(|c| c["code"] == card["code"]),
-                            "the winning card's meld closes the exposed row"
+                        let last = last.as_array().unwrap();
+                        assert_eq!(
+                            last[(last.len() - 1) / 2]["code"],
+                            card["code"],
+                            "the winning card is the middle, or second of four, of the last exposed meld"
                         );
                     }
                     assert!(
