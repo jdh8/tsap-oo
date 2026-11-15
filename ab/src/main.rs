@@ -3,8 +3,8 @@
 //!
 //! `new` is the working tree and `old` the revision `run.sh` exported.  A bot
 //! reads only its own crate's `View`, so the two crates' rounds are stepped
-//! in lockstep, every claim and discard applied to both.
-use new::Strategy as _;
+//! in lockstep, every claim and discard applied to both.  Set `SAMPLES` to
+//! seat a `MonteCarloBot` of that many samples as the candidate instead.
 use old::Strategy as _;
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
@@ -19,6 +19,16 @@ fn play(seed: u64, dealer: usize, candidate: bool) -> (i32, bool) {
         new::Seat::ALL[dealer],
         &mut SmallRng::seed_from_u64(seed),
     );
+    // `SAMPLES` puts a MonteCarloBot in the candidate seat, its rng
+    // derived from the deal's seed so a deal replays.
+    let mut bot: Box<dyn new::Strategy> = match std::env::var("SAMPLES") {
+        Ok(n) => Box::new(new::MonteCarloBot::new(
+            &nr,
+            n.parse().unwrap(),
+            SmallRng::seed_from_u64(!seed),
+        )),
+        Err(_) => Box::new(new::HeuristicBot::new(&nr)),
+    };
     let mut b = old::Round::deal(
         or,
         old::Seat::ALL[dealer],
@@ -30,7 +40,7 @@ fn play(seed: u64, dealer: usize, candidate: bool) -> (i32, bool) {
             (new::Phase::Claim(s), old::Phase::Claim(t)) => {
                 assert_eq!(s.index(), t.index());
                 let claim = if candidate && s.index() == CANDIDATE {
-                    new::HeuristicBot::new(&nr).claim(&new::View::new(&a, s), &a.claim_options(s))
+                    bot.claim(&new::View::new(&a, s), &a.claim_options(s))
                 } else {
                     match old::HeuristicBot::new(&or)
                         .claim(&old::View::new(&b, t), &b.claim_options(t))
@@ -54,7 +64,7 @@ fn play(seed: u64, dealer: usize, candidate: bool) -> (i32, bool) {
             (new::Phase::Discard(s), old::Phase::Discard(t)) => {
                 assert_eq!(s.index(), t.index());
                 let card = if candidate && s.index() == CANDIDATE {
-                    new::HeuristicBot::new(&nr).discard(&new::View::new(&a, s))
+                    bot.discard(&new::View::new(&a, s))
                 } else {
                     old::HeuristicBot::new(&or).discard(&old::View::new(&b, t))
                 };

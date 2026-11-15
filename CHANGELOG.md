@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   plays.  Over 100000 deals (seed 20261118) a hand holds 6.63 胡 and 7.28
   loose cards on average.
 
+### Changed
+
+- `MonteCarloBot` at 128 samples no longer measurably beats
+  `HeuristicBot`, which has improved four times since 0.2.1 put it at 26.2%
+  against 23.8%.  Seated among three `HeuristicBot`s and paired with a
+  fourth on the same deals (`SAMPLES=128 ab/run.sh 3200`, control 6428dab,
+  seed base 1794777431, 1082 of 3200 deals differ), it scores +0.148 ±
+  0.276 points a deal, 95% CI [-0.392, +0.689], and wins 24.97% of rounds
+  against 24.47%.  Verdict: inconclusive.
+
 ## [0.2.1] - 2026-11-16
 
 ### Added
