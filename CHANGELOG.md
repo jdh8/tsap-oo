@@ -22,6 +22,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `HeuristicBot`, and so the web hint, keeps a waiting hand: a hand is
+  graded 8 higher for each unseen card it would win on.  Two discards that
+  left the same melds and loose cards used to tie whether or not one of
+  them left the hand a card from winning — a 仕 or a 俥 off 帥帥仕俥炮, where
+  only the 仕 waits on the 傌 — and the tie went to the later card.  A/B
+  against `a74b951`, the new bot in one seat among three old ones and four
+  old ones on the same 200000 deals (seed base 1794772616, 3551 differ):
+  +0.111 ± 0.010 points a deal, 95% CI [+0.091, +0.132], winning 24.52% of
+  rounds for 24.24%.  Verdict: win.
 - `HeuristicBot`, and so the web hint, no longer eats a card into a meld
   the hand already holds whole — a 俥 into 俥傌炮 with no second 俥.  Passing
   was graded as if no draw followed, so trading a loose card for a milder

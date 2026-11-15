@@ -28,6 +28,11 @@ const OWN: i32 = 2;
 /// graded on.
 const COPIES: i32 = 4;
 
+/// What each unseen card a hand would win on adds to its grade: more than
+/// any 搭子 is graded per finishing card, since a win is taken from any seat.
+// ponytail: one knob, set before its A/B and not tuned.
+const WAIT: i32 = 8;
+
 /// What a dead hand costs: more than any hand is worth, so one is kept only
 /// when every choice is dead.
 const DEAD: i32 = 1000;
@@ -127,7 +132,9 @@ impl HeuristicBot {
         if self.dead(hand, need) {
             return -SCALE * DEAD;
         }
-        self.solvers
+        let wait = self.wait(hand, need);
+        let grade = self
+            .solvers
             .iter_mut()
             .zip(COSTS)
             .map(|(solver, cost)| {
@@ -142,7 +149,25 @@ impl HeuristicBot {
                 SCALE * (2 * (hu - WEIGHT * loose) - WEIGHT * short) / 2 + grade
             })
             .max()
-            .expect("two solvers")
+            .expect("two solvers");
+        grade + wait
+    }
+
+    /// [`WAIT`] for every unseen card `hand` would win on
+    fn wait(&mut self, hand: Hand, need: i32) -> i32 {
+        // The winning card melds with at most two others, so a hand that
+        // cannot be laid out with two loose cards or fewer waits on nothing.
+        let loose = self.solvers[1]
+            .layout(hand)
+            .map_or(usize::MAX, |layout| layout.loose.len());
+        if loose > 2 {
+            return 0;
+        }
+        let live = self.live;
+        live.distinct()
+            .filter(|&(card, _)| self.win(hand, card, need).is_some())
+            .map(|(_, n)| WAIT * i32::from(n))
+            .sum()
     }
 
     /// The hand's value after its best discard other than `locked`
@@ -389,6 +414,18 @@ mod tests {
             assert!(!bot.dead(hand, most), "{hand} can make {most}");
             assert!(bot.dead(hand, most + 1), "{hand} cannot make {}", most + 1);
         }
+    }
+
+    #[test]
+    fn waits() {
+        let mut bot = HeuristicBot::new(&Rules::eight());
+        let hand: Hand = "帥兵.帥帥仕俥炮兵.象象包包卒.將".parse().unwrap();
+        let seen = "相相相仕仕.兵俥傌.馬馬將士士士.包包車車車將士包";
+        bot.live = Hand::FULL - hand - seen.parse().unwrap();
+        let mut value = |card: &str| bot.value(hand.without(card.parse().unwrap()), 7);
+        // Shedding the 仕 waits on three 傌; the 俥 or the 炮, on nothing.
+        assert!(value("黃仕") > value("黃俥"));
+        assert!(value("黃仕") > value("黃炮"));
     }
 
     #[test]
