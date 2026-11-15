@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The `dealt` example: the 胡 already in a dealt hand of twenty cards, the
+  melds they come from, and the cards left outside every meld.  No bot
+  plays.  Over 100000 deals (seed 20261118) a hand holds 6.63 胡 and 7.28
+  loose cards on average.
+
 ## [0.2.1] - 2026-11-16
 
 ### Added

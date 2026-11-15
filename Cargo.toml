@@ -37,5 +37,9 @@ required-features = ["rand"]
 name = "danger"
 required-features = ["rand"]
 
+[[example]]
+name = "dealt"
+required-features = ["rand"]
+
 [profile.dev.package."*"]
 opt-level = 2
