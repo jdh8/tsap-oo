@@ -1,11 +1,11 @@
 //! A greedy bot.
 
 use crate::Seat;
-use crate::round::{Claim, ClaimOptions, discardable};
+use crate::round::{Claim, ClaimOptions, discardable, options};
 use crate::rules::Rules;
 use crate::strategy::Strategy;
 use crate::view::View;
-use susik::{Card, Hand, Layout, Meld, Rank, Solver, Values};
+use susik::{Card, Hand, Layout, Meld, Rank, Solver, Values, locked_completions};
 
 /// What a loose card, or a 胡 short of the threshold, costs a hand.
 const WEIGHT: i32 = 4;
@@ -23,14 +23,6 @@ const SCALE: i32 = 32;
 
 /// What each unseen copy of a loose card adds to its grade.
 const OWN: i32 = 2;
-
-/// What the draw is worth that the next seat gives up by claiming, in the
-/// units of [`prospects`]: without it, eating into a meld the hand already
-/// holds grades as a gain whenever the card set loose is a milder one than
-/// the discard.
-// ponytail: one knob, flat from 2 to 4 胡 on 20000 paired deals; grading
-// every card the draw could be would be exact.
-const DRAW: i32 = 3 * SCALE;
 
 /// Copies of a card in the deck, and the most finishing cards a 搭子 is
 /// graded on.
@@ -53,7 +45,9 @@ const DEAD: i32 = 1000;
 /// pick up late.  It counts the cards it has seen — its own, the melds on
 /// the table, the discards — but never guesses at another seat's hand.  It
 /// is deterministic and looks one decision ahead, but for the draw it would
-/// forgo: the seat next to draw leaves a card that barely helps and draws.
+/// forgo: the seat next to draw claims only what beats the mean of its best
+/// answers to every card it might draw instead.  Its own draw has no such
+/// second chance, so it takes whatever beats leaving the hand as it is.
 #[derive(Debug, Clone)]
 pub struct HeuristicBot {
     solvers: [Solver; 2],
@@ -157,7 +151,67 @@ impl HeuristicBot {
             .distinct()
             .map(|(card, _)| self.value(hand.without(card), need))
             .max()
-            .expect("claims leave a card to discard")
+            // A drawn general or a kong may leave nothing: a 相公.
+            .unwrap_or(-SCALE * DEAD)
+    }
+
+    /// The grade of claiming `card` into `meld` and discarding
+    fn take(&mut self, hand: Hand, meld: Meld, card: Card, need: i32) -> i32 {
+        let gain = to_i32(self.exposed.score(&meld));
+        let rest = hand - meld.cards().without(card);
+        SCALE * gain + self.after_discard(rest, card, need - gain)
+    }
+
+    /// The grade of winning on `card`, if the hand does: its 胡, as a hand
+    /// with no loose card and nothing short grades
+    fn win(&mut self, hand: Hand, card: Card, need: i32) -> Option<i32> {
+        locked_completions(hand, card)
+            .into_iter()
+            .filter_map(|meld| {
+                // At 16 a loose card, a layout without any comes first.
+                let layout = self.solvers[1].layout(hand - meld.cards().without(card))?;
+                let hu = to_i32(self.exposed.score(&meld)) + layout.score;
+                (layout.loose.is_empty() && hu >= need).then_some(SCALE * hu)
+            })
+            .max()
+    }
+
+    /// What `hand` is worth with a draw to come, when leaving the drawn
+    /// card grades `pass`: the mean, over the cards not yet seen, of the
+    /// best answer to each
+    ///
+    /// A win and a kong are taken unasked and a general cannot be left;
+    /// any other card is claimed only when that beats `pass`.
+    // ponytail: the draw is taken for certain, though a pong of the card
+    // passed takes it away and a pile down to its dead cards has none.
+    fn draw(&mut self, hand: Hand, need: i32, pass: i32) -> i32 {
+        let live = self.live;
+        let total: i32 = live
+            .distinct()
+            .map(|(card, n)| {
+                let grade = if let Some(win) = self.win(hand, card, need) {
+                    win
+                } else if hand.count(card) == 3 {
+                    self.take(hand, Meld::Quad(card), card, need)
+                } else {
+                    let options = options(hand, card, true);
+                    let best = options
+                        .pong
+                        .then_some(Meld::Triplet(card))
+                        .into_iter()
+                        .chain(options.eats.iter().copied())
+                        .map(|meld| self.take(hand, meld, card, need))
+                        .max();
+                    match best {
+                        Some(best) if options.forced() => best,
+                        Some(best) => best.max(pass),
+                        None => pass,
+                    }
+                };
+                i32::from(n) * grade
+            })
+            .sum();
+        total / to_i32(live.len()).max(1)
     }
 }
 
@@ -261,13 +315,16 @@ impl HeuristicBot {
         let offer = view.offer().expect("claims answer an offer");
         let card = offer.card;
         // A drawn general cannot be passed.
-        // Passing brings the next seat a draw; a claim must beat that too.
-        let draw = if view.seat() == offer.source.next() {
-            DRAW
-        } else {
-            0
-        };
-        let pass = (!options.forced()).then(|| (self.value(hand, need) + draw, Claim::Pass));
+        let pass = (!options.forced()).then(|| {
+            let pass = self.value(hand, need);
+            // Passing brings the next seat a draw; a claim must beat that
+            // too.
+            if view.seat() == offer.source.next() {
+                (self.draw(hand, need, pass), Claim::Pass)
+            } else {
+                (pass, Claim::Pass)
+            }
+        });
         let melds = options
             .pong
             .then_some((Meld::Triplet(card), Claim::Pong))
@@ -275,12 +332,7 @@ impl HeuristicBot {
             .chain(options.eats.iter().map(|&meld| (meld, Claim::Eat(meld))));
         let mut graded: Vec<(i32, Claim)> = pass
             .into_iter()
-            .chain(melds.map(|(meld, claim)| {
-                let gain = to_i32(self.exposed.score(&meld));
-                let rest = hand - meld.cards().without(card);
-                let grade = SCALE * gain + self.after_discard(rest, card, need - gain);
-                (grade, claim)
-            }))
+            .chain(melds.map(|(meld, claim)| (self.take(hand, meld, card, need), claim)))
             .collect();
         // Stable: the earlier of equals stays first, passing before claiming.
         graded.sort_by_key(|&(grade, _)| std::cmp::Reverse(grade));
@@ -336,6 +388,25 @@ mod tests {
             assert!(!bot.dead(hand, most), "{hand} can make {most}");
             assert!(bot.dead(hand, most + 1), "{hand} cannot make {}", most + 1);
         }
+    }
+
+    #[test]
+    fn draws() {
+        let mut bot = HeuristicBot::new(&Rules::new());
+        let hand: Hand = "兵傌.兵..".parse().unwrap();
+        let mut draw = |seen: &str, need| {
+            bot.live = Hand::FULL - hand - seen.parse().unwrap();
+            let pass = bot.value(hand, need);
+            bot.draw(hand, need, pass) - pass
+        };
+        // A third soldier, a 兵 or a 傌 to pair: the draw is worth having.
+        let open = draw("...", 0);
+        assert!(open > 0);
+        // Less so once the soldiers that would finish the meld are out,
+        let pairs = draw("..卒卒卒卒.卒卒卒卒", 0);
+        assert!(pairs < open);
+        // and less again with nothing left to pair.
+        assert!(draw("兵兵兵傌傌傌.兵兵兵.卒卒卒卒.卒卒卒卒", 0) < pairs);
     }
 
     #[test]

@@ -30,6 +30,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   seat among three old ones and four old ones on the same 200000 deals
   (seed base 1794765506): +0.283 ± 0.018 points a deal, 95% CI [+0.249,
   +0.318], and 25.05% of deals won where the old bot wins 24.50%.
+- `HeuristicBot`, and so the web hint, tells eating the seat before's card
+  from eating its own draw.  Leaving the first still brings a draw, which
+  was graded at a flat 3 胡; it is now the mean, over the cards the seat has
+  not seen, of its best answer to each — a win, a kong, a general it must
+  eat, a claim where one beats leaving the card.  A hand with many cards to
+  come holds out for them, and one with few takes what is offered.  Leaving
+  its own draw hands the turn on, so nothing is added there, as before.  A/B
+  against `1b644f2`, the new bot in one seat among three old ones and four
+  old ones on the same 200000 deals (seed base 1794768139): +0.078 ± 0.015
+  points a deal, 95% CI [+0.049, +0.108], a win; 24.41% of deals won where
+  the old bot wins 24.28%.  A round of four such bots takes about six times
+  as long, 15 ms where it took 2.3 ms.
 - `web/`: a meld on the table shows the card it took from the table in the
   middle, as a mahjong table lays out an eat — 車 eaten with 馬包 reads
   馬車包 — and so does the meld of the winning card.  Of four soldiers it is

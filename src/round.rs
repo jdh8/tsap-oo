@@ -211,6 +211,50 @@ pub fn discardable(hand: Hand, locked: Option<Card>) -> Hand {
         .collect()
 }
 
+/// What a seat holding `hand` may do with `card`, which it may eat only as
+/// an `eater`: its drawer, or the next seat unless it is a general
+pub(crate) fn options(hand: Hand, card: Card, eater: bool) -> ClaimOptions {
+    let n = hand.count(card);
+    let eats = if eater {
+        locked_completions(hand, card)
+            .into_iter()
+            .filter(|meld| match meld {
+                // Holding a pair, one pongs instead; generals stay
+                // singles, which outscore a pair.
+                Meld::Pair(_) => n == 1 && card.rank != Rank::General,
+                Meld::Court(_) | Meld::Field(_) | Meld::Soldiers(_) => true,
+                // `completions` lists a single only for a general.
+                Meld::Single(_) => true,
+                Meld::Triplet(_) | Meld::Quad(_) => false,
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    // A claim must leave a card to discard other than the locked one
+    // and the generals; a hand fully melded below the threshold has no
+    // legal claim.  A general eaten alone is compulsory and exempt.
+    let leaves_discard = |meld: &Meld| {
+        (hand - meld.cards().without(card))
+            .distinct()
+            .any(|(c, _)| c != card && c.rank != Rank::General)
+    };
+    let pong = n == 2 && card.rank != Rank::General;
+    let can_pong = pong && leaves_discard(&Meld::Triplet(card));
+    let (eats, blocked): (Vec<Meld>, Vec<Meld>) = eats
+        .into_iter()
+        .partition(|meld| matches!(meld, Meld::Single(_)) || leaves_discard(meld));
+    ClaimOptions {
+        pong: can_pong,
+        eats,
+        blocked: (pong && !can_pong)
+            .then_some(Claim::Pong)
+            .into_iter()
+            .chain(blocked.into_iter().map(Claim::Eat))
+            .collect(),
+    }
+}
+
 /// The pile handed to [`Round::from_pile`] was not the full deck
 #[derive(Debug, Error, Clone, Copy, PartialEq, Eq, Hash)]
 #[error("a deal needs all 112 cards")]
@@ -505,50 +549,11 @@ impl Round {
     }
 
     fn options_for(&self, offer: Offer, seat: Seat) -> ClaimOptions {
-        let hand = self.hands[seat.index()];
         let card = offer.card;
-        let n = hand.count(card);
         let drawer = offer.drawn && seat == offer.source;
         // Only its drawer eats a general.
         let eater = drawer || (seat == offer.source.next() && card.rank != Rank::General);
-        let eats = if eater {
-            locked_completions(hand, card)
-                .into_iter()
-                .filter(|meld| match meld {
-                    // Holding a pair, one pongs instead; generals stay
-                    // singles, which outscore a pair.
-                    Meld::Pair(_) => n == 1 && card.rank != Rank::General,
-                    Meld::Court(_) | Meld::Field(_) | Meld::Soldiers(_) => true,
-                    // `completions` lists a single only for a general.
-                    Meld::Single(_) => true,
-                    Meld::Triplet(_) | Meld::Quad(_) => false,
-                })
-                .collect()
-        } else {
-            Vec::new()
-        };
-        // A claim must leave a card to discard other than the locked one
-        // and the generals; a hand fully melded below the threshold has no
-        // legal claim.  A general eaten alone is compulsory and exempt.
-        let leaves_discard = |meld: &Meld| {
-            (hand - meld.cards().without(card))
-                .distinct()
-                .any(|(c, _)| c != card && c.rank != Rank::General)
-        };
-        let pong = n == 2 && card.rank != Rank::General;
-        let can_pong = pong && leaves_discard(&Meld::Triplet(card));
-        let (eats, blocked): (Vec<Meld>, Vec<Meld>) = eats
-            .into_iter()
-            .partition(|meld| matches!(meld, Meld::Single(_)) || leaves_discard(meld));
-        ClaimOptions {
-            pong: can_pong,
-            eats,
-            blocked: (pong && !can_pong)
-                .then_some(Claim::Pong)
-                .into_iter()
-                .chain(blocked.into_iter().map(Claim::Eat))
-                .collect(),
-        }
+        options(self.hands[seat.index()], card, eater)
     }
 
     /// The best winning layout of `seat`'s cards plus `card`, if it reaches
