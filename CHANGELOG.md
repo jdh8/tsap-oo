@@ -125,8 +125,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The web help sheet is cut to the essentials: five rules and the 胡 table,
-  with links to the book for the rest.
+- The web help sheet is cut to the essentials: six rules and the 胡 table,
+  with links to the book for the rest.  It opens with the rule that sets
+  the game apart from mahjong: a drawn card is turned face up on the table
+  and never enters the hand.
 
 - On a touch screen a discard in the web page takes two taps: the first
   picks the card and lists what it leaves you waiting on, which a finger
