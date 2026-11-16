@@ -1,6 +1,6 @@
 //! What one seat may see.
 
-use crate::round::{Offer, Phase, Round};
+use crate::round::{Event, Offer, Phase, Round};
 use crate::{Rules, Seat};
 use susik::{Card, Hand, Meld};
 
@@ -96,6 +96,38 @@ impl<'a> View<'a> {
     #[inline]
     pub const fn pile_len(&self) -> usize {
         self.round.pile_len()
+    }
+
+    /// The cards `seat` has shown it does not win on, one of each
+    ///
+    /// Winning is compulsory, so a card that came up and ended nothing wins
+    /// for no seat it was offered to: every seat when it was drawn, every
+    /// seat but its owner when it was discarded.  A seat's cards change only
+    /// when it claims — nothing drawn enters a hand — so that holds until
+    /// its next eat, pong or kong.  It is a proof, not a guess: such a card
+    /// cannot deal in to `seat` now.
+    #[must_use]
+    pub fn safe(&self, seat: Seat) -> Hand {
+        let mut safe = Hand::EMPTY;
+        for &event in self.round.events() {
+            let card = match event {
+                Event::Eat { seat: s, .. }
+                | Event::Pong { seat: s, .. }
+                | Event::Kong { seat: s, .. }
+                    if s == seat =>
+                {
+                    safe = Hand::EMPTY;
+                    continue;
+                }
+                Event::Draw { card, .. } => card,
+                Event::Discard { seat: s, card } if s != seat => card,
+                _ => continue,
+            };
+            if !safe.contains(card) {
+                safe.insert(card);
+            }
+        }
+        safe
     }
 
     /// A round that looks the same from this seat, with the cards it cannot

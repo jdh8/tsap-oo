@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `View::safe`: the cards a seat is proven not to win on.  Winning is
+  compulsory and a hand changes only when its seat claims, so a card that
+  came up and ended nothing stays safe against every seat it was offered to
+  until that seat's next eat, pong or kong.  A playout test holds every win
+  to it.
+- The `safe` example and `research/safe-cards.md`: over 20000 rounds (seed
+  base 20261117) the proof never fails but covers only about 5% of the cards
+  a seat could discard, taken against one other seat; what sets a card's
+  danger is how many concealed cards that seat has left, from 0.02% at
+  twenty to between 3% and 5% at eight or fewer.
+- `doc/stronger-bot.md`: the ways to a stronger bot other than Monte Carlo,
+  and where the first of them, reading the other seats, stands.
 - The `dealt` example: the 胡 already in a dealt hand of twenty cards, the
   melds they come from, and the cards left outside every meld.  No bot
   plays.  Over 100000 deals (seed 20261118) a hand holds 6.63 胡 and 7.28
@@ -24,6 +36,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `HeuristicBot` does not discard by danger: two trials did not win and
+  play is unchanged (`ab/run.sh 20000`, control 0b5d48f, seed base
+  1794817500, 0 of 20000 deals differ).  Both priced a discard at the rate
+  cards win for each seat not proven safe against it, by that seat's
+  concealed cards, on 200000 paired deals against 0b5d48f.  Taking twelve
+  胡 times that rate off the grade (seed base 1794815549, 5328 differ):
+  −0.037 ± 0.010 points a deal, 95% CI [−0.057, −0.017], a loss; the seat
+  dealt in less but lost as often, since a waiting hand is offered every
+  draw at the table, and won less.  Breaking only ties in grade by it (seed
+  base 1794816883, 2513 differ): −0.002 ± 0.007, 95% CI [−0.015, +0.011],
+  inconclusive.
 - `MonteCarloBot` at 128 samples no longer measurably beats
   `HeuristicBot`, which has improved four times since 0.2.1 put it at 26.2%
   against 23.8%.  Seated among three `HeuristicBot`s and paired with a

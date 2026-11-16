@@ -12,7 +12,7 @@ readme = "README.md"
 license = "Apache-2.0"
 categories = ["game-development", "games", "simulation"]
 keywords = ["four-color-cards", "si-se-pai", "card-game", "taiwan", "bot"]
-exclude = [".claude/", "CLAUDE.md", "ab/", "research/", "web/"]
+exclude = [".claude/", "CLAUDE.md", "ab/", "doc/", "research/", "web/"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -39,6 +39,10 @@ required-features = ["rand"]
 
 [[example]]
 name = "dealt"
+required-features = ["rand"]
+
+[[example]]
+name = "safe"
 required-features = ["rand"]
 
 [profile.dev.package."*"]

@@ -267,10 +267,11 @@ mod playouts {
     use rand::SeedableRng as _;
     use rand::rngs::SmallRng;
     use susik::Meld;
-    use tsap_oo::{Event, Game, HeuristicBot, Phase, Rules, Seat, Step, Table};
+    use tsap_oo::{Event, Game, HeuristicBot, Phase, Rules, Seat, Step, Table, View};
 
-    /// Bots play out whole rounds; cards are conserved after every step and
-    /// every win reaches the threshold.
+    /// Bots play out whole rounds; cards are conserved after every step,
+    /// every win reaches the threshold, and none comes on a card the winner
+    /// was proven not to win on.
     #[test]
     fn bots_finish_rounds() {
         playout(Rules::new());
@@ -285,11 +286,16 @@ mod playouts {
     fn playout(rules: Rules) {
         let mut game = Game::new(rules, FIRST);
         let mut rng = SmallRng::seed_from_u64(2026);
-        let (mut wins, mut exhausted, mut fouls) = (0, 0, 0);
+        let (mut wins, mut exhausted, mut fouls, mut proven) = (0, 0, 0, 0);
         for _ in 0..200 {
             let bots = Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as _));
             let mut table = Table::new(game.deal(&mut rng), bots);
+            let mut safe = Seat::ALL.map(|_| susik::Hand::EMPTY);
             loop {
+                let round = table.round();
+                if round.phase() != Phase::Finished {
+                    safe = Seat::ALL.map(|seat| View::new(round, seat).safe(seat));
+                }
                 match table.step().unwrap() {
                     Step::Acted(seat) => {
                         let round = table.round();
@@ -310,6 +316,10 @@ mod playouts {
                 Some(winner) => {
                     wins += 1;
                     assert!(result.hu >= rules.threshold);
+                    if let Some(card) = result.winning_card {
+                        assert!(!safe[winner.index()].contains(card));
+                        proven += safe[winner.index()].len();
+                    }
                     assert_eq!(
                         result.layout.iter().map(|m| m.cards().len()).sum::<usize>(),
                         21
@@ -336,6 +346,7 @@ mod playouts {
         }
         assert_eq!(wins + exhausted + fouls, 200);
         assert!(wins > 0, "the bots never won");
+        assert!(proven > 0, "no card was ever proven safe");
         assert_eq!(game.scores().iter().sum::<i32>(), 0);
     }
 }
