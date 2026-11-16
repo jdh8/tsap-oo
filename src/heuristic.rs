@@ -274,7 +274,7 @@ impl HeuristicBot {
                         .pong
                         .then_some(Meld::Triplet(card))
                         .into_iter()
-                        .chain(options.eats.iter().copied())
+                        .chain(weighed(&options, hand, card))
                         .map(|meld| self.take(hand, meld, card, need))
                         .max();
                     match best {
@@ -288,6 +288,22 @@ impl HeuristicBot {
             .sum();
         total / to_i32(live.len()).max(1)
     }
+}
+
+/// The eats the bot weighs: all but a pair eaten while holding a pair
+///
+/// That eat keeps one copy in hand beside a meld it could have finished
+/// instead, as 車馬包包 eating a 包 into 包包 and keeping 車馬包.  Eating
+/// into the meld keeps the pair, which still waits on the last copy.
+// ponytail: left out since the rules allowed it, so the bots play on as
+// before; A/B before letting them weigh it.
+fn weighed(options: &ClaimOptions, hand: Hand, card: Card) -> impl Iterator<Item = Meld> + '_ {
+    let held = hand.count(card);
+    options
+        .eats
+        .iter()
+        .copied()
+        .filter(move |meld| !(matches!(meld, Meld::Pair(_)) && held == 2))
 }
 
 /// 將士象, 車馬包 or soldiers: the cards that meld together
@@ -414,7 +430,7 @@ impl HeuristicBot {
             .pong
             .then_some((Meld::Triplet(card), Claim::Pong))
             .into_iter()
-            .chain(options.eats.iter().map(|&meld| (meld, Claim::Eat(meld))));
+            .chain(weighed(options, hand, card).map(|meld| (meld, Claim::Eat(meld))));
         let mut graded: Vec<(i32, Claim)> = pass
             .into_iter()
             .chain(melds.map(|(meld, claim)| (self.take(hand, meld, card, need), claim)))

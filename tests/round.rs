@@ -393,3 +393,28 @@ fn the_greedy_bot_draws_rather_than_eat_into_a_meld_it_holds() {
     let mut bot = HeuristicBot::new(&Rules::new());
     assert_eq!(bot.claim(&View::new(&round, SECOND), &options), Claim::Pass);
 }
+
+#[test]
+fn a_pair_held_may_eat_into_a_pair_but_the_bot_does_not() {
+    // Second holds 俥傌炮炮 in yellow: First's 炮 may be ponged, eaten into
+    // 俥傌炮, or eaten into a pair keeping 俥傌炮 in hand.
+    let second = hand("帥仕兵兵.帥仕相相俥傌炮炮兵.將馬馬包.將包卒");
+    let offered = card("黃炮");
+    let mut others = [Hand::EMPTY; 3];
+    let rest = Hand::FULL - second - Hand::EMPTY.with(offered);
+    for (i, card) in rest.iter().take(60).enumerate() {
+        others[i % 3].insert(card);
+    }
+    let [first, third, fourth] = others;
+    let hands = [first.with(offered), second, third, fourth];
+    let mut round = Round::from_pile(Rules::new(), FIRST, pile(hands)).unwrap();
+    round.discard(FIRST, offered).unwrap();
+    assert_eq!(round.phase(), Phase::Claim(SECOND));
+    let options = round.claim_options(SECOND);
+    assert!(options.pong);
+    assert!(options.eats.contains(&Meld::Field(Color::Yellow)));
+    assert!(options.eats.contains(&Meld::Pair(offered)));
+    let mut bot = HeuristicBot::new(&Rules::new());
+    let claim = bot.claim(&View::new(&round, SECOND), &options);
+    assert_ne!(claim, Claim::Eat(Meld::Pair(offered)));
+}

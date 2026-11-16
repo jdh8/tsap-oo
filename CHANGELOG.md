@@ -125,6 +125,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A seat holding a pair may eat the third copy into a pair as well as pong
+  it: 車馬包包 can eat a 包 into 包包 and keep 車馬包 in hand.  Nothing
+  forbade it; the claim options left it out.  The bots still do not weigh
+  it, so their play is unchanged: `ab/run.sh` on 200,000 deals, seed base
+  1794854887, control 1945c1f, 0 deals part.
+
 - An exposed meld on the web table leads with the card it took from the
   table, as the log reads and as a Japanese mahjong table lays out a chi,
   instead of putting it in the middle as a Taiwanese mahjong table does.

@@ -219,9 +219,10 @@ pub(crate) fn options(hand: Hand, card: Card, eater: bool) -> ClaimOptions {
         locked_completions(hand, card)
             .into_iter()
             .filter(|meld| match meld {
-                // Holding a pair, one pongs instead; generals stay
+                // Holding a pair, one may still eat into a pair rather
+                // than pong, keeping the third copy; generals stay
                 // singles, which outscore a pair.
-                Meld::Pair(_) => n == 1 && card.rank != Rank::General,
+                Meld::Pair(_) => card.rank != Rank::General,
                 Meld::Court(_) | Meld::Field(_) | Meld::Soldiers(_) => true,
                 // `completions` lists a single only for a general.
                 Meld::Single(_) => true,

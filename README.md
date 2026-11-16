@@ -30,7 +30,8 @@ Play it in the browser at [jdh8.github.io/tsap-oo][web]; the front end in
   be won on by anyone, must be konged by whoever holds its concealed
   triplet, may be ponged by anyone holding its pair, and may be eaten by
   the drawer or by the next player into 將士象, 車馬包, soldiers of three
-  or four colours, or a pair.  Win beats kong beats pong beats eat; equal
+  or four colours, or a pair — even by a seat holding the pair, which may
+  pong instead.  Win beats kong beats pong beats eat; equal
   claims go to the earlier seat in turn order.  Winning is compulsory.
 - Generals (將帥) are each a meld by themselves, one 胡 apiece however many
   are held.  A drawn general that nobody wins on or kongs must be eaten by
