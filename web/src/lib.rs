@@ -7,7 +7,7 @@
 use rand::rngs::StdRng;
 use rand::{RngExt as _, SeedableRng as _};
 use serde::{Deserialize, Serialize};
-use tsap_oo::susik::{Card, Color, Hand, Meld, Solver};
+use tsap_oo::susik::{Card, Color, Hand, Meld, Rank, Solver};
 use tsap_oo::{
     Claim, Event, Game, HeuristicBot, Phase, Round, Rules, Seat, Strategy, Table, View, discardable,
 };
@@ -135,6 +135,8 @@ fn exposed(round: &Round, seat: Seat) -> Vec<Vec<CardJson>> {
 /// Lone generals go with the loose cards although each is a meld: there
 /// they head their colour, right beside any loose 士 or 象, so the 將士 and
 /// 將象 waits read at a glance.  The page marks them with a coin instead.
+/// Loose soldiers go last, together: beside a 炮 they make nothing, but
+/// with soldiers of other colours they make 三色卒.
 fn arrange(rules: &Rules, hand: Hand) -> Vec<Vec<CardJson>> {
     // The bots' grading (loose cards at 1 each), so the grouping shows what
     // they would see in the same hand.
@@ -151,7 +153,15 @@ fn arrange(rules: &Rules, hand: Hand) -> Vec<Vec<CardJson>> {
         }
     }
     if !loose.is_empty() {
-        groups.push(loose.iter().map(CardJson::from).collect());
+        let (soldiers, others): (Vec<Card>, Vec<Card>) =
+            loose.iter().partition(|card| card.rank == Rank::Soldier);
+        groups.push(
+            others
+                .into_iter()
+                .chain(soldiers)
+                .map(CardJson::from)
+                .collect(),
+        );
     }
     groups
 }
@@ -586,7 +596,6 @@ mod tests {
     /// A lone general heads its colour among the loose cards.
     #[test]
     fn lone_general_sits_with_the_loose_cards() {
-        use tsap_oo::susik::Rank;
         let stray = Card::new(Color::Red, Rank::Elephant);
         let general = Card::new(Color::Green, Rank::General);
         let advisor = Card::new(Color::Green, Rank::Advisor);
@@ -601,6 +610,21 @@ mod tests {
         assert_eq!(hand_hu(&Rules::new(), hand), 1);
         let elephant = Card::new(Color::Green, Rank::Elephant);
         assert_eq!(hand_hu(&Rules::new(), hand.with(elephant)), 2);
+    }
+
+    /// Loose soldiers of every colour go last, after the 炮.
+    #[test]
+    fn loose_soldiers_go_last() {
+        let red = Card::new(Color::Red, Rank::Soldier);
+        let cannon = Card::new(Color::Red, Rank::Cannon);
+        let green = Card::new(Color::Green, Rank::Soldier);
+        let hand = Hand::from_iter([red, cannon, green]);
+        let codes: Vec<Vec<String>> = arrange(&Rules::new(), hand)
+            .into_iter()
+            .map(|group| group.into_iter().map(|card| card.code).collect())
+            .collect();
+        let code = |card: Card| CardJson::from(card).code;
+        assert_eq!(codes, [[code(cannon), code(red), code(green)]]);
     }
 
     /// Drive whole rounds: the bots step, the human passes every claim and

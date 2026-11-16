@@ -59,6 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The web hand puts its loose soldiers last, all colours together: beside a
+  炮 they make nothing, but with soldiers of other colours they make 三色卒.
+  Display only; the hint and the bots are untouched.
 - `HeuristicBot` does not discard by danger: two trials did not win and
   play is unchanged (`ab/run.sh 20000`, control 0b5d48f, seed base
   1794817500, 0 of 20000 deals differ).  Both priced a discard at the rate
