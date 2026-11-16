@@ -33,6 +33,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   half-胡 short of the threshold at −11 to −18 against −64, and a card the
   hand wins on at about 25 against 8; yet the bot's own pick beats the
   discards graded within half a 胡 of it by 0.46 points on average.
+- The `fit` example also puts the grade in points, and
+  `research/grade-in-points.md` reads it (60000 rounds, seed base 20261119;
+  the earlier tables print unchanged).  Across hands the grade maps to
+  points by a rising curve, about 0.5 points a 胡 below a grade of 0 and 1.4
+  above, and by the stage of the round: a grade of 0 is worth +8.2 points
+  with 23 cards or more in the pile, −2.0 with 14 to 22 and −4.9 with fewer.
+  Between the choices of one discard it does not: the curve, fitted on half
+  the rounds, tells a third of what a choice within 2 胡 of the pick costs
+  on the other half, and the cost itself does not rise with the gap, 4.1
+  points at 1 to 2 胡 behind and 1.6 at 2 to 4.  Choices within 0.25 胡 of
+  the pick cost nothing measurable (+0.04 ± 0.10).
 - The `dealt` example: the 胡 already in a dealt hand of twenty cards, the
   melds they come from, and the cards left outside every meld.  No bot
   plays.  Over 100000 deals (seed 20261118) a hand holds 6.63 胡 and 7.28
@@ -70,6 +81,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   loss; over its first 60000 deals the seat lost where it broke a meld to
   keep a 搭子 and where it claimed or passed differently, not where it only
   kept a different loose card, and won 4% less often.
+- `HeuristicBot` still claims out of a wait: one trial did not win and play
+  is unchanged.  A hand that waits ponged or ate whenever that graded
+  higher, though it left fewer unseen cards to win on: 帥帥將將將 炮炮 兵卒
+  at its eight 胡 ponged the 炮 and went from eight waiting cards to three.
+  Grading such a claim below passing, on 200000 paired deals against
+  fc6ca57 (seed base 1794828275, 3607 differ): +0.007 ± 0.011 points a
+  deal, 95% CI [−0.014, +0.029], winning 24.23% of rounds for 24.19%.
+  Verdict: inconclusive.
 - `MonteCarloBot` at 128 samples no longer measurably beats
   `HeuristicBot`, which has improved four times since 0.2.1 put it at 26.2%
   against 23.8%.  Seated among three `HeuristicBot`s and paired with a

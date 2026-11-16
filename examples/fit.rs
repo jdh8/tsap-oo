@@ -13,6 +13,11 @@
 //!   all.  The fit is of what a card scores beyond the bot's own pick on how
 //!   their terms differ, so whatever the choices share drops out.
 //!
+//! Then the grade as a whole is put in points, the way a chess engine puts
+//! its evaluation in pawns: the even shards' hands give the mean points of a
+//! hand by its grade, made monotone, and the odd shards' choices check that
+//! the curve tells what a choice costs.  `research/grade-in-points.md`.
+//!
 //! ```sh
 //! cargo run --release --example fit -- [rounds] [seed base]
 //! ```
@@ -71,6 +76,14 @@ const NEAR: f64 = 2.0;
 /// of these, then beyond
 const GAPS: [f64; 4] = [0.0, 0.5, 2.0, 8.0];
 
+/// The curve's bins: one a 胡 of grade, the first from [`LOW`] down and the
+/// last from `LOW + BINS - 1` up
+const BINS: usize = 72;
+const LOW: f64 = -40.0;
+
+/// [`GAPS`] cut finer, for what a choice behind the pick costs
+const FINE: [f64; 8] = [0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0];
+
 /// The sums a least squares fit needs
 #[derive(Clone, Copy)]
 struct Sums<const K: usize> {
@@ -121,7 +134,6 @@ impl<const K: usize> Sums<K> {
 }
 
 /// What one shard of rounds adds up to
-#[derive(Clone, Copy)]
 struct Tally {
     /// By stage, as [`STAGES`]
     hands: [Sums<13>; 4],
@@ -129,6 +141,67 @@ struct Tally {
     choices: [Sums<7>; 2],
     /// By gap, as [`GAPS`]: choices, and their points beyond the pick's
     gaps: [[f64; 2]; 5],
+    /// By stage and bin of grade: hands, and the points they end with
+    curve: [[[f64; 2]; BINS]; 4],
+    /// Choices other than the pick: the stage, the pick's grade, the
+    /// choice's and its points beyond the pick's
+    trials: Vec<(usize, f64, f64, f64)>,
+}
+
+/// The stage of `round`, as [`STAGES`]
+fn stage(round: &Round) -> usize {
+    match round.pile_len() {
+        23.. => 0,
+        14..=22 => 1,
+        _ => 2,
+    }
+}
+
+/// The 胡 `seat` has exposed
+fn shown(round: &Round, seat: Seat) -> u32 {
+    let melds = round.exposed(seat).iter();
+    melds.map(|meld| round.rules().exposed.score(meld)).sum()
+}
+
+/// The bin of [`BINS`] a grade falls in
+fn bin(grade: f64) -> usize {
+    ((grade - LOW).floor().max(0.0) as usize).min(BINS - 1)
+}
+
+/// A curve's `bins` of (hands, points) as (grade, mean points) knots, the
+/// means made to rise with the grade by pooling adjacent violators
+fn monotone(bins: &[[f64; 2]; BINS]) -> Vec<(f64, f64)> {
+    // (hands, points, bins pooled)
+    let mut pools: Vec<(f64, f64, usize)> = Vec::new();
+    let mut knots = Vec::new();
+    for (i, &[n, sum]) in bins.iter().enumerate() {
+        if n == 0.0 {
+            continue;
+        }
+        knots.push(LOW + i as f64 + 0.5);
+        pools.push((n, sum, 1));
+        while let [.., a, b] = pools[..]
+            && a.1 / a.0 > b.1 / b.0
+        {
+            pools.truncate(pools.len() - 2);
+            pools.push((a.0 + b.0, a.1 + b.1, a.2 + b.2));
+        }
+    }
+    let means = pools
+        .iter()
+        .flat_map(|&(n, sum, bins)| std::iter::repeat_n(sum / n, bins));
+    knots.into_iter().zip(means).collect()
+}
+
+/// The points of `grade` on a curve of `knots`: between two knots a line,
+/// beyond the ends flat
+fn read(knots: &[(f64, f64)], grade: f64) -> f64 {
+    let i = knots.partition_point(|&(at, _)| at < grade);
+    match (i.checked_sub(1).map(|i| knots[i]), knots.get(i)) {
+        (Some((x0, y0)), Some(&(x1, y1))) => y0 + (y1 - y0) * (grade - x0) / (x1 - x0),
+        (Some((_, y)), None) | (None, Some(&(_, y))) => y,
+        (None, None) => 0.0,
+    }
 }
 
 fn terms(t: Terms) -> [f64; 7] {
@@ -161,6 +234,7 @@ fn points(round: &Round) -> [i32; Seat::COUNT] {
 /// Try every card `seat` could discard and play the round out after each
 fn choices(bot: &mut HeuristicBot, round: &Round, seat: Seat, tally: &mut Tally) {
     let view = View::new(round, seat);
+    let (stage, shown) = (stage(round), f64::from(shown(round, seat)));
     let mut pick = None;
     for (card, grade) in bot.discards(&view) {
         // A dead hand has no terms.
@@ -189,6 +263,9 @@ fn choices(bot: &mut HeuristicBot, round: &Round, seat: Seat, tally: &mut Tally)
         let row = &mut tally.gaps[row.unwrap_or(GAPS.len())];
         row[0] += 1.0;
         row[1] += dy;
+        tally
+            .trials
+            .push((stage, shown + grade0, shown + grade, dy));
     }
 }
 
@@ -200,16 +277,8 @@ fn hands(
     (seat, card): (Seat, tsap_oo::susik::Card),
     seen: &mut Vec<(usize, Seat, [f64; 13])>,
 ) {
-    let rules = round.rules();
-    let stage = match round.pile_len() {
-        23.. => 0,
-        14..=22 => 1,
-        _ => 2,
-    };
-    let shown = Seat::ALL.map(|seat| {
-        let melds = round.exposed(seat).iter();
-        melds.map(|meld| rules.exposed.score(meld)).sum::<u32>()
-    });
+    let stage = stage(round);
+    let shown = Seat::ALL.map(|seat| shown(round, seat));
     // The discarder's own card is not out yet.
     let out: usize = Seat::ALL
         .iter()
@@ -271,6 +340,13 @@ fn play(seed: u64, tally: &mut Tally) {
         let y = f64::from(points[seat.index()]);
         tally.hands[stage].add(&x, y);
         tally.hands[3].add(&x, y);
+        // The grade the bot compares claims by: exposed 胡 and all.
+        let grade = x[1] + (0..7).map(|i| CHOICE_NOW[i] * x[2 + i]).sum::<f64>() / 32.0;
+        for stage in [stage, 3] {
+            let cell = &mut tally.curve[stage][bin(grade)];
+            cell[0] += 1.0;
+            cell[1] += y;
+        }
     }
 }
 
@@ -330,6 +406,8 @@ fn main() {
                         hands: [Sums::NEW; 4],
                         choices: [Sums::NEW; 2],
                         gaps: [[0.0; 2]; 5],
+                        curve: [[[0.0; 2]; BINS]; 4],
+                        trials: Vec::new(),
                     };
                     for i in (shard..rounds).step_by(threads) {
                         play(base + i, &mut tally);
@@ -365,5 +443,115 @@ fn main() {
         );
         let most = GAPS.get(row).map_or("more".into(), |most| most.to_string());
         println!("{most:6} {n:9} {mean:23.3} {se:6.3}");
+    }
+    curve(&shards);
+}
+
+/// Print the grade in points: the curve of each stage from the even shards'
+/// hands, then how it tells the odd shards' choices
+fn curve(shards: &[Tally]) {
+    let knots: Vec<Vec<(f64, f64)>> = (0..4)
+        .map(|stage| {
+            let mut bins = [[0.0; 2]; BINS];
+            for shard in shards.iter().step_by(2) {
+                for (cell, add) in bins.iter_mut().zip(shard.curve[stage]) {
+                    cell[0] += add[0];
+                    cell[1] += add[1];
+                }
+            }
+            println!("\ngrade in points, {}", STAGES[stage]);
+            println!("grade      hands     mean  monotone");
+            let knots = monotone(&bins);
+            for &(at, points) in &knots {
+                let [n, sum] = bins[bin(at)];
+                println!("{:5} {n:10} {:8.3} {points:9.3}", at - 0.5, sum / n);
+            }
+            knots
+        })
+        .collect();
+    // Per odd shard and gap, the last row every gap: choices, the 胡 behind,
+    // the points beyond the pick, then for the curve of the stage and of the
+    // whole round what it tells, that times the points, and its square.
+    let rows: Vec<[[f64; 9]; 6]> = shards
+        .iter()
+        .skip(1)
+        .step_by(2)
+        .map(|shard| {
+            let mut rows = [[0.0; 9]; 6];
+            for &(stage, pick, grade, dy) in &shard.trials {
+                let gap = pick - grade;
+                let row = GAPS.iter().position(|&most| gap <= most);
+                let told = [stage, 3].map(|s| read(&knots[s], grade) - read(&knots[s], pick));
+                for row in [row.unwrap_or(GAPS.len()), 5] {
+                    let row = &mut rows[row];
+                    row[0] += 1.0;
+                    row[1] += gap;
+                    row[2] += dy;
+                    for (i, told) in told.into_iter().enumerate() {
+                        row[3 + 3 * i] += told;
+                        row[4 + 3 * i] += told * dy;
+                        row[5 + 3 * i] += told * told;
+                    }
+                }
+            }
+            rows
+        })
+        .collect();
+    println!("\nwhat the curves tell of the odd shards' choices");
+    println!(
+        "up to    choices  胡 behind   points      ±  by stage  slope      ±  whole  slope      ±"
+    );
+    for row in 0..6 {
+        let sum = |i: usize| rows.iter().map(|shard| shard[row][i]).sum::<f64>();
+        let (points, se) = spread(rows.iter().map(|shard| shard[row][2] / shard[row][0]));
+        let most = match GAPS.get(row) {
+            Some(most) => most.to_string(),
+            None if row == GAPS.len() => "more".into(),
+            None => "all".into(),
+        };
+        print!(
+            "{most:6} {:9} {:10.3} {points:8.3} {se:6.3}",
+            sum(0),
+            sum(1) / sum(0)
+        );
+        for i in [3, 6] {
+            // Least squares through the origin: points on what was told.
+            let slope = spread(
+                rows.iter()
+                    .map(|shard| shard[row][i + 1] / shard[row][i + 2]),
+            );
+            print!(" {:9.3} {:6.3} {:6.3}", sum(i) / sum(0), slope.0, slope.1);
+        }
+        println!();
+    }
+    // Every shard's choices by stage and gap: choices, 胡 behind, points.
+    for (stage, name) in STAGES.into_iter().enumerate() {
+        println!("\nwhat a choice behind the pick costs, {name}");
+        println!("up to    choices  胡 behind   points      ±");
+        let rows: Vec<[[f64; 3]; FINE.len() + 1]> = shards
+            .iter()
+            .map(|shard| {
+                let mut rows = [[0.0; 3]; FINE.len() + 1];
+                for &(at, pick, grade, dy) in &shard.trials {
+                    if stage == 3 || stage == at {
+                        let gap = pick - grade;
+                        let row = FINE.iter().position(|&most| gap <= most);
+                        let row = &mut rows[row.unwrap_or(FINE.len())];
+                        row[0] += 1.0;
+                        row[1] += gap;
+                        row[2] += dy;
+                    }
+                }
+                rows
+            })
+            .collect();
+        for row in 0..=FINE.len() {
+            let n: f64 = rows.iter().map(|shard| shard[row][0]).sum();
+            let gap: f64 = rows.iter().map(|shard| shard[row][1]).sum();
+            let filled = rows.iter().filter(|shard| shard[row][0] > 0.0);
+            let (points, se) = spread(filled.map(|shard| shard[row][2] / shard[row][0]));
+            let most = FINE.get(row).map_or("more".into(), |most| most.to_string());
+            println!("{most:6} {n:9} {:10.3} {points:8.3} {se:6.3}", gap / n);
+        }
     }
 }
