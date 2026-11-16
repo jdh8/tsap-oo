@@ -80,7 +80,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   both at 3aa5b0c (3200 deals, seed base 1794830779, 1251 differ): +0.347 ±
   0.175, 95% CI [+0.005, +0.689], winning 50.41% of rounds for 49.44%; a
   win by the rule, on one run with its bound at zero, where four seats gave
-  +0.148 ± 0.276.
+  +0.148 ± 0.276.  A second run on a fresh seed base did not repeat it
+  (both at e40cca4, 3200 deals, seed base 1794846583, 1202 differ): +0.050 ±
+  0.172, 95% CI [−0.287, +0.388], winning 51.47% for 51.47%; inconclusive.
+  The Peeker at 128 samples wins at two seats (e40cca4 with the Peeker
+  against e40cca4, `RESHUFFLE=0`, 3200 deals, seed base 1794847090, 1616
+  differ): +2.824 ± 0.192, 95% CI [+2.449, +3.200], winning 60.88% of rounds
+  for 49.31%.  Less the rerun that is +2.77 ± 0.26 points a deal, the most
+  that reading the other hand could be worth at two seats.
 - `HeuristicBot::terms` and `Terms`: the seven counts a hand's grade is the
   weighted sum of.  Play is unchanged: on paired deals against 10a046f
   (`ab/run.sh 20000`, seed base 1794823476), 0 of 20000 deals differ.
