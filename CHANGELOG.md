@@ -24,7 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   grade's weights to data, stand.  It now opens with what the survey below
   found and adds two ways that leave the bot alone: measuring better, by
   replaying each deal from where the two bots first differ over reshuffled
-  piles, and a table of two seats to try ideas at.
+  piles, and a table of two seats to try ideas at.  The bot that is to
+  measure the ceiling by peeking at the other hands is named Peeker and kept
+  out of the library, behind a `peek` feature the web does not enable.
 - `research/prior-art.md`: what mahjong and rummy bots do that could carry
   over.  No paper on four-colour cards was found.  Mahjong bots model the
   other seats to price dealing in, which does not pay here; the gin rummy
