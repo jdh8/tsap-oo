@@ -21,7 +21,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   twenty to between 3% and 5% at eight or fewer.
 - `doc/stronger-bot.md`: the ways to a stronger bot other than Monte Carlo,
   and where the first two of them, reading the other seats and fitting the
-  grade's weights to data, stand.
+  grade's weights to data, stand.  It now opens with what the survey below
+  found and adds two ways that leave the bot alone: measuring better, by
+  replaying each deal from where the two bots first differ over reshuffled
+  piles, and a table of two seats to try ideas at.
+- `research/prior-art.md`: what mahjong and rummy bots do that could carry
+  over.  No paper on four-colour cards was found.  Mahjong bots model the
+  other seats to price dealing in, which does not pay here; the gin rummy
+  champion grades a discard by how useful it is to the opponent; and paired
+  deals leave the noise that follows the first differing move, which
+  backgammon rollouts and poker's luck-adjusted scores remove.
+- `research/two-seats.md`: the same rules at two seats, by changing
+  `Seat::COUNT` in a scratch copy; the library and the bots are unchanged.
+  Two changes that won at four seats win at two, each on 200000 paired
+  deals, but no more clearly.  Keeping a waiting hand (3526146 against
+  a74b951, seed base 1794830208, 3901 differ): +0.030 ± 0.005 points a
+  deal, 95% CI [+0.021, +0.040], for 1.8 times the compute of the four-seat
+  verdict.  Not eating into a whole meld (1b644f2 against 6fc8f21, seed
+  base 1794830528, 21854 differ): +0.222 ± 0.011, 95% CI [+0.199, +0.244],
+  for 0.4 times.  `MonteCarloBot` at 128 samples against `HeuristicBot`,
+  both at 3aa5b0c (3200 deals, seed base 1794830779, 1251 differ): +0.347 ±
+  0.175, 95% CI [+0.005, +0.689], winning 50.41% of rounds for 49.44%; a
+  win by the rule, on one run with its bound at zero, where four seats gave
+  +0.148 ± 0.276.
 - `HeuristicBot::terms` and `Terms`: the seven counts a hand's grade is the
   weighted sum of.  Play is unchanged: on paired deals against 10a046f
   (`ab/run.sh 20000`, seed base 1794823476), 0 of 20000 deals differ.
