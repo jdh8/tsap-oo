@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The web page shows your waits (聽牌): while you are one card from
+  winning, a row under the hand lists every card that wins, each with the
+  胡 it wins at and the copies you have not seen.  While you discard, each
+  card whose discard leaves you waiting is marked 聽, and pointing at it
+  shows those waits.  `Round::win` is public for it and takes the hand to
+  try, so a discard can be tried before it is made.
+
 - `ab/` averages out the luck after the two bots part: at the candidate's
   first choice the control would not make, it reshuffles the pile left 8
   times and plays both choices out on each (`RESHUFFLE`, 0 for the plain

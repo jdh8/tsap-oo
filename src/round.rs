@@ -562,10 +562,12 @@ impl Round {
         options(self.hands[seat.index()], card, eater)
     }
 
-    /// The best winning layout of `seat`'s cards plus `card`, if it reaches
-    /// the threshold
-    fn win(&self, seat: Seat, card: Card) -> Option<(u32, Vec<Meld>)> {
-        let hand = self.hands[seat.index()];
+    /// The 胡 and the best winning layout of `hand` plus `card` beside
+    /// `seat`'s exposed melds, if it reaches the threshold: what `card` wins
+    /// at, drawn or discarded.  `hand` is `seat`'s concealed cards, or what
+    /// they would be after a discard.
+    #[must_use]
+    pub fn win(&self, seat: Seat, hand: Hand, card: Card) -> Option<(u32, Vec<Meld>)> {
         let exposed = &self.exposed[seat.index()];
         let base: u32 = exposed.iter().map(|m| self.rules.exposed.score(m)).sum();
         let mut solver = Solver::new(self.rules.concealed, None).locked();
@@ -595,7 +597,7 @@ impl Round {
         };
         self.offer = Some(offer);
         for seat in Self::order(offer) {
-            if let Some((hu, layout)) = self.win(seat, card) {
+            if let Some((hu, layout)) = self.win(seat, self.hands[seat.index()], card) {
                 let from = (!(drawn && seat == source)).then_some(source);
                 self.finish(Some(seat), None, hu, layout, Some(card), from);
                 return;

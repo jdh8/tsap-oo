@@ -211,6 +211,34 @@ function render() {
     hand.append(box);
   }
 
+  // Your waits (聽牌), each card that wins with the 胡 it wins at and the
+  // copies you have not seen.  While you discard, a card whose discard
+  // leaves you waiting is marked 聽, and pointing at it shows those waits;
+  // the row keeps its room meanwhile so the buttons below stay put.
+  const waits = id('waits');
+  const showWaits = (rows) => {
+    waits.replaceChildren();
+    if (!rows.length) return;
+    waits.append('聽');
+    for (const w of rows) {
+      const item = document.createElement('div');
+      item.className = w.left ? 'wait' : 'wait gone';
+      const note = document.createElement('span');
+      note.innerHTML = `${w.hu} 胡<br>${w.left} 張`;
+      item.append(cardEl(w.card), note);
+      waits.append(item);
+    }
+  };
+  showWaits(state.waits);
+  waits.classList.toggle('reserve', state.discard_waits.length > 0);
+  for (const { code, waits: rows } of state.discard_waits) {
+    for (const el of hand.querySelectorAll(`[data-code="${code}"]`)) {
+      el.classList.add('tenpai');
+      el.onmouseenter = () => showWaits(rows);
+      el.onmouseleave = () => showWaits([]);
+    }
+  }
+
   // Claim buttons.
   const actions = id('actions');
   actions.replaceChildren();

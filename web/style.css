@@ -137,9 +137,29 @@ section.me { display: flex; flex-direction: column; align-items: center; gap: 0.
 .status { min-height: 1.4rem; font-weight: 600; }
 .status.acting { color: var(--gold); }
 /* The bottom padding keeps room for the hint's grades under the cards. */
-.hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.9rem; padding-bottom: 1rem; }
+.hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.9rem; padding: 0.8rem 0 1rem; }
+/* A discard that leaves you waiting. */
+.card.tenpai::before {
+  content: "聽";
+  position: absolute;
+  bottom: calc(100% + 1px);
+  left: 50%;
+  translate: -50% 0;
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: var(--gold);
+}
 .hand .group { display: flex; gap: 0.25rem; }
 .exposed { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; }
+/* Your waits, sized like the melds on the table so they do not read as
+   your hand; the 胡 and the copies left under each card. */
+.waits { display: flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.4rem; border-radius: 6px; background: rgba(0, 0, 0, 0.18); }
+.waits:empty { display: none; }
+.waits.reserve { display: flex; min-height: 4.6rem; }
+.waits.reserve:empty { background: none; }
+.waits .wait { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; font-size: 0.65rem; line-height: 1.2; text-align: center; font-variant-numeric: tabular-nums; }
+.waits .wait.gone { opacity: 0.5; }
+.waits .card { --card-w: 1.1rem; --card-h: 2.8rem; font-size: 0.9rem; }
 
 /* Cards: dyed strips, piece in black. */
 .card {

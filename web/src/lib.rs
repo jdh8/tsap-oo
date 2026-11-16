@@ -220,6 +220,49 @@ struct OptionsJson {
     blocked_eats: Vec<Vec<CardJson>>,
 }
 
+/// A card that would win the human's hand, the 胡 it wins at, and how many
+/// copies the human has not seen
+#[derive(Serialize)]
+struct WaitJson {
+    card: CardJson,
+    hu: u32,
+    left: u8,
+}
+
+/// A discard that leaves the human's hand waiting, and on what
+#[derive(Serialize)]
+struct DiscardWaitsJson {
+    code: String,
+    waits: Vec<WaitJson>,
+}
+
+/// The cards the human has not seen: in other hands or the pile, counted
+/// as `HeuristicBot` counts them
+fn unseen(round: &Round) -> Hand {
+    let shown = Seat::ALL
+        .into_iter()
+        .flat_map(|seat| round.exposed(seat))
+        .flat_map(|meld| meld.cards())
+        .chain(round.discards().iter().map(|&(_, card)| card))
+        .chain(round.offer().map(|offer| offer.card));
+    shown.fold(Hand::FULL - round.hand(HUMAN), Hand::without)
+}
+
+/// The cards that would win `hand` beside the human's exposed melds
+fn waits(round: &Round, hand: Hand, unseen: Hand) -> Vec<WaitJson> {
+    Card::ALL
+        .into_iter()
+        .filter_map(|card| {
+            let (hu, _) = round.win(HUMAN, hand, card)?;
+            Some(WaitJson {
+                card: card.into(),
+                hu,
+                left: unseen.count(card),
+            })
+        })
+        .collect()
+}
+
 #[derive(Serialize)]
 struct DiscardJson {
     seat: usize,
@@ -258,6 +301,10 @@ struct Snapshot {
     /// generals
     locked: Vec<String>,
     discards: Vec<DiscardJson>,
+    /// The human's waits (聽牌), empty while they discard or the round is over
+    waits: Vec<WaitJson>,
+    /// While the human discards, each discard that leaves them waiting
+    discard_waits: Vec<DiscardWaitsJson>,
     log: Vec<String>,
     result: Option<ResultJson>,
 }
@@ -348,6 +395,24 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
                 card: card.into(),
             })
             .collect(),
+        waits: match round.phase() {
+            Phase::Discard(HUMAN) | Phase::Finished => Vec::new(),
+            _ => waits(round, round.hand(HUMAN), unseen(round)),
+        },
+        discard_waits: if round.phase() == Phase::Discard(HUMAN) {
+            let hand = round.hand(HUMAN);
+            let unseen = unseen(round);
+            discardable(hand, round.locked())
+                .distinct()
+                .map(|(card, _)| DiscardWaitsJson {
+                    code: CardJson::from(card).code,
+                    waits: waits(round, hand.without(card), unseen),
+                })
+                .filter(|discard| !discard.waits.is_empty())
+                .collect()
+        } else {
+            Vec::new()
+        },
         log: round.events().iter().map(describe).collect(),
         result: round.result().map(|result| {
             let public = result.winner.map_or(0, |seat| {
@@ -623,6 +688,57 @@ mod tests {
         assert_eq!(codes, [[code(cannon), code(red), code(green)]]);
     }
 
+    /// With a bot in the human's seat, every win of theirs on a card comes
+    /// on one of the waits shown just before, at the 胡 shown, and each
+    /// discard leaves the waits shown for it.
+    #[test]
+    fn waits_foretell_the_win() {
+        let mut rng = StdRng::seed_from_u64(7);
+        let game = Game::new(Rules::new(), HUMAN);
+        let mut wins = 0;
+        while wins < 5 {
+            let bots = Seat::ALL
+                .map(|_| Some(Box::new(HeuristicBot::new(game.rules())) as Box<dyn Strategy>));
+            let mut table = Table::new(game.deal(&mut rng), bots);
+            let pairs = |waits: &[WaitJson]| -> Vec<(String, u32)> {
+                waits.iter().map(|w| (w.card.code.clone(), w.hu)).collect()
+            };
+            let mut waits = Vec::new();
+            let mut foretold = None;
+            while table.round().phase() != Phase::Finished {
+                let snapshot = snapshot(&game, table.round());
+                if table.round().phase() == Phase::Discard(HUMAN) {
+                    assert!(snapshot.waits.is_empty());
+                    foretold = Some((snapshot.discard_waits, table.round().events().len()));
+                } else {
+                    assert!(snapshot.discard_waits.is_empty());
+                    if let Some((discards, n)) = foretold.take() {
+                        // An unclaimed draw is logged as its drawer's
+                        // discard too, so take the event this discard pushed.
+                        let Event::Discard { card, .. } = table.round().events()[n] else {
+                            unreachable!("the human discarded");
+                        };
+                        let code = CardJson::from(card).code;
+                        let shown = discards.iter().find(|d| d.code == code);
+                        assert_eq!(
+                            shown.map_or_else(Vec::new, |d| pairs(&d.waits)),
+                            pairs(&snapshot.waits),
+                        );
+                    }
+                    waits = snapshot.waits;
+                }
+                table.step().unwrap();
+            }
+            let result = table.round().result().unwrap();
+            if let (Some(HUMAN), Some(card)) = (result.winner, result.winning_card) {
+                let code = CardJson::from(card).code;
+                let wait = waits.iter().find(|wait| wait.card.code == code);
+                assert_eq!(wait.map(|wait| wait.hu), Some(result.hu));
+                wins += 1;
+            }
+        }
+    }
+
     /// Drive whole rounds: the bots step, the human passes every claim and
     /// discards their first legal card, and every snapshot serializes.
     #[test]
@@ -666,6 +782,9 @@ mod tests {
                     assert_eq!(hu, u64::from(table), "a hidden hand counts nothing");
                 }
             }
+            for wait in value["waits"].as_array().unwrap() {
+                assert!(wait["hu"].as_u64().unwrap() >= u64::from(rules.threshold));
+            }
             match core.table.round().phase() {
                 Phase::Finished => {
                     let result = &value["result"];
@@ -705,6 +824,7 @@ mod tests {
                     }
                 }
                 Phase::Discard(HUMAN) => {
+                    assert!(value["waits"].as_array().unwrap().is_empty());
                     let round = core.table.round();
                     let legal = discardable(round.hand(HUMAN), round.locked());
                     let hints = core.hint();
