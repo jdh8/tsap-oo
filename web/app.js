@@ -196,6 +196,7 @@ function render() {
   if (me.exposed.length) exposed.append(meldsEl(me.exposed));
   const hand = id('hand');
   hand.replaceChildren();
+  hand.style.setProperty('--n', me.hand.flat().length);
   const myDiscard = !finished && state.phase === 'discard' && state.actor === state.human;
   // Grouped by the engine: the best melds, then the loose cards with the
   // lone generals among them.

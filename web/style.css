@@ -30,6 +30,10 @@
   --back: #8a4b2a;
   --card-w: 1.75rem;
   --card-h: 4.5rem;
+  /* The cards you only read: melds on the table, discards, waits. */
+  --small-w: 1.1rem;
+  --small-h: 2.8rem;
+  --small-font: 0.9rem;
 }
 
 * { box-sizing: border-box; }
@@ -75,6 +79,7 @@ h1 { font-size: 1.2rem; margin: 0; white-space: nowrap; }
   color: inherit;
   text-decoration: none;
   cursor: pointer;
+  white-space: nowrap;
 }
 #new { margin-left: auto; }
 .quiet:hover { background: rgba(255, 255, 255, 0.12); }
@@ -109,9 +114,7 @@ main {
 .melds { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; }
 .meld { display: flex; gap: 0.15rem; padding: 0.2rem; border-radius: 6px; background: rgba(0, 0, 0, 0.18); }
 .side .fan .card, .side .meld .card, .top .fan .card, .top .meld .card {
-  --card-w: 1.1rem;
-  --card-h: 2.8rem;
-  font-size: 0.9rem;
+  --card-w: var(--small-w); --card-h: var(--small-h); font-size: var(--small-font);
 }
 
 /* Centre of the table: the card on offer, the discard pile, the draw pile. */
@@ -129,15 +132,27 @@ main {
 .offer .card { box-shadow: 0 0 0 3px var(--gold); }
 .offer .who { font-size: 0.9rem; opacity: 0.9; }
 .discards { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.2rem; max-width: 100%; }
-.discards .card { --card-w: 1.1rem; --card-h: 2.8rem; font-size: 0.9rem; opacity: 0.85; }
+.discards .card { --card-w: var(--small-w); --card-h: var(--small-h); font-size: var(--small-font); opacity: 0.85; }
 .pile { font-size: 0.85rem; opacity: 0.8; }
 
 /* You: status line, exposed melds, the hand, and the claim buttons. */
 section.me { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
 .status { min-height: 1.4rem; font-weight: 600; }
 .status.acting { color: var(--gold); }
-/* The bottom padding keeps room for the hint's grades under the cards. */
-.hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.9rem; padding: 0.8rem 0 1rem; }
+/* The bottom padding keeps room for the hint's grades under the cards.
+   The hand never wraps: its cards narrow to fit one row instead, and the
+   piece shrinks with them, by `--n`, the cards in hand (set in app.js). */
+.hand {
+  --n: 21;
+  container-type: inline-size;
+  align-self: stretch;
+  display: flex;
+  justify-content: center;
+  padding: 0.8rem 0 1rem;
+}
+.hand .group, .hand .card { flex: 0 1 auto; min-width: 0; }
+.hand .group + .group { margin-left: min(0.9rem, 1.5cqw); }
+.hand .card { flex-basis: var(--card-w); font-size: min(1.25rem, 80cqw / var(--n)); }
 /* A discard that leaves you waiting. */
 .card.tenpai::before {
   content: "聽";
@@ -149,17 +164,17 @@ section.me { display: flex; flex-direction: column; align-items: center; gap: 0.
   font-weight: 400;
   color: var(--gold);
 }
-.hand .group { display: flex; gap: 0.25rem; }
+.hand .group { display: flex; gap: min(0.25rem, 0.4cqw); }
 .exposed { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; }
 /* Your waits, sized like the melds on the table so they do not read as
    your hand; the 胡 and the copies left under each card. */
 .waits { display: flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.4rem; border-radius: 6px; background: rgba(0, 0, 0, 0.18); }
 .waits:empty { display: none; }
-.waits.reserve { display: flex; min-height: 4.6rem; }
+.waits.reserve { display: flex; min-height: calc(var(--small-h) + 1.8rem); }
 .waits.reserve:empty { background: none; }
 .waits .wait { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; font-size: 0.65rem; line-height: 1.2; text-align: center; font-variant-numeric: tabular-nums; }
 .waits .wait.gone { opacity: 0.5; }
-.waits .card { --card-w: 1.1rem; --card-h: 2.8rem; font-size: 0.9rem; }
+.waits .card { --card-w: var(--small-w); --card-h: var(--small-h); font-size: var(--small-font); }
 
 /* Cards: dyed strips, piece in black. */
 .card {
@@ -281,7 +296,7 @@ button.action.claim:enabled:hover { background: rgba(255, 255, 255, 0.12); }
 .result h2 { margin: 0; font-size: 1.1rem; }
 .result .melds { justify-content: center; }
 .result .meld { background: rgba(0, 0, 0, 0.06); }
-.result .meld .card { --card-w: 1.1rem; --card-h: 2.8rem; font-size: 0.9rem; }
+.result .meld .card { --card-w: var(--small-w); --card-h: var(--small-h); font-size: var(--small-font); }
 
 /* The help sheet: the same paper, as a native modal <dialog>. */
 .rules {
@@ -299,7 +314,7 @@ button.action.claim:enabled:hover { background: rgba(255, 255, 255, 0.12); }
 .rules table { border-collapse: collapse; width: 100%; }
 .rules th, .rules td { padding: 0.25rem 0.4rem; border-bottom: 1px solid rgba(0, 0, 0, 0.12); text-align: left; }
 .rules td:last-child, .rules th:last-child { text-align: right; white-space: nowrap; }
-.rules .card { display: inline-flex; margin-right: 0.15rem; --card-w: 1.1rem; --card-h: 2.8rem; font-size: 0.9rem; }
+.rules .card { display: inline-flex; margin-right: 0.15rem; --card-w: var(--small-w); --card-h: var(--small-h); font-size: var(--small-font); }
 .rules p { font-size: 0.85rem; opacity: 0.8; }
 .rules form { text-align: center; }
 .rules .setting { margin: 0 0 0.8rem; }
@@ -323,13 +338,47 @@ body.log-hidden {
 }
 body.log-hidden .log { display: none; }
 
+/* A phone.  The page is exactly one screen: the table in the middle takes
+   what room is left and scrolls by itself when the melds outgrow it, so the
+   hand and the buttons never leave the screen.  The cards you only read
+   turn from strips to stubs. */
 @media (max-width: 40rem) {
-  body {
-    grid-template-columns: 1fr;
-    grid-template-rows: none;
-    grid-template-areas: "header" "main" "log";
+  :root {
+    --card-h: 3rem;
+    --small-w: 1rem;
+    --small-h: 1.7rem;
+    --small-font: 0.8rem;
   }
-  .middle { grid-template-columns: minmax(4rem, 1fr) minmax(0, 3fr) minmax(4rem, 1fr); }
-  :root { --card-w: 1.5rem; --card-h: 3.9rem; }
-  .log { max-height: 12rem; }
+  body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "header" "main" "log";
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+  }
+  header { flex-wrap: wrap; gap: 0.3rem 0.5rem; padding: 0.3rem 0.5rem; }
+  /* The title and the buttons share a row; the scores take the next. */
+  .scores { gap: 0.6rem; order: 1; flex-basis: 100%; }
+  .quiet { padding: 0.2rem 0.4rem; }
+  main { gap: 0.4rem; padding: 0.4rem 0.5rem; min-height: 0; }
+  .middle {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+    gap: 0.3rem;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    align-content: safe center;
+  }
+  .table { min-height: 0; }
+  .pile { text-align: center; }
+  .melds { gap: 0.2rem; }
+  .meld { gap: 1px; padding: 2px; }
+  /* Backs only count, so they close up; a hand shown at the end wraps. */
+  .fan { flex-wrap: wrap; justify-content: center; max-width: 100%; }
+  .fan .card:not(.back) { margin-left: 0; }
+  .fan .card.back:not(:first-child) { margin-left: calc(var(--card-w) * -0.85); }
+  .card.back { border-width: 1px; }
+  button.action .card { --card-h: 1.6rem; }
+  .log { max-height: 8rem; }
 }

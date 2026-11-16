@@ -125,6 +125,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The web page fits a phone.  The hand stays on one row at any width: its
+  cards narrow, and the pieces shrink with them, instead of wrapping.  On a
+  screen under 40rem wide the page is exactly one screen tall and never
+  wider: the table in the middle takes the room left over and scrolls by
+  itself, so the hand and the buttons stay put; the cards you only read
+  (melds, discards, waits) turn from strips to stubs, the opponents' backs
+  close up, and the header wraps.
+
 - A seat holding a pair may eat the third copy into a pair as well as pong
   it: 車馬包包 can eat a 包 into 包包 and keep 車馬包 in hand.  Nothing
   forbade it; the claim options left it out.  The bots still do not weigh
