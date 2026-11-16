@@ -125,6 +125,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The web help sheet is cut to the essentials: five rules and the 胡 table,
+  with links to the book for the rest.
+
 - On a touch screen a discard in the web page takes two taps: the first
   picks the card and lists what it leaves you waiting on, which a finger
   could not see for want of hovering, and the second plays it.  A mouse
