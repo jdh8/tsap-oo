@@ -17,9 +17,9 @@
     <button id="help" class="quiet" title="玩法與胡數（?）">?</button>
     <a class="quiet" href="https://jdh8.github.io/">arcade</a>
   </header>
-  <!-- One control per setting, named for its field of `Settings` in
-       src/lib.rs.  Applying deals a new game, since scores under different
-       tables do not add up. -->
+  <!-- One control per setting.  Those the engine reads are named for their
+       fields of `Settings` in src/lib.rs, and changing one deals a new game,
+       since scores under different tables do not add up; `tap` is app.js's. -->
   <dialog id="settings" class="rules" closedby="any">
     <h2>設定</h2>
     <form method="dialog">
@@ -28,7 +28,14 @@
           <option value="10">十胡（滿 10 胡）</option>
           <option value="8">八胡（滿 8 胡）</option>
         </select></label></div>
-      <button class="action">開新局</button>
+      <div class="setting"><label>打牌
+        <select name="tap">
+          <option value="0">自動（滑鼠點一下，觸控點兩下）</option>
+          <option value="1">點一下就打出</option>
+          <option value="2">先點選，再點一次打出</option>
+        </select></label></div>
+      <p>換玩法會開新局。</p>
+      <button class="action">套用</button>
     </form>
   </dialog>
   <!-- The values mirror `Rules::new`; app.js fills in the threshold. -->
@@ -49,7 +56,8 @@
         會讓你相公的吃碰按鈕是灰的，按不下去。</li>
       <li>不知道怎麼打？按<b>提示</b>（或 <kbd>h</kbd>）看電腦在你的位置會怎麼做：金框是它的首選，每張牌下和按鈕上的數字是電腦把那一步排在首選後面多遠：只是排序用的分數，沒有單位，8 以內可以當成一樣好，「死」是走了以後再也湊不到胡數的走法。</li>
       <li>你<b>聽牌</b>時，手牌下方列出胡得到的每一張牌，牌下是胡到那張的胡數，和你還沒看到的張數（不在你手上、桌上或棄牌堆的）。
-        輪到你打牌時，打了會聽牌的牌上標「聽」，滑鼠指著它就列出打掉以後聽什麼。</li>
+        輪到你打牌時，打了會聽牌的牌上標「聽」，滑鼠指著它就列出打掉以後聽什麼。
+        用觸控螢幕時打牌要點兩下：第一下選牌並列出聽什麼，再點一下才打出；<b>設定</b>裡可以改。</li>
       <li>名字旁的<b>胡數</b>是目前看得到的牌有幾胡：別家只算亮在桌上的組合，你的再加上手牌裡已成的組合，斜線後是胡牌要的胡數。</li>
       <li>21 張牌全部排成組合，合計滿 <b><span class="threshold">10</span> 胡</b>就胡牌；贏家向其他三家各收自己的胡數，並當下一局的莊。</li>
       <li>牌堆剩最後 6 張時流局，莊家連莊。</li>

@@ -225,6 +225,8 @@ section.me { display: flex; flex-direction: column; align-items: center; gap: 0.
 .card.locked { opacity: 0.5; }
 .hint { outline: 3px solid var(--gold); outline-offset: 2px; }
 .card.hint { transform: translateY(-0.4rem); }
+/* Picked by a first tap; the second plays it. */
+.card.picked { transform: translateY(-0.6rem); box-shadow: 0 0 0 2px #fff; }
 /* The hint's grade of each move: under a card, after a button's label. */
 .grade { font-size: 0.65rem; font-weight: 400; font-variant-numeric: tabular-nums; margin-left: 0.3rem; }
 .card .grade {

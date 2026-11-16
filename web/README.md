@@ -49,7 +49,12 @@ Once a round is over the bots' hands are shown and counted too, and the
 winner shows the winning count.
 
 設定 (or the `s` key) picks the table: 十胡, ten to win, or 八胡, eight.
-Applying it starts a new game, and the choice is remembered in the browser.
+Changing it starts a new game, and the choice is remembered in the browser.
+
+On a touch screen a discard takes two taps: the first picks the card and
+lists what it leaves you waiting on, the second plays it.  A mouse plays on
+the first click.  The page goes by the pointer you last pressed; 設定 can
+pin either way.
 
 Generals cannot be discarded, so they are dimmed in your hand.  A 碰 or 吃
 that would leave you nothing to discard is shown as a disabled button;

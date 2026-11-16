@@ -27,6 +27,14 @@ try {
   settings = JSON.parse(localStorage.getItem(SETTINGS_KEY)) ?? {};
 } catch {} // no storage or junk in it: the defaults
 
+// Whether a discard takes two taps: the first picks the card and shows what
+// it leaves you waiting on, the second plays it.  The `tap` setting says so,
+// or leaves it to the pointer last pressed: a finger covers a narrow card
+// and cannot hover, a mouse can do both.
+let touch = false;
+document.addEventListener('pointerdown', (e) => (touch = e.pointerType !== 'mouse'), true);
+const twoTaps = () => (settings.tap ? settings.tap === 2 : touch);
+
 function openSettings() {
   const form = id('settings').querySelector('form');
   for (const [name, value] of Object.entries(settings)) {
@@ -41,7 +49,9 @@ function applySettings(e) {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   } catch {} // still applies to this visit
-  newGame();
+  // Scores under different tables do not add up; the rest is the page's own.
+  if (settings.threshold !== state.threshold) newGame();
+  else render();
 }
 
 async function main() {
@@ -206,7 +216,16 @@ function render() {
     for (const c of group) {
       const locked = state.locked.includes(c.code);
       const el = cardEl(c, locked ? 'locked' : myDiscard ? 'clickable' : '');
-      if (myDiscard && !locked) el.onclick = () => show(game.discard(c.code));
+      if (myDiscard && !locked) {
+        el.onclick = () => {
+          if (!twoTaps() || el.classList.contains('picked')) return show(game.discard(c.code));
+          hand.querySelector('.picked')?.classList.remove('picked');
+          el.classList.add('picked');
+          status.firstChild.textContent = '再點一次打出';
+          picked = state.discard_waits.find((w) => w.code === c.code)?.waits ?? [];
+          showWaits(picked);
+        };
+      }
       box.append(el);
     }
     hand.append(box);
@@ -217,6 +236,7 @@ function render() {
   // leaves you waiting is marked 聽, and pointing at it shows those waits;
   // the row keeps its room meanwhile so the buttons below stay put.
   const waits = id('waits');
+  let picked = []; // the waits behind the card picked by a first tap
   const showWaits = (rows) => {
     waits.replaceChildren();
     if (!rows.length) return;
@@ -236,7 +256,7 @@ function render() {
     for (const el of hand.querySelectorAll(`[data-code="${code}"]`)) {
       el.classList.add('tenpai');
       el.onmouseenter = () => showWaits(rows);
-      el.onmouseleave = () => showWaits([]);
+      el.onmouseleave = () => showWaits(picked);
     }
   }
 

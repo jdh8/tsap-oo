@@ -125,6 +125,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- On a touch screen a discard in the web page takes two taps: the first
+  picks the card and lists what it leaves you waiting on, which a finger
+  could not see for want of hovering, and the second plays it.  A mouse
+  still plays on the first click.  The page goes by the pointer last
+  pressed, and a new setting, 打牌, pins either way.  Applying the settings
+  deals a new game only when the table changes.
+
 - The web page fits a phone.  The hand stays on one row at any width: its
   cards narrow, and the pieces shrink with them, instead of wrapping.  On a
   screen under 40rem wide the page is exactly one screen tall and never
