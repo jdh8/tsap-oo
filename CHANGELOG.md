@@ -52,34 +52,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `fit` example and `research/fitted-weights.md`: what each term is
   worth in points, by least squares over 60000 rounds (seed base 20261119),
   once across the hands held at every discard and once between the choices
-  of one discard, each played out.  A 胡 of grade is worth about 1.4 points.
+  of one discard, each played out.  A 胡 in the hand is worth about 1.4 points.
   Both fits weigh a loose card at about −48 where the bot has −128, a
   half-胡 short of the threshold at −11 to −18 against −64, and a card the
   hand wins on at about 25 against 8; yet the bot's own pick beats the
-  discards graded within half a 胡 of it by 0.46 points on average.
+  discards graded within 16 of it by 0.46 points on average.
 - The `fit` example also puts the grade in points, and
   `research/grade-in-points.md` reads it (60000 rounds, seed base 20261119;
   the earlier tables print unchanged).  Across hands the grade maps to
-  points by a rising curve, about 0.5 points a 胡 below a grade of 0 and 1.4
-  above, and by the stage of the round: a grade of 0 is worth +8.2 points
+  points by a rising curve, about 0.5 points for each 32 below a grade of 0 and
+  1.4 above, and by the stage of the round: a grade of 0 is worth +8.2 points
   with 23 cards or more in the pile, −2.0 with 14 to 22 and −4.9 with fewer.
   Between the choices of one discard it does not: the curve, fitted on half
-  the rounds, tells a third of what a choice within 2 胡 of the pick costs
+  the rounds, tells a third of what a choice within 64 of the pick costs
   on the other half, and the cost itself does not rise with the gap, 4.1
-  points at 1 to 2 胡 behind and 1.6 at 2 to 4.  Choices within 0.25 胡 of
-  the pick cost nothing measurable (+0.04 ± 0.10).
+  points at 32 to 64 behind and 1.6 at 64 to 128.  Choices within 8 of the
+  pick cost nothing measurable (+0.04 ± 0.10).  The example prints the grade
+  whole, where a 胡 held counts 32; its tables are those of d3bbb27 row for
+  row (1600 rounds, seed base 20261119), their grades 32 times as large.
 - The `dealt` example: the 胡 already in a dealt hand of twenty cards, the
   melds they come from, and the cards left outside every meld.  No bot
   plays.  Over 100000 deals (seed 20261118) a hand holds 6.63 胡 and 7.28
   loose cards on average.
 - The web hint grades every move: each card in your hand and each claim
-  button shows how many 胡 it falls behind the bot's pick, and 死 marks a
+  button shows how far the bot grades it behind its pick, and 死 marks a
   move that leaves the hand short of the 胡 to win.  Equal moves show as
-  equal.
+  equal.  The number is the bot's own grade, a whole number without a unit:
+  it orders the moves and is no price (`research/grade-in-points.md`).
 - `HeuristicBot::claims` and `HeuristicBot::discards` are public and return
-  each move with its grade in 胡, best first.  Play is unchanged: on paired
+  each move with its grade, best first.  The grade is the `i32` the bot
+  sorts by, a priority without a unit: a 胡 held counts 32 in it, but it is
+  not 胡.  Play is unchanged: on paired
   deals against fd5b9b2 (`ab/run.sh 20000`, seed base 1794786340), 0 of
-  20000 deals differ.
+  20000 deals differ.  Nor does returning the grade whole change it:
+  against d3bbb27 (`ab/run.sh 20000`, seed base 1794845426), 0 of 20000
+  deals differ.
 
 ### Changed
 
@@ -94,8 +101,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   play is unchanged (`ab/run.sh 20000`, control 0b5d48f, seed base
   1794817500, 0 of 20000 deals differ).  Both priced a discard at the rate
   cards win for each seat not proven safe against it, by that seat's
-  concealed cards, on 200000 paired deals against 0b5d48f.  Taking twelve
-  胡 times that rate off the grade (seed base 1794815549, 5328 differ):
+  concealed cards, on 200000 paired deals against 0b5d48f.  Taking 12 × 32
+  times that rate off the grade (seed base 1794815549, 5328 differ):
   −0.037 ± 0.010 points a deal, 95% CI [−0.057, −0.017], a loss; the seat
   dealt in less but lost as often, since a waiting hand is offered every
   draw at the table, and won less.  Breaking only ties in grade by it (seed

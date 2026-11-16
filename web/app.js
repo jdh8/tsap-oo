@@ -279,7 +279,7 @@ function render() {
 }
 
 // Ring what a bot would do here, a card in your hand or a claim button, and
-// mark every move with the 胡 it grades behind that pick.  The marks last
+// mark every move with how far it grades behind that pick.  The marks last
 // until the next render, i.e. for this one decision.  Of several copies of
 // the pick it rings the last: the loose cards are the last group, so a loose
 // copy is ringed before one sitting in a meld.
@@ -296,10 +296,10 @@ function showHint() {
     for (const el of els(code)) {
       const mark = document.createElement('span');
       mark.className = 'grade';
-      // One decimal: a 0.0 trails the pick by less than 0.05 胡, a 0 not at all.
-      mark.textContent = behind == null ? '死' : behind === 0 ? '0' : behind.toFixed(1);
+      // A priority without a unit: it orders the moves and prices nothing.
+      mark.textContent = behind ?? '死';
       mark.title =
-        behind == null ? '走了這步，手牌再也湊不到胡牌要的胡數' : `電腦估這步比它的首選差 ${behind.toFixed(2)} 胡`;
+        behind == null ? '走了這步，手牌再也湊不到胡牌要的胡數' : `電腦把這步排在首選後面 ${behind}（只是排序用的分數，沒有單位）`;
       el.append(mark);
     }
   }

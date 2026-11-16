@@ -55,7 +55,7 @@ const HAND: [&str; 13] = [
     "their 胡",
 ];
 
-/// What the bot weighs each of [`HAND`] at, in 32nds of a 胡: `SCALE`,
+/// What the bot weighs each of [`HAND`] at, a 胡 held counting 32: `SCALE`,
 /// `WEIGHT`, `OWN` and `WAIT` of `src/heuristic.rs`
 const HAND_NOW: [f64; 13] = [
     0.0, 32.0, 32.0, -128.0, -64.0, 2.0, 1.0, -1.0, 8.0, 0.0, 0.0, 0.0, 0.0,
@@ -68,21 +68,22 @@ const CHOICE_NOW: [f64; 7] = [32.0, -128.0, -64.0, 2.0, 1.0, -1.0, 8.0];
 /// One discard in this many has its choices played out
 const EVERY: u64 = 8;
 
-/// The most 胡 of grade a choice may fall behind the bot's pick and still
-/// count as near it
-const NEAR: f64 = 2.0;
+/// The most a choice may grade behind the bot's pick and still count as
+/// near it
+const NEAR: f64 = 64.0;
 
-/// Choices by the 胡 of grade they fall behind the bot's pick: up to each
-/// of these, then beyond
-const GAPS: [f64; 4] = [0.0, 0.5, 2.0, 8.0];
+/// Choices by how far they grade behind the bot's pick: up to each of
+/// these, then beyond
+const GAPS: [f64; 4] = [0.0, 16.0, 64.0, 256.0];
 
-/// The curve's bins: one a 胡 of grade, the first from [`LOW`] down and the
-/// last from `LOW + BINS - 1` up
+/// The curve's bins: each [`WIDTH`] of grade, the first from [`LOW`] down
+/// and the last from `LOW + WIDTH * (BINS - 1)` up
 const BINS: usize = 72;
-const LOW: f64 = -40.0;
+const LOW: f64 = -1280.0;
+const WIDTH: f64 = 32.0;
 
 /// [`GAPS`] cut finer, for what a choice behind the pick costs
-const FINE: [f64; 8] = [0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0];
+const FINE: [f64; 8] = [0.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0];
 
 /// The sums a least squares fit needs
 #[derive(Clone, Copy)]
@@ -165,7 +166,7 @@ fn shown(round: &Round, seat: Seat) -> u32 {
 
 /// The bin of [`BINS`] a grade falls in
 fn bin(grade: f64) -> usize {
-    ((grade - LOW).floor().max(0.0) as usize).min(BINS - 1)
+    (((grade - LOW) / WIDTH).floor().max(0.0) as usize).min(BINS - 1)
 }
 
 /// A curve's `bins` of (hands, points) as (grade, mean points) knots, the
@@ -178,7 +179,7 @@ fn monotone(bins: &[[f64; 2]; BINS]) -> Vec<(f64, f64)> {
         if n == 0.0 {
             continue;
         }
-        knots.push(LOW + i as f64 + 0.5);
+        knots.push(LOW + WIDTH * (i as f64 + 0.5));
         pools.push((n, sum, 1));
         while let [.., a, b] = pools[..]
             && a.1 / a.0 > b.1 / b.0
@@ -234,9 +235,11 @@ fn points(round: &Round) -> [i32; Seat::COUNT] {
 /// Try every card `seat` could discard and play the round out after each
 fn choices(bot: &mut HeuristicBot, round: &Round, seat: Seat, tally: &mut Tally) {
     let view = View::new(round, seat);
-    let (stage, shown) = (stage(round), f64::from(shown(round, seat)));
+    // An exposed 胡 counts 32 in the grade the bot compares claims by.
+    let (stage, shown) = (stage(round), 32.0 * f64::from(shown(round, seat)));
     let mut pick = None;
     for (card, grade) in bot.discards(&view) {
+        let grade = f64::from(grade);
         // A dead hand has no terms.
         let Some(t) = bot.terms(&view, round.hand(seat).without(card)) else {
             continue;
@@ -341,7 +344,7 @@ fn play(seed: u64, tally: &mut Tally) {
         tally.hands[stage].add(&x, y);
         tally.hands[3].add(&x, y);
         // The grade the bot compares claims by: exposed 胡 and all.
-        let grade = x[1] + (0..7).map(|i| CHOICE_NOW[i] * x[2 + i]).sum::<f64>() / 32.0;
+        let grade = 32.0 * x[1] + (0..7).map(|i| CHOICE_NOW[i] * x[2 + i]).sum::<f64>();
         for stage in [stage, 3] {
             let cell = &mut tally.curve[stage][bin(grade)];
             cell[0] += 1.0;
@@ -432,7 +435,7 @@ fn main() {
         let sums: Vec<_> = shards.iter().map(|shard| shard.choices[near]).collect();
         table(CHOICE, CHOICE_NOW, 0, &sums);
     }
-    println!("\nchoices by the 胡 of grade behind the pick");
+    println!("\nchoices by the grade behind the pick");
     println!("up to    choices  points beyond the pick      ±");
     for row in 0..5 {
         let n: f64 = shards.iter().map(|shard| shard.gaps[row][0]).sum();
@@ -464,12 +467,12 @@ fn curve(shards: &[Tally]) {
             let knots = monotone(&bins);
             for &(at, points) in &knots {
                 let [n, sum] = bins[bin(at)];
-                println!("{:5} {n:10} {:8.3} {points:9.3}", at - 0.5, sum / n);
+                println!("{:5} {n:10} {:8.3} {points:9.3}", at - WIDTH / 2.0, sum / n);
             }
             knots
         })
         .collect();
-    // Per odd shard and gap, the last row every gap: choices, the 胡 behind,
+    // Per odd shard and gap, the last row every gap: choices, the grade behind,
     // the points beyond the pick, then for the curve of the stage and of the
     // whole round what it tells, that times the points, and its square.
     let rows: Vec<[[f64; 9]; 6]> = shards
@@ -499,7 +502,7 @@ fn curve(shards: &[Tally]) {
         .collect();
     println!("\nwhat the curves tell of the odd shards' choices");
     println!(
-        "up to    choices  胡 behind   points      ±  by stage  slope      ±  whole  slope      ±"
+        "up to    choices     behind   points      ±  by stage  slope      ±  whole  slope      ±"
     );
     for row in 0..6 {
         let sum = |i: usize| rows.iter().map(|shard| shard[row][i]).sum::<f64>();
@@ -524,10 +527,10 @@ fn curve(shards: &[Tally]) {
         }
         println!();
     }
-    // Every shard's choices by stage and gap: choices, 胡 behind, points.
+    // Every shard's choices by stage and gap: choices, grade behind, points.
     for (stage, name) in STAGES.into_iter().enumerate() {
         println!("\nwhat a choice behind the pick costs, {name}");
-        println!("up to    choices  胡 behind   points      ±");
+        println!("up to    choices     behind   points      ±");
         let rows: Vec<[[f64; 3]; FINE.len() + 1]> = shards
             .iter()
             .map(|shard| {

@@ -61,12 +61,12 @@ impl Settings {
 // ---------------------------------------------------------------------------
 
 /// One move the hint rates: a card code to discard, or `pass`, `pong`,
-/// `eat<index>`, and how many 胡 it grades behind the bot's pick, `null`
-/// when it leaves the hand dead
+/// `eat<index>`, and how far it grades behind the bot's pick, `null` when it
+/// leaves the hand dead
 #[derive(Serialize)]
 struct HintJson {
     code: String,
-    behind: Option<f64>,
+    behind: Option<i32>,
 }
 
 #[derive(Serialize)]
@@ -442,12 +442,12 @@ impl Core {
         let round = self.table.round();
         let mut bot = HeuristicBot::new(self.game.rules());
         let view = View::new(round, HUMAN);
-        let rated: Vec<(String, f64)> = match round.phase() {
+        let rated: Vec<(String, i32)> = match round.phase() {
             Phase::Claim(HUMAN) => {
                 let options = round.claim_options(HUMAN);
                 bot.claims(&view, &options)
                     .into_iter()
-                    .map(|(claim, hu)| {
+                    .map(|(claim, grade)| {
                         let code = match claim {
                             Claim::Pass => "pass".to_owned(),
                             Claim::Pong => "pong".to_owned(),
@@ -456,29 +456,25 @@ impl Core {
                                 format!("eat{}", i.expect("the bot eats an offered meld"))
                             }
                         };
-                        (code, hu)
+                        (code, grade)
                     })
                     .collect()
             }
             Phase::Discard(HUMAN) => bot
                 .discards(&view)
                 .into_iter()
-                .map(|(card, hu)| (CardJson::from(card).code, hu))
+                .map(|(card, grade)| (CardJson::from(card).code, grade))
                 .collect(),
             _ => Vec::new(),
         };
-        let best = rated.first().map_or(0.0, |&(_, hu)| hu);
+        let best = rated.first().map_or(0, |&(_, grade)| grade);
         rated
             .into_iter()
-            .map(|(code, hu)| HintJson {
+            .map(|(code, grade)| HintJson {
                 code,
-                // The bot's grades are in 1/32 胡.  A dead hand grades about
-                // 1000 胡 down, far below any live one.
-                behind: if best - hu > 500.0 {
-                    None
-                } else {
-                    Some(best - hu)
-                },
+                // A dead hand grades about 32000 down, far below any live
+                // one.
+                behind: (best - grade <= 16_000).then_some(best - grade),
             })
             .collect()
     }
@@ -553,7 +549,7 @@ impl WebGame {
 
     /// The greedy bot's rating of your moves as a JSON array, its pick
     /// first: `[{"code": "RK", "behind": 0}, ...]`, where `code` is a card
-    /// code, `pass`, `pong` or `eat<index>` and `behind` the 胡 it grades
+    /// code, `pass`, `pong` or `eat<index>` and `behind` how far it grades
     /// behind the pick, `null` for a move that leaves the hand dead (short of
     /// the 胡 to win however the cards come); empty
     /// when it is not your decision
@@ -691,7 +687,7 @@ mod tests {
                 Phase::Claim(HUMAN) => {
                     assert!(value["options"].is_object());
                     let hints = core.hint();
-                    assert_eq!(hints[0].behind, Some(0.0), "the pick is the best");
+                    assert_eq!(hints[0].behind, Some(0), "the pick is the best");
                     let hint = hints[0].code.clone();
                     let eats = value["options"]["eats"].as_array().unwrap().len();
                     assert!(
