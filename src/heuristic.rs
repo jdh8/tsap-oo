@@ -37,6 +37,44 @@ const WAIT: i32 = 8;
 /// when every choice is dead.
 const DEAD: i32 = 1000;
 
+/// The terms of a hand's grade, each before its weight
+///
+/// [`HeuristicBot`] lays a hand out twice, once for 胡 and once for the
+/// fewest loose cards, and grades it by whichever layout comes out higher.
+/// These are that layout's counts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Terms {
+    /// 胡 of the melds
+    pub hu: i32,
+    /// Cards outside every meld
+    pub loose: i32,
+    /// Half-胡 the melds fall short of the threshold, after the half-胡
+    /// the 搭子 among the loose cards may bring
+    pub short: i32,
+    /// Unseen copies of the loose cards, each of which would pair one
+    pub own: i32,
+    /// Over the loose cards in a 搭子: the 胡 of the meld each would be
+    /// eaten into, times the unseen cards that would finish it, four at
+    /// most
+    pub kept: i32,
+    /// Over the loose cards that go with nothing: four times the 胡 of the
+    /// meld each would be eaten into
+    pub lonely: i32,
+    /// Unseen cards the hand would win on
+    pub waits: i32,
+}
+
+impl Terms {
+    /// The grade, in [`SCALE`]ths of a 胡
+    const fn grade(&self) -> i32 {
+        SCALE * (self.hu - WEIGHT * self.loose) - SCALE * WEIGHT / 2 * self.short
+            + OWN * self.own
+            + self.kept
+            - self.lonely
+            + WAIT * self.waits
+    }
+}
+
 /// A greedy bot: grades a hand by its 胡 less a cost for every loose card
 /// and every 胡 short of the threshold, and takes whichever claim or discard
 /// grades highest
@@ -129,12 +167,19 @@ impl HeuristicBot {
 
     /// Grade `hand` when its melds must be worth `need` to win
     fn value(&mut self, hand: Hand, need: i32) -> i32 {
+        self.terms_of(hand, need)
+            .map_or(-SCALE * DEAD, |terms| terms.grade())
+    }
+
+    /// The terms of `hand`'s grade when its melds must be worth `need` to
+    /// win, unless it is dead: of its two layouts, the one that grades
+    /// higher
+    fn terms_of(&mut self, hand: Hand, need: i32) -> Option<Terms> {
         if self.dead(hand, need) {
-            return -SCALE * DEAD;
+            return None;
         }
-        let wait = self.wait(hand, need);
-        let grade = self
-            .solvers
+        let waits = self.waits(hand, need);
+        self.solvers
             .iter_mut()
             .zip(COSTS)
             .map(|(solver, cost)| {
@@ -143,18 +188,23 @@ impl HeuristicBot {
                     .expect("layouts with loose cards always exist");
                 let loose = to_i32(layout.loose.len());
                 let hu = layout.score + to_i32(cost) * loose;
-                let (grade, hope) = prospects(hand, &layout, self.live, self.eaten, self.general);
-                // In half-胡, like `hope`.
-                let short = (2 * (need - hu) - hope).max(0);
-                SCALE * (2 * (hu - WEIGHT * loose) - WEIGHT * short) / 2 + grade
+                let [own, kept, lonely, hope] =
+                    prospects(hand, &layout, self.live, self.eaten, self.general);
+                Terms {
+                    hu,
+                    loose,
+                    short: (2 * (need - hu) - hope).max(0),
+                    own,
+                    kept,
+                    lonely,
+                    waits,
+                }
             })
-            .max()
-            .expect("two solvers");
-        grade + wait
+            .max_by_key(Terms::grade)
     }
 
-    /// [`WAIT`] for every unseen card `hand` would win on
-    fn wait(&mut self, hand: Hand, need: i32) -> i32 {
+    /// How many unseen cards `hand` would win on
+    fn waits(&mut self, hand: Hand, need: i32) -> i32 {
         // The winning card melds with at most two others, so a hand that
         // cannot be laid out with two loose cards or fewer waits on nothing.
         let loose = self.solvers[1]
@@ -166,7 +216,7 @@ impl HeuristicBot {
         let live = self.live;
         live.distinct()
             .filter(|&(card, _)| self.win(hand, card, need).is_some())
-            .map(|(_, n)| WAIT * i32::from(n))
+            .map(|(_, n)| i32::from(n))
             .sum()
     }
 
@@ -249,21 +299,22 @@ const fn family(rank: Rank) -> usize {
     }
 }
 
-/// What the loose cards of `layout` promise: a grade to tell hands of the
-/// same melds apart, and the half-胡 they may yet bring
+/// What the loose cards of `layout` promise: [`Terms::own`],
+/// [`Terms::kept`] and [`Terms::lonely`], which tell hands of the same melds
+/// apart, and the half-胡 they may yet bring
 ///
 /// A loose card is one of a 搭子 when the hand holds a second card of its
-/// meld and a third is `live`, not yet seen.  It is then graded at the 胡
+/// meld and a third is `live`, not yet seen.  It is then kept at the 胡
 /// of the meld it would be eaten into (`eaten`, by [`family`]) for each live
 /// card that would finish it, up to [`COPIES`], and promises half that 胡:
 /// the other half is its partner's.  So a 搭子 is kept, soldiers before
 /// 將士象 before 車馬包, and the one with more cards left to come before the
 /// one with fewer.
 ///
-/// A card that goes with nothing is graded that far below nothing, so the
-/// dearest goes first, before it can finish another seat's hand.  Either
-/// way a card is worth [`OWN`] more for each live copy of itself, which
-/// would pair it.
+/// A card that goes with nothing is lonely by as much as a 搭子 with every
+/// finishing card left is kept, so the dearest goes first, before it can
+/// finish another seat's hand.  Either way each live copy of the card,
+/// which would pair it, counts as its own.
 ///
 /// The second card may be a lone general or one of a pair — 車車 馬 still
 /// eats a 包 — but not one of three or four alike, which are locked and
@@ -273,7 +324,7 @@ const fn family(rank: Rank) -> usize {
 /// seat ever discards one, so they are graded as if a single card were left
 /// to finish them, and a general is worth `general` alone, so the 士象 add
 /// only the rest of the meld.
-fn prospects(hand: Hand, layout: &Layout, live: Hand, eaten: [i32; 3], general: i32) -> (i32, i32) {
+fn prospects(hand: Hand, layout: &Layout, live: Hand, eaten: [i32; 3], general: i32) -> [i32; 4] {
     let free = layout
         .melds
         .iter()
@@ -300,17 +351,19 @@ fn prospects(hand: Hand, layout: &Layout, live: Hand, eaten: [i32; 3], general: 
                 })
                 .map(|(third, _)| i32::from(live.count(third)))
                 .sum();
-            let own = OWN * i32::from(live.count(card));
+            let own = i32::from(live.count(card));
             if finishers == 0 {
-                (own - COPIES * eaten[kin], 0)
+                [own, 0, COPIES * eaten[kin], 0]
             } else if kin == 0 && !hand.contains(Card::new(card.color, Rank::General)) {
                 let worth = eaten[kin] - general;
-                (own + worth, worth)
+                [own, worth, 0, worth]
             } else {
-                (own + finishers.min(COPIES) * eaten[kin], eaten[kin])
+                [own, finishers.min(COPIES) * eaten[kin], 0, eaten[kin]]
             }
         })
-        .fold((0, 0), |sum, (grade, hope)| (sum.0 + grade, sum.1 + hope))
+        .fold([0; 4], |sum, card| {
+            std::array::from_fn(|i| sum[i] + card[i])
+        })
 }
 
 /// What each meld is worth beyond a general for every card in it
@@ -383,6 +436,18 @@ impl HeuristicBot {
         graded.reverse();
         graded.sort_by_key(|&(grade, _)| std::cmp::Reverse(grade));
         in_hu(graded)
+    }
+}
+
+impl HeuristicBot {
+    /// The [`Terms`] of the grade `hand` would get in `view`'s seat, or
+    /// `None` when it is dead: too poor to reach the threshold however the
+    /// cards fall
+    ///
+    /// `hand` is the seat's own or what a discard would leave of it.
+    pub fn terms(&mut self, view: &View<'_>, hand: Hand) -> Option<Terms> {
+        let need = self.start(view);
+        self.terms_of(hand, need)
     }
 }
 
@@ -470,7 +535,9 @@ mod tests {
             let hand: Hand = hand.parse().unwrap();
             let live = Hand::FULL - hand - seen.parse().unwrap();
             let layout = solver.layout(hand).unwrap();
-            super::prospects(hand, &layout, live, bot.eaten, bot.general)
+            let [own, kept, lonely, hope] =
+                super::prospects(hand, &layout, live, bot.eaten, bot.general);
+            (OWN * own + kept - lonely, hope)
         };
         // (hand, its grade, the half-胡 it hopes for) with nothing else seen
         for (hand, grade, hope) in [

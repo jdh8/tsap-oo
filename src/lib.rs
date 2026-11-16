@@ -13,7 +13,7 @@ pub mod view;
 
 pub use driver::{Step, Table};
 pub use game::Game;
-pub use heuristic::HeuristicBot;
+pub use heuristic::{HeuristicBot, Terms};
 #[cfg(feature = "rand")]
 pub use montecarlo::MonteCarloBot;
 pub use round::{

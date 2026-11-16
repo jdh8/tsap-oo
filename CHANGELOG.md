@@ -20,7 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   danger is how many concealed cards that seat has left, from 0.02% at
   twenty to between 3% and 5% at eight or fewer.
 - `doc/stronger-bot.md`: the ways to a stronger bot other than Monte Carlo,
-  and where the first of them, reading the other seats, stands.
+  and where the first two of them, reading the other seats and fitting the
+  grade's weights to data, stand.
+- `HeuristicBot::terms` and `Terms`: the seven counts a hand's grade is the
+  weighted sum of.  Play is unchanged: on paired deals against 10a046f
+  (`ab/run.sh 20000`, seed base 1794823476), 0 of 20000 deals differ.
+- The `fit` example and `research/fitted-weights.md`: what each term is
+  worth in points, by least squares over 60000 rounds (seed base 20261119),
+  once across the hands held at every discard and once between the choices
+  of one discard, each played out.  A 胡 of grade is worth about 1.4 points.
+  Both fits weigh a loose card at about −48 where the bot has −128, a
+  half-胡 short of the threshold at −11 to −18 against −64, and a card the
+  hand wins on at about 25 against 8; yet the bot's own pick beats the
+  discards graded within half a 胡 of it by 0.46 points on average.
 - The `dealt` example: the 胡 already in a dealt hand of twenty cards, the
   melds they come from, and the cards left outside every meld.  No bot
   plays.  Over 100000 deals (seed 20261118) a hand holds 6.63 胡 and 7.28
@@ -47,6 +59,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   draw at the table, and won less.  Breaking only ties in grade by it (seed
   base 1794816883, 2513 differ): −0.002 ± 0.007, 95% CI [−0.015, +0.011],
   inconclusive.
+- `HeuristicBot` keeps its hand-tuned weights: three trials of fitted ones
+  did not win and play is unchanged.  Each ran 200000 paired deals against
+  10a046f.  Every weight from the fit across hands (seed base 1794819512,
+  59981 differ): −0.005 ± 0.034 points a deal, 95% CI [−0.071, +0.060],
+  inconclusive.  `WAIT` alone, 8 to 24 (seed base 1794820392, 2221 differ):
+  +0.002 ± 0.007, 95% CI [−0.012, +0.017], inconclusive.  The 搭子 term
+  eightfold and `WAIT` at 72, from the fit between near choices (seed base
+  1794822233, 35378 differ): −0.070 ± 0.025, 95% CI [−0.120, −0.021], a
+  loss; over its first 60000 deals the seat lost where it broke a meld to
+  keep a 搭子 and where it claimed or passed differently, not where it only
+  kept a different loose card, and won 4% less often.
 - `MonteCarloBot` at 128 samples no longer measurably beats
   `HeuristicBot`, which has improved four times since 0.2.1 put it at 26.2%
   against 23.8%.  Seated among three `HeuristicBot`s and paired with a
