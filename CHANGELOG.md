@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ab/` averages out the luck after the two bots part: at the candidate's
+  first choice the control would not make, it reshuffles the pile left 8
+  times and plays both choices out on each (`RESHUFFLE`, 0 for the plain
+  paired estimate).  The pile's order is still uniform there, so the
+  estimate stays unbiased; no library change is needed, as the deal is
+  rebuilt with `Round::from_pile` and replayed to the split.  Calibrated on
+  1b644f2 against 6fc8f21 (`research/reshuffle.md`): within one split the
+  shuffles spread by 18 to 19 points, the splits' true means by only 4.4 to
+  4.7.  At K = 8 (40000 deals, seed base 1794846881) +0.289 ± 0.017, 95% CI
+  [+0.256, +0.322], against +0.283 ± 0.018 from 200000 plain deals: a fifth
+  of the deals, a quarter of the compute.  The same tree against itself
+  (`ab/run.sh 20000`, control e40cca4, seed base 1794846981): 0 of 20000
+  deals part.  The iron rules in `CLAUDE.md` now name this estimate.
+- `research/feed-next-seat.md`: not feeding the next seat, by taking off
+  each discard's grade `FEED` times the chance the next seat can eat it;
+  the bot is unchanged.  All against e40cca4 with 8 reshuffles.  `FEED` 32
+  overrides the order of loose cards and loses at four seats (100000 deals,
+  seed base 1794847173): −0.172 ± 0.017, 95% CI [−0.205, −0.140].  `FEED`
+  4, which only picks among like cards, is inconclusive at four seats twice
+  (100000 deals, seed base 1794848292: +0.015 ± 0.008, [−0.002, +0.031];
+  400000 deals, seed base 1794849203: −0.007 ± 0.004, [−0.015, +0.001]) and
+  wins at two (200000 deals, seed base 1794848696: +0.007 ± 0.003, [+0.002,
+  +0.012]).  The patch is kept beside it to replay.
+- The Peeker, in `ab/src/peeker.rs`: `MonteCarloBot` with every hand in
+  sight, sampling only the pile, through the hidden `View::peek` behind the
+  new non-default `peek` feature.  `SAMPLES=n PEEK=1` seats it.  It cheats,
+  so it stays out of the library; it measures the most that reading the
+  other seats could be worth.
 - `View::safe`: the cards a seat is proven not to win on.  Winning is
   compulsory and a hand changes only when its seat claims, so a card that
   came up and ended nothing stays safe against every seat it was offered to

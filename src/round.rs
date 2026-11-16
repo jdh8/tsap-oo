@@ -538,6 +538,12 @@ impl Round {
         round
     }
 
+    /// The cards left in the pile, for [`View::peek`](crate::View::peek)
+    #[cfg(feature = "peek")]
+    pub(crate) fn pile_mut(&mut self) -> &mut [Card] {
+        &mut self.pile
+    }
+
     /// The seats a public card is offered to, in priority order
     fn order(offer: Offer) -> impl Iterator<Item = Seat> {
         let (start, n) = if offer.drawn {

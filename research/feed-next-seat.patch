@@ -1,0 +1,88 @@
+diff --git a/src/heuristic.rs b/src/heuristic.rs
+index f090ae5..23ae29f 100644
+--- a/src/heuristic.rs
++++ b/src/heuristic.rs
+@@ -5,7 +5,7 @@ use crate::round::{Claim, ClaimOptions, discardable, options};
+ use crate::rules::Rules;
+ use crate::strategy::Strategy;
+ use crate::view::View;
+-use susik::{Card, Hand, Layout, Meld, Rank, Solver, Values, locked_completions};
++use susik::{Card, Color, Hand, Layout, Meld, Rank, Solver, Values, locked_completions};
+ 
+ /// What a loose card, or a 胡 short of the threshold, costs a hand.
+ const WEIGHT: i32 = 4;
+@@ -33,6 +33,11 @@ const COPIES: i32 = 4;
+ // ponytail: one knob, set before its A/B and not tuned.
+ const WAIT: i32 = 8;
+ 
++/// What a discard costs when the next seat surely eats it.
++// ponytail: one knob.  At 32 it overrode the order of loose cards and lost;
++// below the gap between their families it picks among like cards.
++const FEED: f64 = 4.0;
++
+ /// What a dead hand costs: more than any hand is worth, so one is kept only
+ /// when every choice is dead.
+ const DEAD: i32 = 1000;
+@@ -290,6 +295,45 @@ impl HeuristicBot {
+     }
+ }
+ 
++/// The chance that a seat holding `held` of the `live` cards has `card`
++fn holds(live: Hand, held: usize, card: Card) -> f64 {
++    let (total, copies) = (live.len(), usize::from(live.count(card)));
++    let none: f64 = (0..held)
++        .map(|i| total.saturating_sub(copies + i) as f64 / total.saturating_sub(i).max(1) as f64)
++        .product();
++    1.0 - none
++}
++
++/// The chance that a seat holding `held` of the `live` cards can eat
++/// `card` into a meld: a pair, or the rest of a 將士象, 車馬包 or set of
++/// soldiers
++// ponytail: the partners are taken as independent, and whether the seat
++// wants the meld is not asked.
++fn edible(live: Hand, held: usize, card: Card) -> f64 {
++    let has = |rank: Rank| holds(live, held, Card { rank, ..card });
++    let run = match card.rank {
++        Rank::General => 0.0,
++        Rank::Advisor => has(Rank::General) * has(Rank::Elephant),
++        Rank::Elephant => has(Rank::General) * has(Rank::Advisor),
++        Rank::Chariot => has(Rank::Horse) * has(Rank::Cannon),
++        Rank::Horse => has(Rank::Chariot) * has(Rank::Cannon),
++        Rank::Cannon => has(Rank::Chariot) * has(Rank::Horse),
++        Rank::Soldier => {
++            // Two of the other three colours' soldiers or more
++            let [a, b, c] = <[f64; 3]>::try_from(
++                Color::ALL
++                    .into_iter()
++                    .filter(|&color| color != card.color)
++                    .map(|color| holds(live, held, Card { color, ..card }))
++                    .collect::<Vec<_>>(),
++            )
++            .expect("three other colours");
++            a * b + b * c + c * a - 2.0 * a * b * c
++        }
++    };
++    1.0 - (1.0 - holds(live, held, card)) * (1.0 - run)
++}
++
+ /// 將士象, 車馬包 or soldiers: the cards that meld together
+ const fn family(rank: Rank) -> usize {
+     match rank {
+@@ -432,9 +476,15 @@ impl HeuristicBot {
+     pub fn discards(&mut self, view: &View<'_>) -> Vec<(Card, i32)> {
+         let need = self.start(view);
+         let hand = view.hand();
++        let held = view.concealed_len(view.seat().next());
++        let live = self.live;
+         let mut graded: Vec<(i32, Card)> = discardable(hand, view.locked())
+             .distinct()
+-            .map(|(card, _)| (self.value(hand.without(card), need), card))
++            .map(|(card, _)| {
++                // Feeding the next seat a meld speeds its hand.
++                let fed = (FEED * edible(live, held, card)).round() as i32;
++                (self.value(hand.without(card), need) - fed, card)
++            })
+             .collect();
+         // Stable, and the later of equals goes first.
+         graded.reverse();

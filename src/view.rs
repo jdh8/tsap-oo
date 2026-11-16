@@ -143,4 +143,20 @@ impl<'a> View<'a> {
     pub fn determinize(&self, rng: &mut (impl rand::Rng + ?Sized)) -> Round {
         self.round.determinize(self.seat, rng)
     }
+
+    /// The round with every hand as it is and only the pile shuffled: what
+    /// a seat that saw every hand would sample
+    ///
+    /// A cheat, for the Peeker in `ab/`, which measures the most that reading
+    /// the other hands could be worth.  It is hidden and behind the `peek`
+    /// feature so that no bot that sits at a table can reach it.
+    #[cfg(feature = "peek")]
+    #[doc(hidden)]
+    #[must_use]
+    pub fn peek(&self, rng: &mut (impl rand::Rng + ?Sized)) -> Round {
+        use rand::seq::SliceRandom as _;
+        let mut round = self.round.clone();
+        round.pile_mut().shuffle(rng);
+        round
+    }
 }

@@ -21,6 +21,9 @@ all-features = true
 default = ["rand"]
 # Shuffled dealing: `Round::deal` and `Game::deal`.
 rand = ["dep:rand", "susik/rand"]
+# A hidden window onto every hand, for the Peeker in `ab/` that measures what
+# reading opponents could be worth at most.  No bot may use it.
+peek = ["rand"]
 
 [dependencies]
 susik = "0.1.1"

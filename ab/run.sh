@@ -4,8 +4,10 @@
 #   ab/run.sh [deals] [control]
 #
 # `deals` defaults to 200000 and `control` to HEAD.  SEED_BASE defaults to
-# the clock, fresh for each experiment; set it to replay one.  Declare the
-# deal count before the data and do not rebuild while this runs (CLAUDE.md).
+# the clock, fresh for each experiment; set it to replay one.  RESHUFFLE
+# (default 8) is how often the pile is reshuffled where the two part, 0 for
+# the plain paired estimate.  Declare the deal count before the data and do
+# not rebuild while this runs (CLAUDE.md).
 set -eu
 cd "$(dirname "$0")"
 deals=${1:-200000}

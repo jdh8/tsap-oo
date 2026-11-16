@@ -16,3 +16,8 @@ new = { package = "tsap-oo", path = ".." }
 # `run.sh` exports the control revision here under this package name.
 old = { package = "tsap-oo-base", path = "target/base" }
 rand = "0.10"
+
+[features]
+default = ["peek"]
+# The Peeker; off to build against a revision before `View::peek`.
+peek = ["new/peek"]

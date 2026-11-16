@@ -37,6 +37,12 @@ to what a card-game bot needs.
   Report the mean difference, its standard error and the 95% CI.  The plain
   `arena` cannot see a gain of this size: a seat's score has a standard
   deviation near 30 a round.
+- Average out the luck after the split.  Where the candidate first parts
+  from the control, `ab/` reshuffles the pile left 8 times and plays both
+  choices out on each (`RESHUFFLE`, `research/reshuffle.md`); a deal that
+  never parts counts 0.  It needs about a fifth of the deals and a quarter
+  of the compute.  `RESHUFFLE=0` is the plain paired estimate, kept for
+  Monte Carlo candidates, whose every replay is a search.
 - Take a fresh seed base for each experiment (the script's default) and
   declare the deal count before the data.  Deals a constant was tuned on
   never give its verdict.
@@ -47,7 +53,7 @@ to what a card-game bot needs.
 - Write it down in `CHANGELOG.md` and the commit message: the numbers, the
   deal count, the seed base, the control's SHA and the verdict.
 - A change meant to leave play alone (a refactor, a speed-up) owes the same
-  harness reading zero deals that differ.
+  harness reading zero deals that part.
 
 ### Workflow
 
