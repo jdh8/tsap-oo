@@ -97,12 +97,12 @@ fn cards(meld: &Meld) -> Vec<CardJson> {
     meld.cards().iter().map(CardJson::from).collect()
 }
 
-/// A meld on the table with the card it took from the table in the middle,
-/// as a mahjong table lays out an eat: 車 eaten with 馬包 reads 馬車包.  Of
-/// four soldiers it is the second from the left.
+/// A meld on the table with the card it took from the table first, as the
+/// log reads and as a Japanese mahjong table lays out a chi taken from the
+/// left: 車 eaten with 馬包 reads 車馬包, and 包 eaten with 車馬 reads 包車馬.
 fn claimed(meld: &Meld, card: Card) -> Vec<CardJson> {
     let mut row: Vec<Card> = meld.cards().without(card).iter().collect();
-    row.insert(row.len() / 2, card);
+    row.insert(0, card);
     row.into_iter().map(CardJson::from).collect()
 }
 
@@ -677,9 +677,8 @@ mod tests {
                         let last = result["exposed"].as_array().unwrap().last().unwrap();
                         let last = last.as_array().unwrap();
                         assert_eq!(
-                            last[(last.len() - 1) / 2]["code"],
-                            card["code"],
-                            "the winning card is the middle, or second of four, of the last exposed meld"
+                            last[0]["code"], card["code"],
+                            "the winning card leads the last exposed meld"
                         );
                     }
                     assert!(

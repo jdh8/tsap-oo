@@ -59,6 +59,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- An exposed meld on the web table leads with the card it took from the
+  table, as the log reads and as a Japanese mahjong table lays out a chi,
+  instead of putting it in the middle as a Taiwanese mahjong table does.
+  Display only.
 - The web hand puts its loose soldiers last, all colours together: beside a
   炮 they make nothing, but with soldiers of other colours they make 三色卒.
   Display only; the hint and the bots are untouched.
