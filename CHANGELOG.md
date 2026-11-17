@@ -234,6 +234,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fc6ca57 (seed base 1794828275, 3607 differ): +0.007 ± 0.011 points a
   deal, 95% CI [−0.014, +0.029], winning 24.23% of rounds for 24.19%.
   Verdict: inconclusive.
+- `HeuristicBot` does not count the melds a hand has room for: four trials
+  did not win and play is unchanged.  The cards outside a hand's melds and
+  the winning card make only so many melds of three, and what is left over
+  must go in pairs, so a pair eaten early takes the place of a meld worth
+  胡.  Each trial ran 100000 paired deals against b894777.  Hoping for the
+  dearest 搭子 and pongs of pairs that fit, room rounded down (seed base
+  1794933710, 28275 part): −0.290 ± 0.014 points a deal, 95% CI [−0.317,
+  −0.263], a loss.  The same with the leftover held to pairs (seed base
+  1794934225, 33313 part): −0.216 ± 0.014, 95% CI [−0.244, −0.189], a loss;
+  both ate pairs the control passed on, since a hand with more hopes than
+  room loses none by breaking a 搭子.  That cap on the 搭子 alone, no pongs
+  hoped for (seed base 1794936088, 6093 part): +0.005 ± 0.004, 95% CI
+  [−0.003, +0.014], inconclusive.  Eating no pair while the hand's melds
+  are short of the threshold (seed base 1794934919, 52775 part): −1.497 ±
+  0.020, 95% CI [−1.536, −1.458], winning 20.33% of rounds for 24.20%, a
+  loss.
 - `MonteCarloBot` at 128 samples no longer measurably beats
   `HeuristicBot`, which has improved four times since 0.2.1 put it at 26.2%
   against 23.8%.  Seated among three `HeuristicBot`s and paired with a
