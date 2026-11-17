@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ceiling`, the most 胡 a hand can still win with if every card it wants
+  came and at most a given number of generals from outside; `None` when no
+  layout of 21 cards exists (`doc/hu-ceiling.md`, batch 1).  It lays the
+  hand out block by block — each colour's 將士象 and 車馬包, and the
+  soldiers — every meld either dealt or finished by one outside card, and
+  ignores who could supply the cards and in what order, so it is an upper
+  bound.  Guarded by hand-worked cases and by `tests/round.rs`: at every
+  decision of the eventual winner, the ceiling is at least the 胡 won.
+  No bot changes: `ab/run.sh 20000` against `1aab13e` (seed base
+  1795100000, `RESHUFFLE=8`) read 0 deals that part.
+
 - `research/seven-slots.md` and the `census` example: where a winning
   hand's 胡 come from.  A winning hand is 21 cards, seven slots of three at
   1 胡 each, so 胡 = 7 + 2k + 將士象 + 2 × (concealed triplets, soldiers

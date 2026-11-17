@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![warn(missing_docs)]
 
+pub mod ceiling;
 pub mod driver;
 pub mod game;
 pub mod heuristic;
@@ -11,6 +12,7 @@ pub mod rules;
 pub mod strategy;
 pub mod view;
 
+pub use ceiling::ceiling;
 pub use driver::{Step, Table};
 pub use game::Game;
 pub use heuristic::{HeuristicBot, Terms};

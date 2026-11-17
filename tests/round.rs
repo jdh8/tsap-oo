@@ -418,3 +418,106 @@ fn a_pair_held_may_eat_into_a_pair_but_the_bot_does_not() {
     let claim = bot.claim(&View::new(&round, SECOND), &options);
     assert_ne!(claim, Claim::Eat(Meld::Pair(offered)));
 }
+
+/// At every decision of the eventual winner, the ceiling with the generals
+/// that came from outside afterwards is at least the 胡 won.
+#[cfg(feature = "rand")]
+#[test]
+fn the_ceiling_bounds_every_win() {
+    use rand::SeedableRng as _;
+    use rand::rngs::SmallRng;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use susik::Rank;
+    use tsap_oo::{Step, Table, ceiling};
+
+    struct Point {
+        seat: Seat,
+        hand: Hand,
+        exposed: Vec<Meld>,
+        live: Hand,
+    }
+    struct Recorder {
+        bot: HeuristicBot,
+        log: Rc<RefCell<Vec<Point>>>,
+    }
+    impl Recorder {
+        fn record(&self, view: &View<'_>) {
+            let shown = Seat::ALL
+                .into_iter()
+                .flat_map(|seat| view.exposed(seat))
+                .flat_map(Meld::cards)
+                .chain(view.discards().iter().map(|&(_, card)| card));
+            // The offer stays live: the seat may be about to claim it
+            self.log.borrow_mut().push(Point {
+                seat: view.seat(),
+                hand: view.hand(),
+                exposed: view.exposed(view.seat()).to_vec(),
+                live: shown.fold(Hand::FULL - view.hand(), Hand::without),
+            });
+        }
+    }
+    impl Strategy for Recorder {
+        fn claim(&mut self, view: &View<'_>, options: &ClaimOptions) -> Claim {
+            self.record(view);
+            self.bot.claim(view, options)
+        }
+        fn discard(&mut self, view: &View<'_>) -> Card {
+            self.record(view);
+            self.bot.discard(view)
+        }
+    }
+    let generals = |hand: Hand| hand.iter().filter(|c| c.rank == Rank::General).count();
+
+    let rules = Rules::new();
+    let mut rng = SmallRng::seed_from_u64(2026);
+    let mut checked = 0;
+    for i in 0..100 {
+        let round = Round::deal(rules, Seat::ALL[i % Seat::COUNT], &mut rng);
+        let log = Rc::new(RefCell::new(Vec::new()));
+        let bots = Seat::ALL.map(|_| {
+            let bot = HeuristicBot::new(&rules);
+            Some(Box::new(Recorder {
+                bot,
+                log: log.clone(),
+            }) as Box<dyn Strategy>)
+        });
+        let mut table = Table::new(round, bots);
+        while table.step().unwrap() != Step::Finished {}
+        let round = table.round();
+        let result = round.result().unwrap();
+        let Some(winner) = result.winner else {
+            continue;
+        };
+        let total = result
+            .layout
+            .iter()
+            .map(|m| generals(m.cards()))
+            .sum::<usize>();
+        for point in log.borrow().iter().filter(|p| p.seat == winner) {
+            // A kong's fourth general does not count as one from outside
+            let kongs = round.exposed(winner)[point.exposed.len()..]
+                .iter()
+                .filter(|m| matches!(m, Meld::Quad(c) if c.rank == Rank::General))
+                .count();
+            let held = generals(point.hand)
+                + point
+                    .exposed
+                    .iter()
+                    .map(|m| generals(m.cards()))
+                    .sum::<usize>();
+            let outside = total - held - kongs;
+            let bound = ceiling(&rules, &point.exposed, point.hand, point.live, outside);
+            assert!(
+                bound.is_some_and(|hu| hu >= result.hu),
+                "round {i}: {} beside {:?} with {outside} outside generals: ceiling {bound:?} < {} {:?}",
+                point.hand,
+                point.exposed,
+                result.hu,
+                result.layout
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked > 500, "{checked}");
+}
