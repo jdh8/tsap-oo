@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "tsap-oo",
+  "version": "0.1.0",
+  "identifier": "io.github.jdh8.tsap-oo",
+  "build": {
+    "frontendDist": ["../web/index.html", "../web/app.js", "../web/style.css"]
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [{ "title": "十胡", "width": 1100, "height": 900 }],
+    "security": { "csp": null }
+  }
+}

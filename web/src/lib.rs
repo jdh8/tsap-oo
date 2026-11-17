@@ -9,11 +9,18 @@ use rand::{RngExt as _, SeedableRng as _};
 use serde::{Deserialize, Serialize};
 use tsap_oo::susik::{Card, Color, Hand, Meld, Rank, Solver};
 use tsap_oo::{
-    Claim, Event, Game, HeuristicBot, Phase, Round, Rules, Seat, Strategy, Table, View, discardable,
+    Claim, Event, Game, HeuristicBot, MonteCarloBot, Phase, Round, Rules, Seat, Strategy, Table,
+    View, discardable,
 };
 use wasm_bindgen::prelude::*;
 
 const HUMAN: Seat = Seat::ALL[0];
+
+/// The searching opponents' deals a decision, and the most concealed cards
+/// they search with: the one gate measured to beat the greedy bot
+/// (`research/gated-monte-carlo.md`)
+const SAMPLES: usize = 128;
+const GATE_CARDS: usize = 10;
 
 /// What the human calls each seat, counting on from them in turn order
 fn name(seat: Seat) -> &'static str {
@@ -451,22 +458,41 @@ struct Core {
     game: Game,
     table: Table,
     rng: StdRng,
+    /// Whether the opponents search: the desktop client's, too slow as wasm
+    search: bool,
 }
 
 impl Core {
-    fn new(seed: u64, settings: &Settings) -> Self {
+    fn new(seed: u64, settings: &Settings, search: bool) -> Self {
         let mut rng = StdRng::seed_from_u64(seed);
         let game = Game::new(
             settings.rules(),
             Seat::ALL[rng.random_range(..Seat::ALL.len())],
         );
-        let table = Self::seat(&game, &mut rng);
-        Self { game, table, rng }
+        let table = Self::seat(&game, &mut rng, search);
+        Self {
+            game,
+            table,
+            rng,
+            search,
+        }
     }
 
-    fn seat(game: &Game, rng: &mut StdRng) -> Table {
-        let bots = Seat::ALL.map(|seat| {
-            (seat != HUMAN).then(|| Box::new(HeuristicBot::new(game.rules())) as Box<dyn Strategy>)
+    fn seat(game: &Game, rng: &mut StdRng, search: bool) -> Table {
+        let rules = game.rules();
+        let bots = Seat::ALL.map(|seat| -> Option<Box<dyn Strategy>> {
+            if seat == HUMAN {
+                None
+            } else if search {
+                // ponytail: one thread a decision, a second or so at the
+                // gate; fan the samples out over the cores if that drags.
+                let rng = StdRng::seed_from_u64(rng.random());
+                Some(Box::new(
+                    MonteCarloBot::new(rules, SAMPLES, rng).gated(GATE_CARDS, None),
+                ))
+            } else {
+                Some(Box::new(HeuristicBot::new(rules)))
+            }
         });
         Table::new(game.deal(rng), bots)
     }
@@ -550,7 +576,7 @@ impl Core {
             return;
         };
         self.game.settle(result);
-        self.table = Self::seat(&self.game, &mut self.rng);
+        self.table = Self::seat(&self.game, &mut self.rng, self.search);
     }
 }
 
@@ -572,7 +598,7 @@ impl WebGame {
     #[must_use]
     pub fn new(seed: &str, settings: &str) -> Self {
         Self {
-            core: Core::new(seed.parse().unwrap_or(0), &Settings::parse(settings)),
+            core: Core::new(seed.parse().unwrap_or(0), &Settings::parse(settings), false),
         }
     }
 
@@ -630,6 +656,19 @@ impl WebGame {
     }
 }
 
+impl WebGame {
+    /// [`WebGame::new`] with opponents that search: a [`MonteCarloBot`] of
+    /// 128 samples that searches with 10 concealed cards or fewer and plays
+    /// greedily before.  For the desktop client, as plain Rust; a search
+    /// takes a second or so of native code and several as wasm.
+    #[must_use]
+    pub fn searching(seed: &str, settings: &str) -> Self {
+        Self {
+            core: Core::new(seed.parse().unwrap_or(0), &Settings::parse(settings), true),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -640,7 +679,7 @@ mod tests {
     fn settings_pick_the_threshold() {
         assert_eq!(Settings::parse("junk").threshold, 10);
         assert_eq!(Settings::parse("{}").threshold, 10);
-        let core = Core::new(7, &Settings::parse(r#"{"threshold":8}"#));
+        let core = Core::new(7, &Settings::parse(r#"{"threshold":8}"#), false);
         let value: serde_json::Value = serde_json::from_str(&core.snapshot()).unwrap();
         assert_eq!(value["threshold"], 8);
         assert_eq!(core.game.rules(), &Rules::eight());
@@ -743,7 +782,7 @@ mod tests {
     /// discards their first legal card, and every snapshot serializes.
     #[test]
     fn human_can_muddle_through() {
-        let mut core = Core::new(7, &Settings::default());
+        let mut core = Core::new(7, &Settings::default(), false);
         let mut rounds = 0;
         while rounds < 5 {
             let json = core.snapshot();

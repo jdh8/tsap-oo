@@ -4,15 +4,17 @@
 crate.  Everything about the
 cards themselves — `Card`, `Hand`, `Meld`, the layout `Solver` — lives in
 susik; this crate owns dealing, the claim priority, scoring, and the bots.
-The browser front end is the standalone crate in `web/`, and the A/B harness
-the one in `ab/`.
+The browser front end is the standalone crate in `web/`, the desktop one
+(`web/`'s page in a Tauri window, against opponents that search) the one in
+`tauri/`, and the A/B harness the one in `ab/`.
 
 After updating the codebase, please
 
-- Format the code with `cargo fmt` (also in `web/`).
+- Format the code with `cargo fmt` (also in `web/` and `tauri/`).
 - Lint with `cargo clippy --all-targets --all-features -- -D warnings`.
 - Run the tests with `cargo test --all-features`, then `cargo check
-  --no-default-features`, then `cd web && cargo test`.
+  --no-default-features`, then `cd web && cargo test`; after a change to
+  `web/` or `tauri/`, `cd tauri && cargo test` too.
 - Build the docs with `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features`.
 - Note user-visible changes in `CHANGELOG.md` under `[Unreleased]`.
 - Propose a clear and descriptive commit message.

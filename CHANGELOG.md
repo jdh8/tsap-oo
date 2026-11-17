@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `tauri/`, a desktop client: `web/`'s page in a Tauri window, the engine as
+  native code on its own thread (`cd tauri && cargo run --release`).  Its
+  three opponents search: `MonteCarloBot`s of 128 samples gated to 10
+  concealed cards or fewer, the gate that won its A/B below, about a second
+  a searched decision.  Neither number is a setting, as no other gate has a
+  verdict.  The hint is still `HeuristicBot`'s.  `web/app.js` reaches the
+  engine through one object, the wasm in a browser and Tauri commands in the
+  window; `WebGame::searching` seats the searching opponents.  The browser
+  page deals and plays as before.
+
 - `HeuristicBot::shanten`, the 向聽數: how many claims a hand is from
   waiting once the seat has answered, searched up to a limit, since a count
   of melds and 搭子 cannot see the ten 胡 a win needs.  A hand that eating

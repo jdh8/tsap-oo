@@ -1,0 +1,30 @@
+[package]
+name = "tsap-oo-tauri"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.93"
+publish = false
+license = "Apache-2.0"
+description = "Desktop front end for tsap-oo: the web page in a native window, against opponents that search"
+
+# Standalone crate, like `web/`: its own workspace root, so the parent
+# `tsap-oo` package never adopts it (and never compiles a GUI toolkit).
+[workspace]
+
+[build-dependencies]
+tauri-build = "2"
+
+[dependencies]
+tauri = "2"
+# The game (deal, step, claim, snapshot, hint) is the web crate's, called as
+# plain Rust: one engine surface, and one UI (`web/`'s page, embedded at
+# build time).
+tsap-oo-web = { path = "../web" }
+
+# An un-optimized search takes many seconds a decision.
+[profile.dev]
+opt-level = 2
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 2

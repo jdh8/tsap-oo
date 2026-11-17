@@ -1,8 +1,12 @@
-// Thin renderer over the wasm engine.  The engine holds the whole game; JS
-// asks it for one bot step at a time on a timer so each move can be followed,
-// and sends the human's clicks straight through.  Every call returns the
-// full snapshot and the page is rebuilt from it.
-import init, { WebGame } from './pkg/tsap_oo_web.js';
+// Thin renderer over the engine.  The engine holds the whole game; JS asks
+// it for one bot step at a time on a timer so each move can be followed, and
+// sends the human's clicks straight through.  Every call returns the full
+// snapshot and the page is rebuilt from it.
+//
+// The engine is the wasm in a browser and the native process in the desktop
+// client (`tauri/`), behind one object: see loadEngine().
+
+const NATIVE = '__TAURI__' in window; // the desktop client injects it
 
 const PACE_MS = 550; // pause between bot steps, so they can be followed
 
@@ -10,7 +14,7 @@ const PACE_MS = 550; // pause between bot steps, so they can be followed
 // on from you, the next player (下家) sits to your right.
 const SLOTS = [null, 'right', 'top', 'left'];
 
-let game;
+let game; // every method answers a JSON string, or a promise of one: always await
 let state;
 let timer;
 let logged = 0; // log lines already rendered
@@ -54,8 +58,52 @@ function applySettings(e) {
   else render();
 }
 
+// The engine's methods, named as `WebGame` exports them, with `new_game` for
+// its constructor.
+async function loadEngine() {
+  if (NATIVE) {
+    // One call at a time, in the order made: the native side has a single
+    // engine thread, and a new game must not overtake a bot's step.
+    let tail = Promise.resolve();
+    const call = (cmd, args) => {
+      const answer = tail.then(() => window.__TAURI__.core.invoke(cmd, args));
+      tail = answer.catch(() => {});
+      return answer;
+    };
+    return {
+      new_game: (seed, settings) => call('new_game', { seed, settings }),
+      step: () => call('step'),
+      pass: () => call('pass'),
+      pong: () => call('pong'),
+      eat: (index) => call('eat', { index }),
+      discard: (code) => call('discard', { code }),
+      hint: () => call('hint'),
+      next_round: () => call('next_round'),
+    };
+  }
+  const wasm = await import('./pkg/tsap_oo_web.js');
+  await wasm.default();
+  let table;
+  return {
+    new_game: (seed, settings) => {
+      table?.free();
+      table = new wasm.WebGame(seed, settings);
+      return table.snapshot();
+    },
+    step: () => table.step(),
+    pass: () => table.pass(),
+    pong: () => table.pong(),
+    eat: (index) => table.eat(index),
+    discard: (code) => table.discard(code),
+    hint: () => table.hint(),
+    next_round: () => table.next_round(),
+  };
+}
+
 async function main() {
-  await init();
+  game = await loadEngine();
+  // A link out would leave the desktop window with no way back.
+  if (NATIVE) document.querySelector('header a').remove();
   id('new').onclick = newGame;
   const toggleLog = () => {
     document.body.classList.toggle('log-hidden');
@@ -79,15 +127,20 @@ async function main() {
 }
 
 function newGame() {
-  game = new WebGame(String(Math.floor(Math.random() * 2 ** 53)), JSON.stringify(settings));
-  id('log').innerHTML = '<h2>紀錄</h2>';
-  logged = 0;
-  show(game.snapshot());
+  clearTimeout(timer);
+  const fresh = game.new_game(String(Math.floor(Math.random() * 2 ** 53)), JSON.stringify(settings));
+  // The log restarts with the new game's first snapshot, not before: a step
+  // the old game still owes may answer first.
+  show(fresh, () => {
+    id('log').innerHTML = '<h2>紀錄</h2>';
+    logged = 0;
+  });
 }
 
 // Render a snapshot, then keep the bots moving unless it is your decision.
-function show(json) {
-  state = JSON.parse(json);
+async function show(answer, before) {
+  state = JSON.parse(await answer);
+  before?.();
   render();
   clearTimeout(timer);
   if (state.phase !== 'finished' && state.actor !== state.human) {
@@ -332,9 +385,11 @@ function render() {
 // until the next render, i.e. for this one decision.  Of several copies of
 // the pick it rings the last: the loose cards are the last group, so a loose
 // copy is ringed before one sitting in a meld.
-function showHint() {
-  const rows = JSON.parse(game.hint());
-  if (!rows.length || document.querySelector('.grade')) return;
+async function showHint() {
+  const shown = state;
+  const rows = JSON.parse(await game.hint());
+  // The answer may come after the decision it rates.
+  if (shown !== state || !rows.length || document.querySelector('.grade')) return;
   const els = (code) => [
     ...document.querySelectorAll(
       `#hand [data-code="${code}"]:not(.locked), #actions [data-hint="${code}"]`,
