@@ -25,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `examples/nodes.rs`, a census of the single-player DP that route 3 of
+  `doc/stronger-bot.md` sketched: from every settled hand of `HeuristicBot`
+  self-play, the (hand, exposed 胡) states a chain of claims and discards
+  reaches while `ceiling` still meets the threshold, and the edges between
+  them.  A fresh hand of twenty has about 7 × 10⁵ states and 6 × 10⁷
+  edges and takes 22 s to walk, two to three orders above the sketch's
+  guess; only hands of twelve cards or fewer are in the tens of
+  milliseconds (`research/dp-nodes.md`).  Batch 4 of `doc/hu-ceiling.md`
+  stays four separate candidates.  No bot changes.
+
 - `ceiling`, the most 胡 a hand can still win with if every card it wants
   came and at most a given number of generals from outside; `None` when no
   layout of 21 cards exists (`doc/hu-ceiling.md`, batch 1).  It lays the
