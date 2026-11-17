@@ -28,6 +28,19 @@ pub fn ceiling(
 ) -> Option<u32> {
     let shown: usize = exposed.iter().map(Meld::size).sum();
     let base: u32 = exposed.iter().map(|meld| rules.exposed.score(meld)).sum();
+    reach(rules, shown, hand, live, generals).map(|hu| hu + base)
+}
+
+/// The most 胡 the kept cards of `hand` and the cards from outside add
+/// beside `shown` exposed cards, as [`ceiling`] but without the exposed
+/// melds' own 胡
+pub(crate) fn reach(
+    rules: &Rules,
+    shown: usize,
+    hand: Hand,
+    live: Hand,
+    generals: usize,
+) -> Option<u32> {
     let mut acc = Table::new(generals);
     acc.raise(0, 0, 0);
     for block in blocks() {
@@ -49,10 +62,7 @@ pub fn ceiling(
     }
     // Discards less outside cards: what brings the count to 21.
     let target = i32::try_from(hand.len() + shown).ok()? - 21;
-    (0..=generals)
-        .filter_map(|g| acc.get(target, g))
-        .max()
-        .map(|hu| hu + base)
+    (0..=generals).filter_map(|g| acc.get(target, g)).max()
 }
 
 /// The nine sets of cards that only meld among themselves: each colour's

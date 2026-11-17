@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `HeuristicBot`'s `short` term, and so the web hint, is at least the
+  half-胡 `ceiling(generals = 1)` falls short of the threshold
+  (`doc/hu-ceiling.md`, batch 4): the 搭子's hope can no longer promise
+  more than any layout of the hand reaches.  `ab/run.sh 200000` against
+  `7ad669b` (seed base 1794954270, `RESHUFFLE=8`), 555 deals part:
+  +0.002 ± 0.000 points a deal, 95% CI [+0.001, +0.003], a win, though
+  the smallest measured so far.  Two forms were measured on the way and
+  not kept: replacing `short` outright is −0.380 ± 0.064 on a 5,000-deal
+  smoke test (the term's pull toward the threshold goes), and the same
+  floor with `generals = 0` is −0.036 ± 0.003 (200,000 deals, seed base
+  1794953471), the whole loss being pongs the control takes and the
+  candidate passes.
 - `HeuristicBot`, and so the web hint, no longer eats a pair that drops
   `ceiling(generals = 0)` below the threshold (`doc/hu-ceiling.md`,
   batch 3): groups 甲 and 乙 of batch 2.  A pair eat whose ceiling still

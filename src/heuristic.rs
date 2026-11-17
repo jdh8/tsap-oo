@@ -1,11 +1,12 @@
 //! A greedy bot.
 
 use crate::Seat;
-use crate::ceiling::ceiling;
+use crate::ceiling::{ceiling, reach};
 use crate::round::{Claim, ClaimOptions, Phase, discardable, options};
 use crate::rules::Rules;
 use crate::strategy::Strategy;
 use crate::view::View;
+use std::collections::HashMap;
 use susik::{Card, Hand, Layout, Meld, Rank, Solver, Values, locked_completions};
 
 /// What a loose card, or a 胡 short of the threshold, costs a hand.
@@ -50,7 +51,9 @@ pub struct Terms {
     /// Cards outside every meld
     pub loose: i32,
     /// Half-胡 the melds fall short of the threshold, after the half-胡
-    /// the 搭子 among the loose cards may bring
+    /// the 搭子 among the loose cards may bring; at least the half-胡 the
+    /// hand's [`ceiling`] with at most one general from outside falls
+    /// short, the most its layout can reach if every card it wants comes
     pub short: i32,
     /// Unseen copies of the loose cards, each of which would pair one
     pub own: i32,
@@ -108,6 +111,10 @@ pub struct HeuristicBot {
     live: Hand,
     /// For [`ceiling`]
     rules: Rules,
+    /// Cards in the seat's exposed melds, with those of the claim weighed
+    shown: usize,
+    /// Memo of [`reach`] by hand and `shown`, for one decision
+    reach: HashMap<(Hand, usize), Option<u32>>,
 }
 
 impl HeuristicBot {
@@ -128,6 +135,8 @@ impl HeuristicBot {
             .map(to_i32),
             live: Hand::EMPTY,
             rules: *rules,
+            shown: 0,
+            reach: HashMap::new(),
         }
     }
 
@@ -143,11 +152,10 @@ impl HeuristicBot {
             .chain(view.discards().iter().map(|&(_, card)| card))
             .chain(view.offer().map(|offer| offer.card));
         self.live = shown.fold(Hand::FULL - view.hand(), Hand::without);
-        let have: u32 = view
-            .exposed(view.seat())
-            .iter()
-            .map(|meld| self.exposed.score(meld))
-            .sum();
+        let mine = view.exposed(view.seat());
+        self.shown = mine.iter().map(Meld::size).sum();
+        self.reach.clear();
+        let have: u32 = mine.iter().map(|meld| self.exposed.score(meld)).sum();
         to_i32(self.threshold) - to_i32(have)
     }
 
@@ -183,6 +191,7 @@ impl HeuristicBot {
             return None;
         }
         let waits = self.waits(hand, need);
+        let short = (2 * (need - self.reach(hand))).max(0);
         self.solvers
             .iter_mut()
             .zip(COSTS)
@@ -197,7 +206,7 @@ impl HeuristicBot {
                 Terms {
                     hu,
                     loose,
-                    short: (2 * (need - hu) - hope).max(0),
+                    short: (2 * (need - hu) - hope).max(short),
                     own,
                     kept,
                     lonely,
@@ -205,6 +214,21 @@ impl HeuristicBot {
                 }
             })
             .max_by_key(Terms::grade)
+    }
+
+    /// The 胡 `hand` can reach beside the seat's melds with at most one
+    /// general from outside, 0 when no layout exists
+    fn reach(&mut self, hand: Hand) -> i32 {
+        let key = (hand, self.shown);
+        let hu = match self.reach.get(&key) {
+            Some(&hu) => hu,
+            None => {
+                let hu = reach(&self.rules, self.shown, hand, self.live, 1);
+                self.reach.insert(key, hu);
+                hu
+            }
+        };
+        hu.map_or(0, to_i32)
     }
 
     /// How many unseen cards `hand` would win on
@@ -238,7 +262,10 @@ impl HeuristicBot {
     fn take(&mut self, hand: Hand, meld: Meld, card: Card, need: i32) -> i32 {
         let gain = to_i32(self.exposed.score(&meld));
         let rest = hand - meld.cards().without(card);
-        SCALE * gain + self.after_discard(rest, card, need - gain)
+        self.shown += meld.size();
+        let grade = SCALE * gain + self.after_discard(rest, card, need - gain);
+        self.shown -= meld.size();
+        grade
     }
 
     /// The grade of winning on `card`, if the hand does: its 胡, as a hand
