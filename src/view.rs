@@ -1,6 +1,6 @@
 //! What one seat may see.
 
-use crate::round::{Event, Offer, Phase, Round};
+use crate::round::{ClaimOptions, Event, Offer, Phase, Round};
 use crate::{Rules, Seat};
 use susik::{Card, Hand, Meld};
 
@@ -54,6 +54,13 @@ impl<'a> View<'a> {
     #[inline]
     pub const fn offer(&self) -> Option<Offer> {
         self.round.offer()
+    }
+
+    /// What this seat may do with the offer; empty unless the round waits
+    /// on its claim
+    #[must_use]
+    pub fn claim_options(&self) -> ClaimOptions {
+        self.round.claim_options(self.seat)
     }
 
     /// This seat's concealed cards

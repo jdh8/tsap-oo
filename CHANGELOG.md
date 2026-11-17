@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `HeuristicBot::shanten`, the 向聽數: how many claims a hand is from
+  waiting once the seat has answered, searched up to a limit, since a count
+  of melds and 搭子 cannot see the ten 胡 a win needs.  A hand that eating
+  or ponging the offer would leave waiting counts as waiting;
+  `View::claim_options` is public for that.  It is not a term of the grade,
+  and `MonteCarloBot::gated` uses it: a `MonteCarloBot` that searches only
+  with so many concealed cards or fewer, or within so many claims of
+  waiting, and plays the greedy choice elsewhere.  `ab/` reads the gate
+  from `GATE_CARDS` and `GATE_SHANTEN`.  Ungated, a 128-sample decision
+  takes 3.1 s and a round 25 CPU-s; decisions at 10 cards or fewer are 9.7%
+  of them and 2.7% of the compute (`gate` example, 256 rounds, seed base
+  1794901984).  `HeuristicBot` plays as before
+  (`ab/run.sh 20000`, control 4596efe, seed base 1794866617): 0 of 20000
+  deals part.
+
+  Three gates against `HeuristicBot` (`research/gated-monte-carlo.md`):
+  four seats, 128 samples, `RESHUFFLE=0`, control 4596efe, 40000 deals
+  each, declared before the data.  Searching only with 10 concealed cards
+  or fewer (`GATE_CARDS=10`, seed base 1794910000): +0.070 ± 0.026 points
+  a deal, 95% CI [+0.019, +0.121], 1518 deals part, win.  Only while
+  waiting (`GATE_CARDS=0 GATE_SHANTEN=0`, seed base 1794950000): +0.048 ±
+  0.030, 95% CI [−0.011, +0.108], 1161 deals part, inconclusive.  Either
+  (`GATE_CARDS=10 GATE_SHANTEN=0`, seed base 1794990000): +0.061 ± 0.035,
+  95% CI [−0.009, +0.130], 2302 deals part, inconclusive.  The three lie
+  within one another's error, so the data do not rank the gates.  No bot's
+  default changes: `MonteCarloBot::new` is still ungated and the web page
+  still plays `HeuristicBot`.  The `gate` example times where an ungated
+  search spends its time.
+
 - The web page shows your waits (聽牌): while you are one card from
   winning, a row under the hand lists every card that wins, each with the
   胡 it wins at and the copies you have not seen.  While you discard, each

@@ -34,6 +34,10 @@ pub struct MonteCarloBot<R> {
     rng: R,
     samples: usize,
     policy: HeuristicBot,
+    /// The most concealed cards the bot searches with
+    cards: usize,
+    /// The 向聽數 within which it searches whatever the cards
+    shanten: Option<u32>,
 }
 
 impl<R: Rng> MonteCarloBot<R> {
@@ -44,7 +48,32 @@ impl<R: Rng> MonteCarloBot<R> {
             rng,
             samples,
             policy: HeuristicBot::new(rules),
+            cards: usize::MAX,
+            shanten: None,
         }
+    }
+
+    /// The same bot searching only late: with `cards` concealed cards or
+    /// fewer once it has discarded, or within `shanten` claims of waiting
+    /// ([`HeuristicBot::shanten`]) if given.  Elsewhere it plays the greedy
+    /// choice.
+    ///
+    /// A decision on a full hand costs several times one on a short hand:
+    /// the playouts are longer and each step of them dearer.
+    #[must_use]
+    pub const fn gated(mut self, cards: usize, shanten: Option<u32>) -> Self {
+        self.cards = cards;
+        self.shanten = shanten;
+        self
+    }
+
+    /// Whether the gate of [`gated`](Self::gated) lets `view` be searched
+    fn open(&mut self, view: &View<'_>) -> bool {
+        let discarding = matches!(view.phase(), Phase::Discard(_));
+        view.hand().len() - usize::from(discarding) <= self.cards
+            || self
+                .shanten
+                .is_some_and(|limit| self.policy.shanten(view, limit).is_some())
     }
 
     /// The first action, unless the sampled deals say another one scores
@@ -55,7 +84,7 @@ impl<R: Rng> MonteCarloBot<R> {
         actions: &[A],
         act: impl Fn(&mut Round, A) -> Result<(), RoundError>,
     ) -> A {
-        if actions.len() < 2 || self.samples < 2 {
+        if actions.len() < 2 || self.samples < 2 || !self.open(view) {
             return actions[0];
         }
         // Sums of each action's gain over the first, and of its square.

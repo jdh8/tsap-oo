@@ -5,7 +5,9 @@
 //! reads only its own crate's `View`, so the two crates' rounds are stepped
 //! in lockstep, every claim and discard applied to both.  Set `SAMPLES` to
 //! seat a `MonteCarloBot` of that many samples as the candidate instead, and
-//! `PEEK` as well to seat the Peeker.
+//! `PEEK` as well to seat the Peeker.  `GATE_CARDS` and `GATE_SHANTEN` gate
+//! the `MonteCarloBot` (`MonteCarloBot::gated`): it searches only with that
+//! many concealed cards or fewer, or within that 向聽數.
 //!
 //! Set `RESHUFFLE` to K to average out the luck after the two first part
 //! ways: the deal is played once with the candidate, and at its first choice
@@ -66,7 +68,11 @@ fn candidate_bot(rules: &new::Rules, seed: u64) -> Box<dyn new::Strategy> {
     if std::env::var_os("PEEK").is_some() {
         return Box::new(peeker::Peeker::new(rules, n, rng));
     }
-    Box::new(new::MonteCarloBot::new(rules, n, rng))
+    // `GATE_CARDS` and `GATE_SHANTEN` are `MonteCarloBot::gated`'s two.
+    let gate = |name| std::env::var(name).ok().map(|s| s.parse().unwrap());
+    let cards = gate("GATE_CARDS").unwrap_or(usize::MAX);
+    let shanten = gate("GATE_SHANTEN").map(|n| n as u32);
+    Box::new(new::MonteCarloBot::new(rules, n, rng).gated(cards, shanten))
 }
 
 fn to_new(claim: old::Claim) -> new::Claim {

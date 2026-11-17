@@ -1,7 +1,7 @@
 //! A greedy bot.
 
 use crate::Seat;
-use crate::round::{Claim, ClaimOptions, discardable, options};
+use crate::round::{Claim, ClaimOptions, Phase, discardable, options};
 use crate::rules::Rules;
 use crate::strategy::Strategy;
 use crate::view::View;
@@ -474,6 +474,142 @@ impl HeuristicBot {
     }
 }
 
+impl HeuristicBot {
+    /// The seat's 向聽數 once it has answered, when that is `limit` or less:
+    /// how many claims its hand is from waiting
+    ///
+    /// 0 is a hand that wins on some card not yet seen (聽牌).  A hand comes
+    /// one nearer by claiming a card and discarding, since nothing else
+    /// changes it; the cards are the ones the seat has not seen and the 胡
+    /// must reach the threshold, so a hand of melds too poor to win is not
+    /// waiting.  With a decision pending it is the least the seat can leave
+    /// itself: over the discards, or over passing and every claim of the
+    /// offer with every discard after it, so a hand that an eat would leave
+    /// waiting counts as waiting.  `None` is a hand further off than
+    /// `limit`, or dead.
+    ///
+    /// It is not a term of the grade: the bot plays the same with or
+    /// without it.
+    // ponytail: a search `limit` claims deep: at 2 it took 46 ms on average
+    // and 2 s at worst.  Fine for a gate asked once a decision; a term of
+    // the grade would need it memoized.  Counting melds and 搭子 is exact
+    // for a hand that already holds its 胡 and too low for a third of the
+    // rest, so it only prunes here, in its plainest form.
+    pub fn shanten(&mut self, view: &View<'_>, limit: u32) -> Option<u32> {
+        let need = self.start(view);
+        let live = self.live;
+        answers(view, self.exposed)
+            .into_iter()
+            .filter_map(|(hand, gain)| self.away(hand, need - gain, live, limit))
+            .min()
+    }
+
+    /// How many claims `hand` is from winning on one of `live`, when
+    /// `limit` or fewer
+    fn away(&mut self, hand: Hand, need: i32, live: Hand, limit: u32) -> Option<u32> {
+        // A claim melds two cards of the hand at most beyond those already
+        // in a meld and sheds one more, and the winning card melds two.
+        let loose = self.solvers[1]
+            .layout(hand)
+            .map_or(usize::MAX, |layout| layout.loose.len());
+        if loose > 2 + 3 * limit as usize || self.dead(hand, need) {
+            return None;
+        }
+        if loose <= 2
+            && live
+                .distinct()
+                .any(|(card, _)| self.win(hand, card, need).is_some())
+        {
+            return Some(0);
+        }
+        let mut best = None;
+        // What a further claim must come within to beat `best`.
+        let mut limit = limit;
+        for (rest, gain, card) in steps(hand, live, self.exposed) {
+            if limit == 0 {
+                break;
+            }
+            if let Some(n) = self.away(rest, need - gain, live.without(card), limit - 1) {
+                best = Some(n + 1);
+                limit = n;
+            }
+        }
+        best
+    }
+}
+
+/// Every hand the seat can leave itself by the decision pending, each with
+/// the 胡 of the meld it exposes on the way: its discards, or passing and
+/// every claim of the offer with every discard after it
+fn answers(view: &View<'_>, exposed: Values) -> Vec<(Hand, i32)> {
+    let hand = view.hand();
+    if view.phase() == Phase::Discard(view.seat()) {
+        return discardable(hand, view.locked())
+            .distinct()
+            .map(|(card, _)| (hand.without(card), 0))
+            .collect();
+    }
+    let options = view.claim_options();
+    let pass = (!options.forced()).then_some((hand, 0));
+    let Some(offer) = view.offer() else {
+        return vec![(hand, 0)];
+    };
+    let melds = options
+        .pong
+        .then_some(Meld::Triplet(offer.card))
+        .into_iter()
+        .chain(options.eats);
+    pass.into_iter()
+        .chain(taken(hand, offer.card, melds, exposed))
+        .collect()
+}
+
+/// Every way `hand` claims `card` into one of `melds` and discards: the hand
+/// left and the 胡 of the meld exposed
+fn taken(
+    hand: Hand,
+    card: Card,
+    melds: impl IntoIterator<Item = Meld>,
+    exposed: Values,
+) -> Vec<(Hand, i32)> {
+    let mut taken = Vec::new();
+    for meld in melds {
+        let rest = hand - meld.cards().without(card);
+        let gain = to_i32(exposed.score(&meld));
+        taken.extend(
+            discardable(rest, Some(card))
+                .distinct()
+                .map(|(discard, _)| (rest.without(discard), gain)),
+        );
+    }
+    taken
+}
+
+/// Every way `hand` claims one of `live` and discards: the hand left, the 胡
+/// of the meld exposed and the card claimed
+fn steps(hand: Hand, live: Hand, exposed: Values) -> Vec<(Hand, i32, Card)> {
+    let mut steps = Vec::new();
+    for (card, _) in live.distinct() {
+        let melds = if hand.count(card) == 3 {
+            vec![Meld::Quad(card)]
+        } else {
+            let options = options(hand, card, true);
+            options
+                .pong
+                .then_some(Meld::Triplet(card))
+                .into_iter()
+                .chain(options.eats)
+                .collect()
+        };
+        steps.extend(
+            taken(hand, card, melds, exposed)
+                .into_iter()
+                .map(|(rest, gain)| (rest, gain, card)),
+        );
+    }
+    steps
+}
+
 impl Strategy for HeuristicBot {
     fn claim(&mut self, view: &View<'_>, options: &ClaimOptions) -> Claim {
         self.claims(view, options)[0].0
@@ -539,6 +675,67 @@ mod tests {
         assert!(pairs < open);
         // and less again with nothing left to pair.
         assert!(draw("兵兵兵傌傌傌.兵兵兵.卒卒卒卒.卒卒卒卒", 0) < pairs);
+    }
+
+    /// [`HeuristicBot::away`] without its shortcuts
+    fn search(
+        bot: &mut HeuristicBot,
+        hand: Hand,
+        need: i32,
+        live: Hand,
+        limit: u32,
+    ) -> Option<u32> {
+        if live
+            .distinct()
+            .any(|(card, _)| bot.win(hand, card, need).is_some())
+        {
+            return Some(0);
+        }
+        if limit == 0 {
+            return None;
+        }
+        steps(hand, live, bot.exposed)
+            .into_iter()
+            .filter_map(|(rest, gain, card)| {
+                search(bot, rest, need - gain, live.without(card), limit - 1)
+            })
+            .min()
+            .map(|n| n + 1)
+    }
+
+    /// The shortcuts of the 向聽數 — the loose cards it gives up on, the
+    /// dead hands, the bound that tightens — never change the answer, in
+    /// every position of a few rounds of play.
+    #[cfg(feature = "rand")]
+    #[test]
+    fn shanten() {
+        use crate::{Round, Step, Table};
+        use rand::SeedableRng as _;
+        let rules = Rules::new();
+        let mut bot = HeuristicBot::new(&rules);
+        let mut seen = [0; 3];
+        for seed in 0..3 {
+            let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
+            let round = Round::deal(rules, Seat::ALL[0], &mut rng);
+            let seats = Seat::ALL.map(|_| Some(Box::new(bot.clone()) as Box<dyn Strategy>));
+            let mut table = Table::new(round, seats);
+            while let Ok(Step::Acted(seat)) = table.step() {
+                let view = View::new(table.round(), seat);
+                let need = bot.start(&view);
+                let (hand, live) = (view.hand(), bot.live);
+                // Two claims deep is dear without the shortcuts.
+                let limit = if hand.len() < 12 { 2 } else { 1 };
+                let slow = answers(&view, bot.exposed)
+                    .into_iter()
+                    .filter_map(|(hand, gain)| search(&mut bot, hand, need - gain, live, limit))
+                    .min();
+                assert_eq!(bot.shanten(&view, limit), slow, "{hand} needing {need}");
+                if let Some(n) = slow {
+                    seen[n as usize] += 1;
+                }
+            }
+        }
+        assert!(seen.iter().all(|&n| n > 0), "{seen:?}");
     }
 
     #[test]
