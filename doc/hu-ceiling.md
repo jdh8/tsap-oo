@@ -1,6 +1,6 @@
 # 胡數的天花板：設計
 
-寫於 2026-11-18，基準 `6d5a2a8`，還沒有動工。這份文件取代
+寫於 2026-11-18，基準 `6d5a2a8`；批次 0 到 2 已完成，進度見下表。這份文件取代
 `doc/stronger-bot.md` 路線二裡「封頂只用來拒吃對子」那個實驗：帳換成精確的，
 工程拆成五批，每一批都有閘門，過了才做下一批。
 
@@ -163,8 +163,15 @@ pub fn ceiling(rules: &Rules, exposed: &[Meld], hand: Hand, live: Hand, generals
   刻意的，批次 3 有贏再回頭處理。
 - 天花板不變的吃對子照舊。它們平均很值得（一律不吃是 −1.50 分／局）。
 
-追蹤：套用 `research/room-for-melds-trace.patch`，每個分歧多印四個數字：
-`generals` 取 0 與 1 時，吃之前與吃之後的天花板。
+追蹤：`ab/` 對每個分歧多印四個數字：`generals` 取 0 與 1 時，吃之前與
+吃之後的天花板。探針與追蹤都不在 `main` 上，各存成一個 patch；
+`hu-ceiling-trace.patch` 帶著 `ab/tally.py` 與 `ab/groups.py`：
+
+```sh
+git apply research/hu-ceiling-probe.patch research/hu-ceiling-trace.patch
+TRACE=1 ab/run.sh 800000 > out.txt
+python3 ab/groups.py out.txt 800000
+```
 
 預先宣告的分組，依吃完之後的天花板：
 
@@ -189,6 +196,18 @@ pub fn ceiling(rules: &Rules, exposed: &[Meld], hand: Hand, live: Hand, generals
 - **其他**：這條線停在這裡，寫進 `research/` 與 `CHANGELOG.md`，bot 不改。
   CI 跨 0 的分組是資料不足，不是「可以留著」。
 
+結果（800,000 局，seed base 1794940763，`RESHUFFLE=8`，對照 `168e1e4`，
+357,189 局分歧）：
+
+| | 分／局 | 95% CI | 結論 |
+| --- | ---: | --- | --- |
+| 整體 | −2.173 ± 0.008 | [−2.189, −2.156] | loss |
+| 甲 | +0.0143 | [+0.0133, +0.0154] | 在 0 之上 |
+| 乙 | +0.0254 | [+0.0228, +0.0279] | 在 0 之上 |
+| 丙 | −2.213 | [−2.229, −2.196] | 在 0 之下 |
+
+探針不 commit；甲、乙過了第二道閘門，做批次 3。
+
 ## 批次 3：收窄的規則
 
 只擋批次 2 裡 CI 在 0 之上的那幾組。新的 seed base，局數依批次 2 量到的
@@ -197,7 +216,9 @@ pub fn ceiling(rules: &Rules, exposed: &[Meld], hand: Hand, live: Hand, generals
 
 ## 批次 4：其他用途
 
-有贏才設計，各自 A/B。候選：
+有贏才設計，各自 A/B。下面四項也可以由一個單人期望值的動態規劃一次取代
+（`doc/stronger-bot.md` 路線三）：天花板在裡面是精確的剪枝，到不了門檻的
+手值 0。先數節點再決定走哪一邊。候選：
 
 - **`dead`。** 現在假設每張牌都換成一張將帥，寬得幾乎擋不到東西。
 - **`short` 與 `hope`。** 用「天花板離門檻多遠」取代搭子的半胡數。
