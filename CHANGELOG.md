@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   No bot changes: `ab/run.sh 20000` against `1aab13e` (seed base
   1795100000, `RESHUFFLE=8`) read 0 deals that part.
 
+- The 胡 ceiling's probe, measured and not shipped (`doc/hu-ceiling.md`,
+  batch 2): `HeuristicBot::claims` dropping a pair eat that lowers
+  `ceiling(generals = 0)`.  `ab/run.sh 800000` against `168e1e4` (seed base
+  1794940763, `RESHUFFLE=8`), 357,189 deals part: −2.173 ± 0.008 a deal,
+  95% CI [−2.189, −2.156], a loss.  By the groups declared beforehand, 丙
+  (ceiling still reaches the threshold) −2.213 [−2.229, −2.196]; 乙 +0.0254
+  [+0.0228, +0.0279]; 甲 +0.0143 [+0.0133, +0.0154].  Since 甲 and 乙 lie
+  above 0, batch 3 blocks only those.  The probe and its trace are kept as
+  `research/hu-ceiling-probe.patch` and `research/hu-ceiling-trace.patch`.
+
 - `research/seven-slots.md` and the `census` example: where a winning
   hand's 胡 come from.  A winning hand is 21 cards, seven slots of three at
   1 胡 each, so 胡 = 7 + 2k + 將士象 + 2 × (concealed triplets, soldiers

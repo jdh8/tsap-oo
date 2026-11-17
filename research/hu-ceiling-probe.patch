@@ -1,0 +1,67 @@
+diff --git a/src/heuristic.rs b/src/heuristic.rs
+index a4a9ef3..da95485 100644
+--- a/src/heuristic.rs
++++ b/src/heuristic.rs
+@@ -1,6 +1,7 @@
+ //! A greedy bot.
+ 
+ use crate::Seat;
++use crate::ceiling::ceiling;
+ use crate::round::{Claim, ClaimOptions, Phase, discardable, options};
+ use crate::rules::Rules;
+ use crate::strategy::Strategy;
+@@ -105,6 +106,8 @@ pub struct HeuristicBot {
+     eaten: [i32; 3],
+     /// The cards the seat has not seen: in other hands or the pile
+     live: Hand,
++    /// For [`ceiling`]
++    rules: Rules,
+ }
+ 
+ impl HeuristicBot {
+@@ -124,6 +127,7 @@ impl HeuristicBot {
+             ]
+             .map(to_i32),
+             live: Hand::EMPTY,
++            rules: *rules,
+         }
+     }
+ 
+@@ -430,10 +434,16 @@ impl HeuristicBot {
+             .pong
+             .then_some((Meld::Triplet(card), Claim::Pong))
+             .into_iter()
+-            .chain(weighed(options, hand, card).map(|meld| (meld, Claim::Eat(meld))));
++            .chain(weighed(options, hand, card).map(|meld| (meld, Claim::Eat(meld))))
++            .filter(|&(meld, _)| pass.is_none() || !self.lowers(view, meld))
++            .collect::<Vec<_>>();
+         let mut graded: Vec<(i32, Claim)> = pass
+             .into_iter()
+-            .chain(melds.map(|(meld, claim)| (self.take(hand, meld, card, need), claim)))
++            .chain(
++                melds
++                    .into_iter()
++                    .map(|(meld, claim)| (self.take(hand, meld, card, need), claim)),
++            )
+             .collect();
+         // Stable: the earlier of equals stays first, passing before claiming.
+         graded.sort_by_key(|&(grade, _)| std::cmp::Reverse(grade));
+@@ -443,6 +453,18 @@ impl HeuristicBot {
+             .collect()
+     }
+ 
++    /// Whether eating `meld` is a pair that lowers the hand's [`ceiling`]
++    /// with no generals from outside
++    fn lowers(&self, view: &View<'_>, meld: Meld) -> bool {
++        let Meld::Pair(card) = meld else {
++            return false;
++        };
++        let (hand, exposed) = (view.hand(), view.exposed(view.seat()));
++        let eaten = [exposed, &[meld]].concat();
++        let after = ceiling(&self.rules, &eaten, hand.without(card), self.live, 0);
++        after < ceiling(&self.rules, exposed, hand, self.live, 0)
++    }
++
+     /// The legal discards, best first, each with its grade as for
+     /// [`claims`](Self::claims): the first is the bot's own choice
+     pub fn discards(&mut self, view: &View<'_>) -> Vec<(Card, i32)> {

@@ -1,0 +1,170 @@
+diff --git a/ab/groups.py b/ab/groups.py
+new file mode 100644
+index 0000000..1e0baab
+--- /dev/null
++++ b/ab/groups.py
+@@ -0,0 +1,46 @@
++"""Split the A/B by the pre-declared groups of doc/hu-ceiling.md, batch 2.
++
++    TRACE=1 ab/run.sh 800000 > out.txt
++    python3 ab/groups.py out.txt 800000
++
++A split's group is read from the ceilings after the control's eat of a
++pair: 甲 when even one outside general leaves it short of the threshold,
++乙 when it reaches it only with that general, 丙 when it reaches it with
++none.  Each row is how many deals parted that way, the mean score
++difference over their reshuffles with its standard error, and what they
++add to the difference per deal, with its standard error and 95% CI.
++"""
++import collections
++import sys
++
++THRESHOLD = 10
++
++
++def reach(ceiling):
++    return ceiling != "-" and int(ceiling) >= THRESHOLD
++
++
++rows = collections.defaultdict(list)
++for line in open(sys.argv[1]):
++    if not line.startswith("T\t"):
++        continue
++    fields = line.rstrip("\n").split("\t")
++    if len(fields) != 11:
++        rows["other act"].append(float(fields[-1]))
++        continue
++    _b0, a0, _b1, a1, mean = fields[6:]
++    group = "丙" if reach(a0) else "乙" if reach(a1) else "甲"
++    rows[group].append(float(mean))
++deals = int(sys.argv[2])
++print(f"{'group':10} {'splits':>7} {'mean':>8} {'se':>6} {'per deal':>9} {'se':>7}  95% CI")
++for group, ds in sorted(rows.items()):
++    n = len(ds)
++    mean = sum(ds) / n
++    var = sum((d - mean) ** 2 for d in ds) / max(n - 1, 1)
++    # Per deal: the deals of other groups count 0.
++    per = sum(ds) / deals
++    per_se = ((sum(d * d for d in ds) - deals * per * per) / (deals - 1) / deals) ** 0.5
++    print(
++        f"{group:10} {n:7d} {mean:+8.3f} {(var / n) ** 0.5:6.3f} {per:+9.4f} {per_se:7.4f}"
++        f"  [{per - 1.96 * per_se:+.4f}, {per + 1.96 * per_se:+.4f}]"
++    )
+diff --git a/ab/src/main.rs b/ab/src/main.rs
+index b92faa5..63332de 100644
+--- a/ab/src/main.rs
++++ b/ab/src/main.rs
+@@ -49,6 +49,7 @@ struct Split {
+     candidate: Act,
+     /// Cards left in the pile: the deck's first `left`
+     left: usize,
++    hand: String,
+ }
+ 
+ /// Seat 1's score and whether it won, or where the candidate first parted
+@@ -141,6 +142,12 @@ fn play(
+                         control: theirs,
+                         candidate: ours,
+                         left: a.pile_len(),
++                        hand: format!(
++                            "{} | {:?}\t{}",
++                            view.hand(),
++                            view.exposed(s),
++                            ceilings(&nr, &view, theirs)
++                        ),
+                     });
+                 }
+             }
+@@ -169,6 +176,35 @@ fn play(
+     )
+ }
+ 
++/// The ceilings with 0 and 1 outside generals before and after the
++/// control's eat of a pair, "-" for none, or "" for another act
++fn ceilings(rules: &new::Rules, view: &new::View<'_>, act: Act) -> String {
++    use new::susik::{Hand, Meld};
++    let Act::Claim(new::Claim::Eat(meld @ Meld::Pair(card))) = act else {
++        return String::new();
++    };
++    let shown = new::Seat::ALL
++        .into_iter()
++        .flat_map(|seat| view.exposed(seat))
++        .flat_map(|meld| meld.cards())
++        .chain(view.discards().iter().map(|&(_, card)| card))
++        .chain(view.offer().map(|offer| offer.card));
++    let live = shown.fold(Hand::FULL - view.hand(), Hand::without);
++    let (hand, exposed) = (view.hand(), view.exposed(view.seat()));
++    let eaten = [exposed, &[meld]].concat();
++    let show = |n: Option<u32>| n.map_or("-".to_owned(), |n| n.to_string());
++    (0..2)
++        .flat_map(|g| {
++            [
++                new::ceiling(rules, exposed, hand, live, g),
++                new::ceiling(rules, &eaten, hand.without(card), live, g),
++            ]
++        })
++        .map(show)
++        .collect::<Vec<_>>()
++        .join("\t")
++}
++
+ fn done(outcome: Outcome) -> (i32, bool) {
+     match outcome {
+         Outcome::Done(score, won) => (score, won),
+@@ -230,6 +266,12 @@ fn deal(seed: u64, dealer: usize, reshuffles: usize) -> (f64, f64, f64, Option<f
+     }
+     let k = reshuffles as f64;
+     let mean = sum / k;
++    if std::env::var_os("TRACE").is_some() {
++        println!(
++            "T\t{seed}\t{}\t{:?}\t{:?}\t{}\t{mean:.3}",
++            split.left, split.control, split.candidate, split.hand
++        );
++    }
+     let within = if reshuffles > 1 {
+         (squares - k * mean * mean) / (k - 1.0)
+     } else {
+diff --git a/ab/tally.py b/ab/tally.py
+new file mode 100644
+index 0000000..228af70
+--- /dev/null
++++ b/ab/tally.py
+@@ -0,0 +1,38 @@
++"""Group the splits `TRACE=1` prints by what each side did there.
++
++    TRACE=1 ab/run.sh 20000 > out.txt
++    python3 ab/tally.py out.txt 20000
++
++A row is "control's choice -> candidate's choice": how many deals parted
++that way, the mean score difference over the reshuffles of those deals with
++its standard error, and what they add to the difference per deal.
++"""
++import collections
++import re
++import sys
++
++EATS = {"Court": "將士象", "Field": "車馬包", "Soldiers": "兵卒", "Single": "將"}
++
++
++def kind(act):
++    if act.startswith("Discard"):
++        return "discard"
++    if "Pass" in act:
++        return "pass"
++    if "Pong" in act:
++        return "pong"
++    meld = re.match(r"Claim\(Eat\((\w+)", act).group(1)
++    return "eat pair" if meld == "Pair" else "eat " + EATS.get(meld, meld)
++
++
++rows = collections.defaultdict(list)
++for line in open(sys.argv[1]):
++    if line.startswith("T\t"):
++        _, _seed, _left, control, candidate, _hand, mean = line.rstrip("\n").split("\t")
++        rows[kind(control), kind(candidate)].append(float(mean))
++deals = int(sys.argv[2])
++print(f"{'control -> candidate':34} {'splits':>7} {'mean':>8} {'se':>6} {'per deal':>9}")
++for (control, candidate), ds in sorted(rows.items(), key=lambda row: sum(row[1])):
++    mean = sum(ds) / len(ds)
++    se = (sum((d - mean) ** 2 for d in ds) / max(len(ds) - 1, 1) / len(ds)) ** 0.5
++    print(f"{control + ' -> ' + candidate:34} {len(ds):7d} {mean:+8.3f} {se:6.3f} {sum(ds) / deals:+9.4f}")
