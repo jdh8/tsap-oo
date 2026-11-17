@@ -341,6 +341,31 @@ mod tests {
     }
 
     #[test]
+    fn a_soldier_between_two_others_splits_when_short() {
+        // 紅兵 黃兵 黃兵 綠卒 beside 車馬 and 5 胡 shown, a discard owed
+        let exposed = [
+            Field(Red),
+            Field(Yellow),
+            Field(Green),
+            Field(White),
+            Triplet(Card::new(White, Rank::Advisor)),
+        ];
+        let rules = Rules::new();
+        let held = hand("兵.兵兵.卒.車馬");
+        let live = exposed.iter().fold(Hand::FULL - held, |h, m| h - m.cards());
+        let top = |cards: &str, live| ceiling(&rules, &exposed, hand(cards), live, 0);
+        // 紅黃 and 黃綠 each eat a third colour and 車馬 go: 5 + 3 + 3
+        assert_eq!(top("兵.兵兵.卒.車馬", live), Some(11));
+        assert_eq!(top("兵.兵兵.卒.馬", live), Some(11));
+        // Without the second 黃兵 the three colours and 車馬包 make 9; ten
+        // takes a white 卒 for four colours and the 車 paired
+        assert_eq!(top("兵.兵.卒.車馬", live), Some(10));
+        let white = Card::new(White, Rank::Soldier);
+        let none = (0..4).fold(live, |h, _| h.without(white));
+        assert_eq!(top("兵.兵.卒.車馬", none), Some(9));
+    }
+
+    #[test]
     fn a_finished_hand_is_its_own_ceiling() {
         // 21 cards, nothing from outside: 4 + 1 + 2 + 1 + 1 + 3
         let exposed = [Field(Red), Field(Yellow), Field(Green), Field(White)];

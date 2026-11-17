@@ -204,6 +204,14 @@ pub fn ceiling(rules: &Rules, exposed: &[Meld], hand: Hand, live: Hand, generals
 - **棄牌。** 讓天花板掉到門檻以下的那一張不打。
 - **`draw`。** 假想的吃對子與實際的規則一致。
 
+棄牌的例子（測試 `a_soldier_between_two_others_splits_when_short`）：亮出
+5 胡，手上紅兵、黃兵、黃兵、綠卒與白車、白馬，要打一張。打車或馬，天花板
+是 11：紅黃、黃綠各吃一張第三色。打黃兵剩 10，而且只剩「四色兵卒加車的
+對子」一條路，等包只有 9。`HeuristicBot` 現在不論胡數夠不夠都打黃兵：兩個
+排法都先收暗的三色兵卒，多的那張黃兵是最孤的散牌，`hope` 看不到拆開的
+6 胡。所以棄牌的規則要比各張打掉之後的天花板，只看「掉到門檻以下」會漏掉
+這一手。
+
 ## 每一批的收尾
 
 照 `CLAUDE.md`：`cargo fmt`、clippy、三組測試、文件、`CHANGELOG.md`，提議
