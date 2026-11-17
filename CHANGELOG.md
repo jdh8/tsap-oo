@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `HeuristicBot`, and so the web hint, no longer eats a pair that drops
+  `ceiling(generals = 0)` below the threshold (`doc/hu-ceiling.md`,
+  batch 3): groups 甲 and 乙 of batch 2.  A pair eat whose ceiling still
+  reaches the threshold stands.  `ab/run.sh 800000` against `5b62dc6`
+  (seed base 1794947206, `RESHUFFLE=8`), 59,885 deals part, all of them
+  the control eating a pair: +0.053 ± 0.002 points a deal, 95% CI
+  [+0.049, +0.056], a win.  乙 gives +0.0353 [+0.0323, +0.0383], 甲
+  +0.0173 [+0.0162, +0.0184].
+
+### Fixed
+
+- The web test `waits_foretell_the_win` checked stale waits when the round
+  ended on the draw that the human's discard brought on.
+
 ### Added
 
 - `ceiling`, the most 胡 a hand can still win with if every card it wants

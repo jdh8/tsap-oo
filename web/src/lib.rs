@@ -768,6 +768,17 @@ mod tests {
                 }
                 table.step().unwrap();
             }
+            // The round can end on the draw the human's discard brings on.
+            if let Some((discards, n)) = foretold {
+                let Event::Discard { card, .. } = table.round().events()[n] else {
+                    unreachable!("the human discarded");
+                };
+                let code = CardJson::from(card).code;
+                waits = discards
+                    .into_iter()
+                    .find(|d| d.code == code)
+                    .map_or_else(Vec::new, |d| d.waits);
+            }
             let result = table.round().result().unwrap();
             if let (Some(HUMAN), Some(card)) = (result.winner, result.winning_card) {
                 let code = CardJson::from(card).code;
