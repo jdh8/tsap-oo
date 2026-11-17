@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `research/seven-slots.md` and the `census` example: where a winning
+  hand's 胡 come from.  A winning hand is 21 cards, seven slots of three at
+  1 胡 each, so 胡 = 7 + 2k + 將士象 + 2 × (concealed triplets, soldiers
+  and kongs) + the bonus of four-card melds, k = (singles − pairs) / 3.
+  The identity held on all 19404 wins of 20000 rounds of four
+  `HeuristicBot`s (seed 1795000000); k is 0 on 56.4% of them and +1 on
+  35.2%.  It is the arithmetic `doc/hu-ceiling.md` builds on.  No bot
+  changes.
+
 - `tauri/`, a desktop client: `web/`'s page in a Tauri window, the engine as
   native code on its own thread (`cd tauri && cargo run --release`).  Its
   three opponents search: `MonteCarloBot`s of 128 samples gated to 10

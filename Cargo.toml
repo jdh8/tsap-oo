@@ -37,6 +37,10 @@ name = "arena"
 required-features = ["rand"]
 
 [[example]]
+name = "census"
+required-features = ["rand"]
+
+[[example]]
 name = "danger"
 required-features = ["rand"]
 
