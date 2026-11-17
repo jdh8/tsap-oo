@@ -1,0 +1,159 @@
+diff --git a/src/heuristic.rs b/src/heuristic.rs
+index a4a9ef3..435e0ca 100644
+--- a/src/heuristic.rs
++++ b/src/heuristic.rs
+@@ -49,7 +49,7 @@ pub struct Terms {
+     /// Cards outside every meld
+     pub loose: i32,
+     /// Half-胡 the melds fall short of the threshold, after the half-胡
+-    /// the 搭子 among the loose cards may bring
++    /// the 搭子 and the pairs may bring in the melds the hand has room for
+     pub short: i32,
+     /// Unseen copies of the loose cards, each of which would pair one
+     pub own: i32,
+@@ -103,6 +103,8 @@ pub struct HeuristicBot {
+     general: i32,
+     /// 胡 of the meld a loose card of each [`family`] would be eaten into
+     eaten: [i32; 3],
++    /// 胡 a pair gains when ponged
++    pong: i32,
+     /// The cards the seat has not seen: in other hands or the pile
+     live: Hand,
+ }
+@@ -123,6 +125,7 @@ impl HeuristicBot {
+                 rules.exposed.three_soldiers,
+             ]
+             .map(to_i32),
++            pong: to_i32(rules.exposed.triplet) - to_i32(rules.concealed.pair),
+             live: Hand::EMPTY,
+         }
+     }
+@@ -188,8 +191,14 @@ impl HeuristicBot {
+                     .expect("layouts with loose cards always exist");
+                 let loose = to_i32(layout.loose.len());
+                 let hu = layout.score + to_i32(cost) * loose;
+-                let [own, kept, lonely, hope] =
+-                    prospects(hand, &layout, self.live, self.eaten, self.general);
++                let [own, kept, lonely, hope] = prospects(
++                    hand,
++                    &layout,
++                    self.live,
++                    self.eaten,
++                    self.general,
++                    self.pong,
++                );
+                 Terms {
+                     hu,
+                     loose,
+@@ -340,13 +349,41 @@ const fn family(rank: Rank) -> usize {
+ /// seat ever discards one, so they are graded as if a single card were left
+ /// to finish them, and a general is worth `general` alone, so the 士象 add
+ /// only the rest of the meld.
+-fn prospects(hand: Hand, layout: &Layout, live: Hand, eaten: [i32; 3], general: i32) -> [i32; 4] {
++///
++/// A pair with a copy still live may be ponged, for `pong` half-胡 a card.
++/// Not every hope can come true, though: each takes two cards of the hand
++/// and one from the table into a meld of three, and the cards outside the
++/// melds with the winning card make only so many.  What is left over must
++/// go in pairs, which takes an even number of cards, so 搭子 and a card to
++/// spare make no meld at all: eating the one sheds the other and leaves
++/// nothing to win on.  The half-胡 hoped for are the dearest that fit.
++// ponytail: a concealed triplet konged and three soldiers eating a fourth
++// colour gain 胡 too and are not hoped for.
++fn prospects(
++    hand: Hand,
++    layout: &Layout,
++    live: Hand,
++    eaten: [i32; 3],
++    general: i32,
++    pong: i32,
++) -> [i32; 4] {
+     let free = layout
+         .melds
+         .iter()
+         .filter(|meld| meld.size() >= 3)
+         .fold(hand, |rest, meld| rest - meld.cards());
+-    layout
++    // The half-胡 each card may bring, and the cards outside the melds.
++    let mut hopes = Vec::new();
++    let mut outside = layout.loose.len();
++    for meld in &layout.melds {
++        if let Meld::Pair(card) = *meld {
++            outside += 2;
++            if card.rank != Rank::General && live.contains(card) {
++                hopes.extend([pong; 2]);
++            }
++        }
++    }
++    let [own, kept, lonely] = layout
+         .loose
+         .iter()
+         .map(|card| {
+@@ -369,17 +406,26 @@ fn prospects(hand: Hand, layout: &Layout, live: Hand, eaten: [i32; 3], general:
+                 .sum();
+             let own = i32::from(live.count(card));
+             if finishers == 0 {
+-                [own, 0, COPIES * eaten[kin], 0]
++                [own, 0, COPIES * eaten[kin]]
+             } else if kin == 0 && !hand.contains(Card::new(card.color, Rank::General)) {
+                 let worth = eaten[kin] - general;
+-                [own, worth, 0, worth]
++                hopes.push(worth);
++                [own, worth, 0]
+             } else {
+-                [own, finishers.min(COPIES) * eaten[kin], 0, eaten[kin]]
++                // The general a 士 or 象 leans on leaves its own meld for
++                // theirs.
++                outside += usize::from(kin == 0);
++                hopes.push(eaten[kin]);
++                [own, finishers.min(COPIES) * eaten[kin], 0]
+             }
+         })
+-        .fold([0; 4], |sum, card| {
++        .fold([0; 3], |sum, card| {
+             std::array::from_fn(|i| sum[i] + card[i])
+-        })
++        });
++    hopes.sort_unstable_by_key(|&hope| std::cmp::Reverse(hope));
++    let room = ((outside + 1) / 3).saturating_sub(usize::from(outside % 3 == 0));
++    let hope = hopes.iter().take(2 * room).sum();
++    [own, kept, lonely, hope]
+ }
+ 
+ /// What each meld is worth beyond a general for every card in it
+@@ -748,16 +794,16 @@ mod tests {
+             let live = Hand::FULL - hand - seen.parse().unwrap();
+             let layout = solver.layout(hand).unwrap();
+             let [own, kept, lonely, hope] =
+-                super::prospects(hand, &layout, live, bot.eaten, bot.general);
++                super::prospects(hand, &layout, live, bot.eaten, bot.general, bot.pong);
+             (OWN * own + kept - lonely, hope)
+         };
+         // (hand, its grade, the half-胡 it hopes for) with nothing else seen
+         for (hand, grade, hope) in [
+             ("俥傌...", 20, 2),        // a 搭子: four 炮 and three copies each
+-            ("俥俥傌...", 10, 1),      // one of a pair still eats
++            ("俥俥傌...", 10, 0),      // one of a pair still eats, but not to win
+             ("俥俥俥傌...", 2, 0),     // three alike are locked
+             ("俥俥傌炮炮炮...", 2, 0), // and so is the 炮 this would eat
+-            ("兵兵..卒.", 18, 3),      // soldiers work the same way
++            ("兵兵..卒.", 18, 0),      // soldiers work the same way
+             ("兵兵兵..卒.", -6, 0),
+             ("帥仕...", 14, 2), // a general is company
+             ("仕相...", 14, 2), // 士象 beg for theirs, below 車馬
+@@ -767,6 +813,15 @@ mod tests {
+         ] {
+             assert_eq!(prospects(hand, "..."), (grade, hope), "{hand}");
+         }
++        // Two 搭子 and the winning card make one meld of three; a card to
++        // shed after the first makes room for the second, and a second
++        // such card is left over.
++        assert_eq!(prospects("俥傌.仕相..", "...").1, 2);
++        assert_eq!(prospects("俥傌兵.仕相..", "...").1, 4);
++        assert_eq!(prospects("俥傌兵.仕相炮..", "...").1, 2);
++        // A pair hopes for its pong until the last copy is out.
++        assert_eq!(prospects("俥俥...", "...").1, 2);
++        assert_eq!(prospects("俥俥...", "俥俥...").1, 0);
+         // A 搭子 fades with its finishing cards and dies with the last.
+         assert_eq!(prospects("俥傌...", "炮炮..."), (16, 2));
+         assert_eq!(prospects("俥傌...", "炮炮炮炮..."), (4, 0));

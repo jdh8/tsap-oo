@@ -249,7 +249,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [−0.003, +0.014], inconclusive.  Eating no pair while the hand's melds
   are short of the threshold (seed base 1794934919, 52775 part): −1.497 ±
   0.020, 95% CI [−1.536, −1.458], winning 20.33% of rounds for 24.20%, a
-  loss.
+  loss.  `research/room-for-melds.md` has the arithmetic, the patches and
+  where each trial parted from the control.
 - `MonteCarloBot` at 128 samples no longer measurably beats
   `HeuristicBot`, which has improved four times since 0.2.1 put it at 26.2%
   against 23.8%.  Seated among three `HeuristicBot`s and paired with a

@@ -1,0 +1,77 @@
+diff --git a/ab/src/main.rs b/ab/src/main.rs
+index b92faa5..c573c48 100644
+--- a/ab/src/main.rs
++++ b/ab/src/main.rs
+@@ -49,6 +49,7 @@ struct Split {
+     candidate: Act,
+     /// Cards left in the pile: the deck's first `left`
+     left: usize,
++    hand: String,
+ }
+ 
+ /// Seat 1's score and whether it won, or where the candidate first parted
+@@ -141,6 +142,7 @@ fn play(
+                         control: theirs,
+                         candidate: ours,
+                         left: a.pile_len(),
++                        hand: format!("{} | {:?}", view.hand(), view.exposed(s)),
+                     });
+                 }
+             }
+@@ -230,6 +232,12 @@ fn deal(seed: u64, dealer: usize, reshuffles: usize) -> (f64, f64, f64, Option<f
+     }
+     let k = reshuffles as f64;
+     let mean = sum / k;
++    if std::env::var_os("TRACE").is_some() {
++        println!(
++            "T\t{seed}\t{}\t{:?}\t{:?}\t{}\t{mean:.3}",
++            split.left, split.control, split.candidate, split.hand
++        );
++    }
+     let within = if reshuffles > 1 {
+         (squares - k * mean * mean) / (k - 1.0)
+     } else {
+diff --git a/ab/tally.py b/ab/tally.py
+new file mode 100644
+index 0000000..228af70
+--- /dev/null
++++ b/ab/tally.py
+@@ -0,0 +1,38 @@
++"""Group the splits `TRACE=1` prints by what each side did there.
++
++    TRACE=1 ab/run.sh 20000 > out.txt
++    python3 ab/tally.py out.txt 20000
++
++A row is "control's choice -> candidate's choice": how many deals parted
++that way, the mean score difference over the reshuffles of those deals with
++its standard error, and what they add to the difference per deal.
++"""
++import collections
++import re
++import sys
++
++EATS = {"Court": "將士象", "Field": "車馬包", "Soldiers": "兵卒", "Single": "將"}
++
++
++def kind(act):
++    if act.startswith("Discard"):
++        return "discard"
++    if "Pass" in act:
++        return "pass"
++    if "Pong" in act:
++        return "pong"
++    meld = re.match(r"Claim\(Eat\((\w+)", act).group(1)
++    return "eat pair" if meld == "Pair" else "eat " + EATS.get(meld, meld)
++
++
++rows = collections.defaultdict(list)
++for line in open(sys.argv[1]):
++    if line.startswith("T\t"):
++        _, _seed, _left, control, candidate, _hand, mean = line.rstrip("\n").split("\t")
++        rows[kind(control), kind(candidate)].append(float(mean))
++deals = int(sys.argv[2])
++print(f"{'control -> candidate':34} {'splits':>7} {'mean':>8} {'se':>6} {'per deal':>9}")
++for (control, candidate), ds in sorted(rows.items(), key=lambda row: sum(row[1])):
++    mean = sum(ds) / len(ds)
++    se = (sum((d - mean) ** 2 for d in ds) / max(len(ds) - 1, 1) / len(ds)) ** 0.5
++    print(f"{control + ' -> ' + candidate:34} {len(ds):7d} {mean:+8.3f} {se:6.3f} {sum(ds) / deals:+9.4f}")
