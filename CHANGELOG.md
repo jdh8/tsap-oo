@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `examples/expect_time` takes a `[gate]` and times each card count above
   10.  `ab/run.sh` renames the control with `perl` instead of GNU `sed`,
   so it runs on macOS.
+- `doc/hand-planning.md`: rules of thumb for a person planning a hand
+  from the deal, off the identity of `research/seven-slots.md`.  胡 = 7 +
+  ⅔ × (singles − pairs) + the 胡 a meld scores over a 車馬包, so a lone
+  general pays for one pair, the pairs a hand must hold are singles mod 3,
+  and pairs may match the lone generals only once those extra 胡 reach 3.
+  No bot changes and nothing measured anew.
 
 ### Changed
 
