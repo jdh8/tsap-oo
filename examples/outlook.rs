@@ -21,13 +21,13 @@
 //! ```sh
 //! cargo run --release --example outlook -- [rounds] [seed] [calibration rounds]
 //! ```
-use rand::SeedableRng as _;
-use rand::rngs::SmallRng;
 use tsap_oo::susik::{Hand, Rank};
 use tsap_oo::{
-    Event, Game, Graph, HeuristicBot, Outlook, Payoff, Phase, Prune, Rules, Seat, Step, Strategy,
-    Table, View,
+    Event, Graph, HeuristicBot, Outlook, Payoff, Phase, Prune, Rules, Seat, Step, Strategy, Table,
+    View,
 };
+
+mod common;
 
 /// The concealed cards from which the DP plays
 const GATE: usize = 10;
@@ -286,11 +286,8 @@ fn wilson(k: u64, n: u64) -> (f64, f64) {
 }
 
 fn calibrate(rules: &Rules, outlooks: &[(&str, Outlook)], rounds: u64, seed: u64) {
-    let mut game = Game::new(*rules, Seat::ALL[0]);
-    let mut rng = SmallRng::seed_from_u64(seed);
     let mut bins = vec![[Bin::default(); 10]; outlooks.len()];
-    for _ in 0..rounds {
-        let round = game.deal(&mut rng);
+    let played = common::deals(*rules, rounds, seed, |round| {
         let bots = Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(rules)) as Box<dyn Strategy>));
         let mut table = Table::new(round, bots);
         // (seat, outlook, predicted chance, predicted points)
@@ -339,7 +336,12 @@ fn calibrate(rules: &Rules, outlooks: &[(&str, Outlook)], rounds: u64, seed: u64
             }
             let Step::Acted(_) = step else { break };
         }
-        let result = table.round().result().expect("finished").clone();
+        (
+            predictions,
+            table.round().result().expect("finished").clone(),
+        )
+    });
+    for (predictions, result) in played {
         for (seat, i, chance, points) in predictions {
             let scored = match (result.winner, result.foul) {
                 (Some(winner), _) if winner == seat => 3.0 * f64::from(result.hu),
@@ -356,7 +358,6 @@ fn calibrate(rules: &Rules, outlooks: &[(&str, Outlook)], rounds: u64, seed: u64
             bin.scored += scored;
             bin.scored2 += scored * scored;
         }
-        game.settle(&result);
     }
 
     println!("\ncalibration: {rounds} rounds, seed {seed}, discards leaving {GATE} cards or fewer");
@@ -408,19 +409,16 @@ fn main() {
         perturb(&rules, check, seed + 1);
         return;
     }
-    let mut game = Game::new(rules, Seat::ALL[0]);
-    let mut rng = SmallRng::seed_from_u64(seed);
     let mut tally = Tally::new();
-    for _ in 0..rounds {
-        let round = game.deal(&mut rng);
-        let dealer = round.dealer();
+    let played = common::deals(rules, rounds, seed, |round| {
         let bots =
             Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as Box<dyn Strategy>));
         let mut table = Table::new(round, bots);
         table.run().expect("bots act legally");
-        let result = table.round().result().expect("finished").clone();
-        tally.round(table.round().events(), dealer);
-        game.settle(&result);
+        table.round().clone()
+    });
+    for round in &played {
+        tally.round(round.events(), round.dealer());
     }
     println!("{rounds} rounds of HeuristicBot self-play, seed {seed}");
     tally.print();

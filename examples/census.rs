@@ -8,11 +8,11 @@
 //! ```sh
 //! cargo run --release --example census -- [rounds] [seed]
 //! ```
-use rand::SeedableRng as _;
-use rand::rngs::SmallRng;
 use std::collections::BTreeMap;
 use tsap_oo::susik::{Meld, Solver};
-use tsap_oo::{Game, HeuristicBot, Rules, Seat, Step, Strategy, Table};
+use tsap_oo::{HeuristicBot, Rules, Seat, Step, Strategy, Table};
+
+mod common;
 
 const KINDS: [&str; 10] = [
     "對子",
@@ -47,8 +47,6 @@ fn main() {
     let rounds = args.next().flatten().unwrap_or(10_000);
     let seed = args.next().flatten().unwrap_or(0);
     let rules = Rules::new();
-    let mut game = Game::new(rules, Seat::ALL[0]);
-    let mut rng = SmallRng::seed_from_u64(seed);
     let mut rich = Solver::new(rules.concealed, Some(0)).locked();
 
     let mut wins = 0u64;
@@ -67,12 +65,19 @@ fn main() {
     // Dealt hands of twenty by generals: hands, wins
     let mut by_generals = [[0u64; 2]; 9];
 
-    for _ in 0..rounds {
-        let round = game.deal(&mut rng);
+    let played = common::deals(rules, rounds, seed, |round| {
+        let hands = Seat::ALL.map(|seat| round.hand(seat));
+        let bots =
+            Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as Box<dyn Strategy>));
+        let mut table = Table::new(round, bots);
+        while table.step().expect("bots act legally") != Step::Finished {}
+        (hands, table.round().clone())
+    });
+    for (hands, round) in &played {
         let dealer = round.dealer();
         let buffs = Seat::ALL.map(|seat| {
             let layout = rich
-                .layout(round.hand(seat))
+                .layout(hands[seat.index()])
                 .expect("loose cards are allowed");
             let buff: u32 = layout
                 .melds
@@ -83,8 +88,7 @@ fn main() {
             (buff as usize).min(6)
         });
         let generals = Seat::ALL.map(|seat| {
-            let n: usize = round
-                .hand(seat)
+            let n: usize = hands[seat.index()]
                 .distinct()
                 .filter(|(card, _)| card.rank == tsap_oo::susik::Rank::General)
                 .map(|(_, n)| usize::from(n))
@@ -92,12 +96,7 @@ fn main() {
             n.min(8)
         });
         rich.clear();
-        let bots =
-            Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as Box<dyn Strategy>));
-        let mut table = Table::new(round, bots);
-        while table.step().expect("bots act legally") != Step::Finished {}
-        let round = table.round();
-        let result = round.result().expect("finished").clone();
+        let result = round.result().expect("finished");
         for seat in Seat::ALL {
             if seat != dealer {
                 by_buff[buffs[seat.index()]][0] += 1;
@@ -151,7 +150,6 @@ fn main() {
             row[0] += 1;
             row[1] += u64::from(k > 0 && sum - 2 * k < 10);
         }
-        game.settle(&result);
     }
 
     let share = |n: u64, of: u64| 100.0 * n as f64 / of as f64;

@@ -283,11 +283,27 @@ mod playouts {
         playout(Rules::eight());
     }
 
+    /// Eight games of 25 rounds, a thread each
     fn playout(rules: Rules) {
+        let [wins, proven] = std::thread::scope(|scope| {
+            let games: Vec<_> = (0..8)
+                .map(|seed| scope.spawn(move || game(rules, 2026 + seed)))
+                .collect();
+            games.into_iter().fold([0, 0], |[wins, proven], game| {
+                let [w, p] = game.join().expect("a game panicked");
+                [wins + w, proven + p]
+            })
+        });
+        assert!(wins > 0, "the bots never won");
+        assert!(proven > 0, "no card was ever proven safe");
+    }
+
+    /// Wins and the cards proven safe
+    fn game(rules: Rules, seed: u64) -> [usize; 2] {
         let mut game = Game::new(rules, FIRST);
-        let mut rng = SmallRng::seed_from_u64(2026);
+        let mut rng = SmallRng::seed_from_u64(seed);
         let (mut wins, mut exhausted, mut fouls, mut proven) = (0, 0, 0, 0);
-        for _ in 0..200 {
+        for _ in 0..25 {
             let bots = Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as _));
             let mut table = Table::new(game.deal(&mut rng), bots);
             let mut safe = Seat::ALL.map(|_| susik::Hand::EMPTY);
@@ -344,10 +360,9 @@ mod playouts {
                 None => exhausted += 1,
             }
         }
-        assert_eq!(wins + exhausted + fouls, 200);
-        assert!(wins > 0, "the bots never won");
-        assert!(proven > 0, "no card was ever proven safe");
+        assert_eq!(wins + exhausted + fouls, 25);
         assert_eq!(game.scores().iter().sum::<i32>(), 0);
+        [wins, proven]
     }
 }
 
@@ -471,9 +486,8 @@ fn the_ceiling_bounds_every_win() {
 
     let rules = Rules::new();
     let mut rng = SmallRng::seed_from_u64(2026);
-    let mut checked = 0;
-    for i in 0..100 {
-        let round = Round::deal(rules, Seat::ALL[i % Seat::COUNT], &mut rng);
+    let check = |i: usize, round: Round| {
+        let mut checked = 0;
         let log = Rc::new(RefCell::new(Vec::new()));
         let bots = Seat::ALL.map(|_| {
             let bot = HeuristicBot::new(&rules);
@@ -487,7 +501,7 @@ fn the_ceiling_bounds_every_win() {
         let round = table.round();
         let result = round.result().unwrap();
         let Some(winner) = result.winner else {
-            continue;
+            return 0;
         };
         let total = result
             .layout
@@ -518,6 +532,28 @@ fn the_ceiling_bounds_every_win() {
             );
             checked += 1;
         }
-    }
+        checked
+    };
+    let rounds: Vec<_> = (0..100)
+        .map(|i| (i, Round::deal(rules, Seat::ALL[i % Seat::COUNT], &mut rng)))
+        .collect();
+    let checked: usize = std::thread::scope(|scope| {
+        let shards: Vec<_> = rounds
+            .chunks(13)
+            .map(|shard| {
+                let check = &check;
+                scope.spawn(move || {
+                    shard
+                        .iter()
+                        .map(|(i, round)| check(*i, round.clone()))
+                        .sum::<usize>()
+                })
+            })
+            .collect();
+        shards
+            .into_iter()
+            .map(|shard| shard.join().expect("a round panicked"))
+            .sum()
+    });
     assert!(checked > 500, "{checked}");
 }

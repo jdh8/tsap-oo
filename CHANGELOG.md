@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `census` and `outlook` examples play their rounds on every core
+  (`examples/common/mod.rs`), 11× and 8× faster on 16 threads, and print
+  the same output as before at the same seed: each deals the same piles
+  with seat 1 dealing, which only rotates the play.  `cmp` against the
+  serial binaries: `census 300 1795000000`, `outlook 200 7 100`,
+  `outlook 0 7 100`.  `nodes` stays serial, since it times its graphs.
+- The tests build at `opt-level = 2` (also in `web/`), and the long
+  playouts run on threads: `cargo test --all-features` takes 11 s
+  instead of 5.5 minutes, `web/`'s tests 3 s instead of 37 s.  The bot
+  playouts are now eight games of 25 rounds (seeds 2026–2033) instead of
+  one game of 200.
 - `HeuristicBot`'s `short` term, and so the web hint, is at least the
   half-胡 `ceiling(generals = 1)` falls short of the threshold
   (`doc/hu-ceiling.md`, batch 4): the 搭子's hope can no longer promise

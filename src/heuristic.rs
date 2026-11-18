@@ -763,9 +763,9 @@ mod tests {
         use crate::{Round, Step, Table};
         use rand::SeedableRng as _;
         let rules = Rules::new();
-        let mut bot = HeuristicBot::new(&rules);
-        let mut seen = [0; 3];
-        for seed in 0..3 {
+        let deal = |seed| {
+            let mut bot = HeuristicBot::new(&rules);
+            let mut seen = [0; 3];
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
             let round = Round::deal(rules, Seat::ALL[0], &mut rng);
             let seats = Seat::ALL.map(|_| Some(Box::new(bot.clone()) as Box<dyn Strategy>));
@@ -785,7 +785,15 @@ mod tests {
                     seen[n as usize] += 1;
                 }
             }
-        }
+            seen
+        };
+        let seen = std::thread::scope(|scope| {
+            let deals: Vec<_> = (0..3).map(|seed| scope.spawn(move || deal(seed))).collect();
+            deals.into_iter().fold([0; 3], |a, deal| {
+                let b = deal.join().expect("a deal panicked");
+                std::array::from_fn(|i| a[i] + b[i])
+            })
+        });
         assert!(seen.iter().all(|&n| n > 0), "{seen:?}");
     }
 
