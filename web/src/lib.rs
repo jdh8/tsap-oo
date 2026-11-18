@@ -66,12 +66,15 @@ impl Settings {
 // ---------------------------------------------------------------------------
 
 /// One move the hint rates: a card code to discard, or `pass`, `pong`,
-/// `eat<index>`, and how far it grades behind the bot's pick, `null` when it
-/// leaves the hand dead
+/// `eat<index>`, and how far it falls behind the bot's pick, `null` when it
+/// leaves the hand dead.  Inside [`ExpectBot`]'s gate (`points`) that is
+/// the expected points it gives up; outside, `HeuristicBot`'s grade, a
+/// priority without a unit.
 #[derive(Serialize)]
 struct HintJson {
     code: String,
-    behind: Option<i32>,
+    behind: Option<f64>,
+    points: bool,
 }
 
 #[derive(Serialize)]
@@ -520,13 +523,17 @@ impl Core {
         }
     }
 
-    /// How a greedy bot rates every move in the human's place, its own pick
+    /// How [`ExpectBot`] rates every move in the human's place, its own pick
     /// first; empty when it is not the human's decision
     fn hint(&self) -> Vec<HintJson> {
         let round = self.table.round();
-        let mut bot = HeuristicBot::new(self.game.rules());
+        let mut bot = ExpectBot::new(self.game.rules()).gated(GATE_CARDS);
         let view = View::new(round, HUMAN);
-        let rated: Vec<(String, i32)> = match round.phase() {
+        // ponytail: mirrors `ExpectBot`'s own gate test; give the bot a
+        // `searches` method if the gate ever stops being a card count.
+        let discarding = matches!(round.phase(), Phase::Discard(_));
+        let points = round.hand(HUMAN).len() - usize::from(discarding) <= GATE_CARDS;
+        let rated: Vec<(String, f64)> = match round.phase() {
             Phase::Claim(HUMAN) => {
                 let options = round.claim_options(HUMAN);
                 bot.claims(&view, &options)
@@ -551,14 +558,15 @@ impl Core {
                 .collect(),
             _ => Vec::new(),
         };
-        let best = rated.first().map_or(0, |&(_, grade)| grade);
+        let best = rated.first().map_or(0.0, |&(_, value)| value);
         rated
             .into_iter()
-            .map(|(code, grade)| HintJson {
+            .map(|(code, value)| HintJson {
                 code,
                 // A dead hand grades about 32000 down, far below any live
-                // one.
-                behind: (best - grade <= 16_000).then_some(best - grade),
+                // one; the DP prices a dead hand in points like any other.
+                behind: (points || best - value <= 16_000.0).then_some(best - value),
+                points,
             })
             .collect()
     }
@@ -632,11 +640,12 @@ impl WebGame {
     }
 
     /// The greedy bot's rating of your moves as a JSON array, its pick
-    /// first: `[{"code": "RK", "behind": 0}, ...]`, where `code` is a card
-    /// code, `pass`, `pong` or `eat<index>` and `behind` how far it grades
-    /// behind the pick, `null` for a move that leaves the hand dead (short of
-    /// the 胡 to win however the cards come); empty
-    /// when it is not your decision
+    /// first: `[{"code": "RK", "behind": 0, "points": true}, ...]`, where
+    /// `code` is a card code, `pass`, `pong` or `eat<index>` and `behind` how
+    /// far it falls behind the pick: expected points when `points`, inside
+    /// [`ExpectBot`]'s gate, else `HeuristicBot`'s grade, `null` for a move
+    /// that leaves the hand dead (short of the 胡 to win however the cards
+    /// come); empty when it is not your decision
     #[must_use]
     pub fn hint(&self) -> String {
         serde_json::to_string(&self.core.hint()).expect("hints serialize")
@@ -849,7 +858,7 @@ mod tests {
                 Phase::Claim(HUMAN) => {
                     assert!(value["options"].is_object());
                     let hints = core.hint();
-                    assert_eq!(hints[0].behind, Some(0), "the pick is the best");
+                    assert_eq!(hints[0].behind, Some(0.0), "the pick is the best");
                     let hint = hints[0].code.clone();
                     let eats = value["options"]["eats"].as_array().unwrap().len();
                     assert!(

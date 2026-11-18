@@ -396,14 +396,19 @@ async function showHint() {
     ),
   ];
   els(rows[0].code).at(-1)?.classList.add('hint');
-  for (const { code, behind } of rows) {
+  for (const { code, behind, points } of rows) {
     for (const el of els(code)) {
       const mark = document.createElement('span');
       mark.className = 'grade';
-      // A priority without a unit: it orders the moves and prices nothing.
-      mark.textContent = behind ?? '死';
+      // Inside the bot's gate, expected points given up; outside, a priority
+      // without a unit that orders the moves and prices nothing.
+      mark.textContent = behind == null ? '死' : points ? behind.toFixed(2) : behind;
       mark.title =
-        behind == null ? '走了這步，手牌再也湊不到胡牌要的胡數' : `電腦把這步排在首選後面 ${behind}（只是排序用的分數，沒有單位）`;
+        behind == null
+          ? '走了這步，手牌再也湊不到胡牌要的胡數'
+          : points
+            ? `電腦估計這步比首選少拿 ${behind.toFixed(2)} 點（期望值）`
+            : `電腦把這步排在首選後面 ${behind}（只是排序用的分數，沒有單位）`;
       el.append(mark);
     }
   }

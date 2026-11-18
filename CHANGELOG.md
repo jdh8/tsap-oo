@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The hint is `ExpectBot`'s instead of `HeuristicBot`'s, in the browser
+  and the desktop client: with 10 concealed cards or fewer each mark is the
+  expected points the move gives up against the pick, two decimals; before
+  that the marks stay `HeuristicBot`'s unitless grades.  Batch 4C of
+  `doc/expectation.md`, on batch 3's win (the hint is the bot); as wasm
+  under V8 (`examples/expect_time`, 2,000 rounds, seed base 1000) a
+  decision at the gate takes 6.6 ms on average, 84 ms at most.
 - The desktop client's opponents are `ExpectBot`s gated at 10 cards
   instead of 128-sample `MonteCarloBot`s: a decision at the gate takes
   some 14 ms instead of 0.9 s.  Batch 4 of `doc/expectation.md`, head to

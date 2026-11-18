@@ -7,15 +7,16 @@ maintain.  Only the engine differs: `app.js` finds `window.__TAURI__` and
 calls the commands in `src/main.rs` instead of loading the wasm.
 
 What native buys is opponents that search.  The three bots are
-`MonteCarloBot`s of 128 samples that search only with 10 concealed cards or
-fewer and play as `HeuristicBot` before: the one gate measured to beat
-`HeuristicBot` ([`research/gated-monte-carlo.md`](../research/gated-monte-carlo.md)),
-by +0.070 ± 0.026 points a deal.  Such a decision takes a second or so of
-native code, on an engine thread, so the window never stalls on it.  Neither
-number is a setting: no other gate has a verdict.
+`ExpectBot`s that play by the single-player DP of
+[`doc/expectation.md`](../doc/expectation.md) with 10 concealed cards or fewer
+and as `HeuristicBot` before; head to head against the gated Monte Carlo that
+sat here before, +0.047 ± 0.019 points a deal.  A decision at the gate takes
+some 14 ms of native code, on an engine thread, so the window never stalls on
+it.  The gate is not a setting: no other gate has a verdict.
 
-The hint is still `HeuristicBot`'s, as in the browser: its marks are grades,
-and a search has none to show.
+The hint is the same `ExpectBot`'s, as in the browser: inside the gate its
+marks are the expected points a move gives up, outside they are
+`HeuristicBot`'s grades.
 
 Settings are the page's: they live in the webview's `localStorage`, apart
 from any browser's.
