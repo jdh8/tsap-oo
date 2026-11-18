@@ -16,9 +16,12 @@ use wasm_bindgen::prelude::*;
 
 const HUMAN: Seat = Seat::ALL[0];
 
-/// The most concealed cards the searching opponents search with: the one
-/// gate with an A/B verdict (`doc/expectation.md`, batch 3)
-const GATE_CARDS: usize = 10;
+/// The most concealed cards [`ExpectBot`] plays by the DP with: 10 as wasm,
+/// where a decision must fit a frame or so, and 14 as the desktop's native
+/// code, some 190 ms a decision there (`doc/expectation.md`, batch 3 and D)
+const fn gate(search: bool) -> usize {
+    if search { 14 } else { 10 }
+}
 
 /// What the human calls each seat, counting on from them in turn order
 fn name(seat: Seat) -> &'static str {
@@ -485,7 +488,7 @@ impl Core {
             if seat == HUMAN {
                 None
             } else if search {
-                Some(Box::new(ExpectBot::new(rules).gated(GATE_CARDS)))
+                Some(Box::new(ExpectBot::new(rules).gated(gate(true))))
             } else {
                 Some(Box::new(HeuristicBot::new(rules)))
             }
@@ -527,12 +530,13 @@ impl Core {
     /// first; empty when it is not the human's decision
     fn hint(&self) -> Vec<HintJson> {
         let round = self.table.round();
-        let mut bot = ExpectBot::new(self.game.rules()).gated(GATE_CARDS);
+        let gate = gate(self.search);
+        let mut bot = ExpectBot::new(self.game.rules()).gated(gate);
         let view = View::new(round, HUMAN);
         // ponytail: mirrors `ExpectBot`'s own gate test; give the bot a
         // `searches` method if the gate ever stops being a card count.
         let discarding = matches!(round.phase(), Phase::Discard(_));
-        let points = round.hand(HUMAN).len() - usize::from(discarding) <= GATE_CARDS;
+        let points = round.hand(HUMAN).len() - usize::from(discarding) <= gate;
         let rated: Vec<(String, f64)> = match round.phase() {
             Phase::Claim(HUMAN) => {
                 let options = round.claim_options(HUMAN);
@@ -660,9 +664,10 @@ impl WebGame {
 
 impl WebGame {
     /// [`WebGame::new`] with opponents that search: an [`ExpectBot`] that
-    /// plays by the single-player DP with 10 concealed cards or fewer and
-    /// greedily before.  For the desktop client, as plain Rust; a decision
-    /// at the gate takes some 14 ms of native code, unmeasured as wasm.
+    /// plays by the single-player DP with 14 concealed cards or fewer and
+    /// greedily before, and the hint by the same.  For the desktop client,
+    /// as plain Rust: a decision at the gate takes some 190 ms of native
+    /// code, 1.4 s at worst.
     #[must_use]
     pub fn searching(seed: &str, settings: &str) -> Self {
         Self {

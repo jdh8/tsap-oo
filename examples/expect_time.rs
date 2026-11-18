@@ -5,10 +5,13 @@
 //! the browser's wasm engine:
 //!
 //! ```sh
-//! cargo run --release --example expect_time -- [rounds] [seed base]
+//! cargo run --release --example expect_time -- [rounds] [seed base] [gate]
 //! cargo build --release --example expect_time --target wasm32-wasip1
-//! node --no-warnings research/wasi.mjs target/wasm32-wasip1/release/examples/expect_time.wasm [rounds] [seed base]
+//! node --no-warnings research/wasi.mjs target/wasm32-wasip1/release/examples/expect_time.wasm [rounds] [seed base] [gate]
 //! ```
+//!
+//! `gate` (default 10) is [`ExpectBot::gated`]'s; a wider one adds a row for
+//! each card count above 10.
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use std::cell::RefCell;
@@ -56,7 +59,7 @@ impl Strategy for Timed {
 fn main() {
     let mut args = std::env::args().skip(1);
     let mut arg = |default: u64| args.next().and_then(|s| s.parse().ok()).unwrap_or(default);
-    let (rounds, base) = (arg(1000), arg(0));
+    let (rounds, base, gate) = (arg(1000), arg(0), arg(10) as usize);
     let rules = Rules::new();
     let log = Rc::<RefCell<Vec<Decision>>>::default();
 
@@ -66,7 +69,7 @@ fn main() {
         let mut seats =
             Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as Box<dyn Strategy>));
         seats[1] = Some(Box::new(Timed {
-            bot: ExpectBot::new(&rules),
+            bot: ExpectBot::new(&rules).gated(gate),
             log: Rc::clone(&log),
         }));
         assert_eq!(Table::new(round, seats).run(), Ok(Step::Finished));
@@ -75,18 +78,18 @@ fn main() {
     println!("seed base {base}, {rounds} rounds");
     println!("| cards | decisions | mean ms | p50 | p95 | p99 | max |");
     println!("| --- | ---: | ---: | ---: | ---: | ---: | ---: |");
-    // The concealed cards a row keeps
-    type Keep = fn(usize) -> bool;
-    let rows: [(&str, Keep); 3] = [
-        ("all", |_| true),
-        ("over 10", |c| c > 10),
-        ("10 or fewer", |c| c <= 10),
+    // Each row keeps the decisions with this many concealed cards
+    let mut rows = vec![
+        ("all".to_owned(), 0..=usize::MAX),
+        (format!("over {gate}"), gate + 1..=usize::MAX),
+        (format!("{gate} or fewer"), 0..=gate),
     ];
+    rows.extend((11..=gate).map(|cards| (cards.to_string(), cards..=cards)));
     for (label, keep) in rows {
         let mut micros: Vec<u128> = log
             .borrow()
             .iter()
-            .filter(|d| keep(d.0))
+            .filter(|d| keep.contains(&d.0))
             .map(|d| d.1)
             .collect();
         micros.sort_unstable();

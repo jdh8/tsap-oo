@@ -12,7 +12,9 @@
 //! `GATE_CARDS` (default 10).  Set `BASELINE_SAMPLES` to seat the control's
 //! `MonteCarloBot` of that many samples in seat 1 on the control side, gated
 //! at `GATE_CARDS` (default 10), in place of its `HeuristicBot`: a head to
-//! head of two bots that each beat it.
+//! head of two bots that each beat it.  Set `BASELINE_EXPECT` to seat the
+//! control's `ExpectBot::new` there instead, gated as it ships whatever
+//! `GATE_CARDS` says: a wider gate against the one in place.
 //!
 //! Set `RESHUFFLE` to K to average out the luck after the two first part
 //! ways: the deal is played once with the candidate, and at its first choice
@@ -88,6 +90,9 @@ fn candidate_bot(rules: &new::Rules, seed: u64) -> Box<dyn new::Strategy> {
 }
 
 fn baseline_bot(rules: &old::Rules, seed: u64) -> Option<Box<dyn old::Strategy>> {
+    if std::env::var_os("BASELINE_EXPECT").is_some() {
+        return Some(Box::new(old::ExpectBot::new(rules)));
+    }
     let n = std::env::var("BASELINE_SAMPLES").ok()?.parse().unwrap();
     let cards = std::env::var("GATE_CARDS").map_or(10, |s| s.parse().unwrap());
     let rng = SmallRng::seed_from_u64(!seed);

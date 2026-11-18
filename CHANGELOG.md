@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ab/` takes `BASELINE_SAMPLES=<n>`: the control's seat 1 is then a
   `MonteCarloBot` of n samples gated at `GATE_CARDS`, for a head to head
   of two bots that each beat `HeuristicBot`.
+- `ab/` takes `BASELINE_EXPECT=1`: the control's seat 1 is then its own
+  `ExpectBot::new`, for a wider gate against the one in place.
+  `examples/expect_time` takes a `[gate]` and times each card count above
+  10.  `ab/run.sh` renames the control with `perl` instead of GNU `sed`,
+  so it runs on macOS.
 
 ### Changed
 
@@ -35,6 +40,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `doc/expectation.md`, on batch 3's win (the hint is the bot); as wasm
   under V8 (`examples/expect_time`, 2,000 rounds, seed base 1000) a
   decision at the gate takes 6.6 ms on average, 84 ms at most.
+- The desktop client's opponents and its hint play by the DP with 14
+  concealed cards or fewer instead of 10; the browser stays at 10.  A
+  decision at 14 cards takes some 190 ms of native code, 1.4 s at worst
+  (`expect_time 300 1000 14`).  Application D of `doc/expectation.md`,
+  gate 14 against the control's own `ExpectBot` gated at 10, three
+  `HeuristicBot`s beside (control `e1d0c7d`, `RESHUFFLE=8`, 100,000 deals,
+  seed base 1795214506, declared before the data): 27,472 deals part,
+  seat 1 wins 24.63% against 24.98%, +0.132 ± 0.014 points a deal, 95% CI
+  [+0.105, +0.159], a win.
 - The desktop client's opponents are `ExpectBot`s gated at 10 cards
   instead of 128-sample `MonteCarloBot`s: a decision at the gate takes
   some 14 ms instead of 0.9 s.  Batch 4 of `doc/expectation.md`, head to

@@ -20,7 +20,7 @@ mkdir -p target/base
 # would take an older control for the one it already built.
 git -C .. archive "$control" | tar -xm -C target/base
 # Two packages of one name and version cannot share a lockfile.
-sed -i '0,/^name = "tsap-oo"$/s//name = "tsap-oo-base"/' target/base/Cargo.toml
+perl -pi -e '$done ||= s/^name = "tsap-oo"$/name = "tsap-oo-base"/' target/base/Cargo.toml
 
 cargo build --release
 echo "control $(git rev-parse --short "$control")"
