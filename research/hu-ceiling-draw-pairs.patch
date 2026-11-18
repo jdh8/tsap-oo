@@ -1,0 +1,91 @@
+diff --git a/src/heuristic.rs b/src/heuristic.rs
+index 333044f..006f3f7 100644
+--- a/src/heuristic.rs
++++ b/src/heuristic.rs
+@@ -1,7 +1,7 @@
+ //! A greedy bot.
+ 
+ use crate::Seat;
+-use crate::ceiling::{ceiling, reach};
++use crate::ceiling::reach;
+ use crate::round::{Claim, ClaimOptions, Phase, discardable, options};
+ use crate::rules::Rules;
+ use crate::strategy::Strategy;
+@@ -52,7 +52,7 @@ pub struct Terms {
+     pub loose: i32,
+     /// Half-胡 the melds fall short of the threshold, after the half-胡
+     /// the 搭子 among the loose cards may bring; at least the half-胡 the
+-    /// hand's [`ceiling`] with at most one general from outside falls
++    /// hand's [`ceiling`](crate::ceiling::ceiling) with at most one general from outside falls
+     /// short, the most its layout can reach if every card it wants comes
+     pub short: i32,
+     /// Unseen copies of the loose cards, each of which would pair one
+@@ -109,7 +109,7 @@ pub struct HeuristicBot {
+     eaten: [i32; 3],
+     /// The cards the seat has not seen: in other hands or the pile
+     live: Hand,
+-    /// For [`ceiling`]
++    /// For [`ceiling`](crate::ceiling::ceiling)
+     rules: Rules,
+     /// Cards in the seat's exposed melds, with those of the claim weighed
+     shown: usize,
+@@ -301,15 +301,19 @@ impl HeuristicBot {
+                     self.take(hand, Meld::Quad(card), card, need)
+                 } else {
+                     let options = options(hand, card, true);
++                    let forced = options.forced();
+                     let best = options
+                         .pong
+                         .then_some(Meld::Triplet(card))
+                         .into_iter()
+                         .chain(weighed(&options, hand, card))
++                        .filter(|&meld| forced || !self.lowers(hand, meld, need))
++                        .collect::<Vec<_>>()
++                        .into_iter()
+                         .map(|meld| self.take(hand, meld, card, need))
+                         .max();
+                     match best {
+-                        Some(best) if options.forced() => best,
++                        Some(best) if forced => best,
+                         Some(best) => best.max(pass),
+                         None => pass,
+                     }
+@@ -462,7 +466,7 @@ impl HeuristicBot {
+             .then_some((Meld::Triplet(card), Claim::Pong))
+             .into_iter()
+             .chain(weighed(options, hand, card).map(|meld| (meld, Claim::Eat(meld))))
+-            .filter(|&(meld, _)| pass.is_none() || !self.lowers(view, meld))
++            .filter(|&(meld, _)| pass.is_none() || !self.lowers(hand, meld, need))
+             .collect::<Vec<_>>();
+         let mut graded: Vec<(i32, Claim)> = pass
+             .into_iter()
+@@ -480,18 +484,20 @@ impl HeuristicBot {
+             .collect()
+     }
+ 
+-    /// Whether eating `meld` is a pair that drops the hand's [`ceiling`],
+-    /// with no generals from outside, from where it was to below the
+-    /// threshold or to no layout at all
+-    fn lowers(&self, view: &View<'_>, meld: Meld) -> bool {
++    /// Whether eating `meld` is a pair that drops the [`ceiling`](crate::ceiling::ceiling) of
++    /// `hand`, with no generals from outside, from where it was to below
++    /// `need` or to no layout at all
++    ///
++    /// Both [`claims`](Self::claims) and the claims [`draw`](Self::draw)
++    /// foresees leave such an eat out.
++    fn lowers(&self, hand: Hand, meld: Meld, need: i32) -> bool {
+         let Meld::Pair(card) = meld else {
+             return false;
+         };
+-        let (hand, exposed) = (view.hand(), view.exposed(view.seat()));
+-        let eaten = [exposed, &[meld]].concat();
+-        let after = ceiling(&self.rules, &eaten, hand.without(card), self.live, 0);
+-        after < ceiling(&self.rules, exposed, hand, self.live, 0)
+-            && after.is_none_or(|hu| hu < self.threshold)
++        let reach = |shown, hand| reach(&self.rules, shown, hand, self.live, 0).map(to_i32);
++        let gain = to_i32(self.exposed.score(&meld));
++        let after = reach(self.shown + meld.size(), hand.without(card)).map(|hu| hu + gain);
++        after < reach(self.shown, hand) && after.is_none_or(|hu| hu < need)
+     }
+ 
+     /// The legal discards, best first, each with its grade as for

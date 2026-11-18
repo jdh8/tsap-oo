@@ -37,6 +37,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The pair rule in `draw`, measured and not shipped (`doc/hu-ceiling.md`,
+  batch 4): `HeuristicBot::draw` leaving out the pair eats that
+  `claims` leaves out since batch 3.  `ab/run.sh 400000` against
+  `39d37b2` (seed base 1794956595, `RESHUFFLE=8`), 3,072 deals part:
+  −0.002 ± 0.000 a deal, 95% CI [−0.003, −0.001], a loss.  Every split is
+  the control passing and the candidate claiming: the next seat's pass is
+  graded by the draw it foresees, which is worth less without those eats,
+  so claims that lost to it before now win.  A trace of the first 100,000
+  deals has the loss spread over pair eats (−0.88 a split), 車馬包 and
+  將士象 eats, and pongs.  Kept as `research/hu-ceiling-draw-pairs.patch`.
+
 - `examples/nodes.rs`, a census of the single-player DP that route 3 of
   `doc/stronger-bot.md` sketched: from every settled hand of `HeuristicBot`
   self-play, the (hand, exposed 胡) states a chain of claims and discards
