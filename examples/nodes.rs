@@ -19,16 +19,6 @@ use tsap_oo::{
     Strategy, Table, View, discardable,
 };
 
-// ponytail: guesses until batch 2 measures the four constants from
-// self-play; they set the values compared, not the sizes or the times.
-const OUTLOOK: Outlook = Outlook {
-    end: 0.015,
-    loss: -12.0,
-    eat: 0.45,
-    general: 0.25,
-};
-const PER_DRAW: f64 = 1.3;
-
 /// The node of the best root and its value
 fn best(graph: &Graph, values: &[f64]) -> (usize, f64) {
     graph
@@ -114,6 +104,7 @@ fn main() {
     };
     let compare = discards != Discards::All;
     let rules = Rules::new();
+    let outlook = Outlook::default();
     let mut game = Game::new(rules, Seat::ALL[0]);
     let mut rng = SmallRng::seed_from_u64(seed);
     // By cards in hand after the discard
@@ -145,13 +136,12 @@ fn main() {
                         .flat_map(|meld| meld.cards())
                         .chain(view.discards().iter().map(|&(_, card)| card));
                     let live = shown.fold(Hand::FULL - hand, Hand::without);
-                    let cards =
-                        ((view.pile_len() - rules.dead_tail) as f64 * PER_DRAW).round() as usize;
+                    let draws = view.pile_len() - rules.dead_tail;
 
                     let start = Instant::now();
                     let graph = Graph::new(&rules, live, &roots, prune);
                     let built = start.elapsed().as_secs_f64();
-                    let values = graph.values(&OUTLOOK, cards, Payoff::Points);
+                    let values = graph.values(&outlook, draws, Payoff::Points);
                     let row = &mut by_size[hand.len() - 1];
                     row.decisions += 1;
                     row.roots += roots.len() as u64;
@@ -163,7 +153,7 @@ fn main() {
 
                     if compare {
                         let whole = Graph::new(&rules, live, &roots, Prune::default());
-                        let full = whole.values(&OUTLOOK, cards, Payoff::Points);
+                        let full = whole.values(&outlook, draws, Payoff::Points);
                         let (choice, value) = best(&graph, &values);
                         let (right, top) = best(&whole, &full);
                         let regret = top - full[whole.roots()[choice]];

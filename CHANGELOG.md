@@ -37,6 +37,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `expect`: the table model of `doc/expectation.md`, batch 2, measured
+  from `HeuristicBot` self-play by `examples/outlook.rs` (10,000 rounds,
+  seed 20; `research/outlook.md`).  The chance another seat ends the
+  round and the public cards a draw both move a lot with the pile (h
+  0.018 to 0.12 a card, cards 3.2 to 1.3 a draw), so `Outlook` holds both
+  as tables by draws left, and `Graph::values` takes the draws left
+  rather than the cards to come.  `Outlook::default()` is the measured
+  model: e 0.277, L −12.3, a general the seat's own draw 0.216.
+  Calibrated on 10,000 fresh rounds (seed 21, 22,853 decisions leaving 10
+  cards or fewer), the predicted chance to win runs high in nine of ten
+  bins, 0.382 against 0.291 won, but rises with the wins; changing one
+  constant at a time (seed 23), h × 1.5 takes most of it, 0.306 against
+  0.290 with the four lowest bins inside their 95% intervals, while e and
+  the cards barely move it.  The bias has one direction and one constant
+  explains it, so the gate for batch 3 passes.  No bot uses it:
+  `ab/run.sh 200000` against `c0aea83` (seed base 1794984588), 0 deals
+  part.
 - `expect`: the single-player DP of `doc/expectation.md`, batch 1.
   `Graph::new` lays out every (hand, exposed 胡) a chain of claims reaches
   from the roots of one decision, pruned by the ceiling and optionally by

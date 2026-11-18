@@ -17,10 +17,18 @@ use std::collections::HashMap;
 use susik::{Card, Hand, Meld, Rank, Solver, locked_completions};
 
 /// The table as one seat models it
-#[derive(Debug, Clone, Copy, PartialEq)]
+///
+/// The two tables run by draws left, from 0: the public cards after the
+/// last draw.  Each card with `k` draws left belongs to segment `k`: the
+/// discards before the draw that leaves `k - 1`, then that draw.  A table's
+/// last entry holds for more draws.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Outlook {
-    /// The chance another seat ends the round before each public card
-    pub end: f64,
+    /// The chance another seat ends the round before a public card, by
+    /// draws left
+    pub end: Vec<f64>,
+    /// How many public cards a segment holds, by draws left
+    pub cards: Vec<f64>,
     /// What the seat scores then: minus what it pays the winner
     pub loss: f64,
     /// The chance a public card other than a general comes to the seat to
@@ -30,6 +38,54 @@ pub struct Outlook {
     /// The chance a general is the seat's own draw, which it must eat
     pub general: f64,
 }
+
+impl Outlook {
+    /// The chance another seat ends the round before each public card to
+    /// come, the last card first: segments `0..=draws` less the card being
+    /// decided on
+    fn ends(&self, draws: usize) -> Vec<f64> {
+        let at = |table: &[f64], k: usize| table[k.min(table.len() - 1)];
+        let total: f64 = (0..=draws).map(|k| at(&self.cards, k)).sum();
+        let (mut k, mut upto) = (0, at(&self.cards, 0));
+        (1..=(total - 1.0).round().max(0.0) as usize)
+            .map(|t| {
+                while t as f64 > upto && k < draws {
+                    k += 1;
+                    upto += at(&self.cards, k);
+                }
+                at(&self.end, k)
+            })
+            .collect()
+    }
+}
+
+impl Default for Outlook {
+    /// Measured from `HeuristicBot` self-play while the seat holds 10
+    /// concealed cards or fewer: `research/outlook.md`
+    fn default() -> Self {
+        Self {
+            end: END.to_vec(),
+            cards: CARDS.to_vec(),
+            loss: -12.26,
+            eat: 0.2765,
+            general: 0.2156,
+        }
+    }
+}
+
+/// h by draws left, 0 to 25: `outlook 10000 20`
+const END: [f64; 26] = [
+    0.1126, 0.1126, 0.1217, 0.1164, 0.1099, 0.1121, 0.0983, 0.1021, 0.0966, 0.0821, 0.0851, 0.0824,
+    0.0775, 0.0723, 0.0666, 0.0671, 0.0582, 0.0524, 0.0513, 0.0409, 0.0441, 0.0375, 0.0269, 0.0202,
+    0.0175, 0.0175,
+];
+
+/// Public cards a segment by draws left, 0 to 25: `outlook 10000 20`
+const CARDS: [f64; 26] = [
+    0.2791, 1.2594, 1.3112, 1.4403, 1.3689, 1.4043, 1.4298, 1.4611, 1.4954, 1.5066, 1.5715, 1.5844,
+    1.6264, 1.6332, 1.7161, 1.7365, 1.8207, 1.9039, 1.9455, 2.0456, 2.1579, 2.2592, 2.3920, 2.5734,
+    2.7310, 3.2345,
+];
 
 /// What a round is worth to the seat
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -187,17 +243,17 @@ impl Graph {
         self.children.len()
     }
 
-    /// The value of every node, under `payoff`, with `cards` public cards
-    /// to come
+    /// The value of every node, under `payoff`, with `draws` draws left
+    /// after the public card being decided on, or the discard
     #[must_use]
-    pub fn values(&self, outlook: &Outlook, cards: usize, payoff: Payoff) -> Vec<f64> {
+    pub fn values(&self, outlook: &Outlook, draws: usize, payoff: Payoff) -> Vec<f64> {
         let (loss, foul) = match payoff {
             Payoff::Points => (outlook.loss, -3.0 * f64::from(self.threshold)),
             Payoff::Win => (0.0, 0.0),
         };
         let mut before = vec![0.0; self.len()];
         let mut after = before.clone();
-        for _ in 0..cards {
+        for end in outlook.ends(draws) {
             let best = |group: u32| {
                 let first = if group == 0 {
                     0
@@ -246,7 +302,7 @@ impl Graph {
                     };
                     sum += entry.weight * answer;
                 }
-                *value = outlook.end * loss + (1.0 - outlook.end) * sum;
+                *value = end * loss + (1.0 - end) * sum;
             }
             std::mem::swap(&mut before, &mut after);
         }
@@ -438,16 +494,32 @@ mod tests {
         }
     }
 
-    fn root(graph: &Graph, outlook: &Outlook, cards: usize, payoff: Payoff) -> f64 {
-        graph.values(outlook, cards, payoff)[graph.roots()[0]]
+    /// One public card a draw, so that `draws` is the cards to come
+    fn root(graph: &Graph, outlook: &Outlook, draws: usize, payoff: Payoff) -> f64 {
+        graph.values(outlook, draws, payoff)[graph.roots()[0]]
     }
 
-    const FREE: Outlook = Outlook {
-        end: 0.0,
-        loss: 0.0,
-        eat: 0.5,
-        general: 0.0,
-    };
+    fn free() -> Outlook {
+        Outlook {
+            end: vec![0.0],
+            cards: vec![1.0],
+            loss: 0.0,
+            eat: 0.5,
+            general: 0.0,
+        }
+    }
+
+    #[test]
+    fn the_schedule_follows_the_segments() {
+        let outlook = Outlook {
+            end: vec![0.1, 0.2],
+            cards: vec![2.0, 1.5],
+            ..free()
+        };
+        // 2 + 1.5 + 1.5 less the card decided on, the last first
+        assert_eq!(outlook.ends(2), [0.1, 0.1, 0.2, 0.2]);
+        assert_eq!(outlook.ends(0), [0.1]);
+    }
 
     #[test]
     fn one_wait_is_geometric() {
@@ -464,7 +536,7 @@ mod tests {
             let p = k as f64 / (k + m) as f64;
             for t in 0..8 {
                 let want = 30.0 * (1.0 - (1.0 - p).powi(t));
-                let got = root(&graph, &FREE, t as usize, Payoff::Points);
+                let got = root(&graph, &free(), t as usize, Payoff::Points);
                 assert!(
                     (got - want).abs() < 1e-12,
                     "{k} of {}: {got} ≠ {want}",
@@ -545,7 +617,8 @@ mod tests {
                 };
                 sum += f64::from(count) / total * answer;
             }
-            let v = self.outlook.end * self.outlook.loss + (1.0 - self.outlook.end) * sum;
+            let end = self.outlook.end[0];
+            let v = end * self.outlook.loss + (1.0 - end) * sum;
             self.memo.insert((hand, base, t), v);
             v
         }
@@ -567,7 +640,8 @@ mod tests {
             let live = rng.hand(Hand::FULL - hand, n);
             let base = rng.below(12) as u32;
             let outlook = Outlook {
-                end: 0.2 * rng.unit(),
+                end: vec![0.2 * rng.unit()],
+                cards: vec![1.0],
                 loss: -20.0 * rng.unit(),
                 eat: rng.unit(),
                 general: rng.unit(),
@@ -619,8 +693,8 @@ mod tests {
             };
             let (cut, whole) = (graph(Some(generals)), graph(None));
             let (p, w) = (
-                root(&cut, &FREE, 6, Payoff::Win),
-                root(&whole, &FREE, 6, Payoff::Win),
+                root(&cut, &free(), 6, Payoff::Win),
+                root(&whole, &free(), 6, Payoff::Win),
             );
             assert!((p - w).abs() < 1e-12, "{hand} + {base}: {p} ≠ {w}");
             pruned += usize::from(cut.len() < whole.len());
@@ -648,7 +722,7 @@ mod tests {
             let base = rng.below(10) as u32;
             let graph = Graph::new(&rules, live, &[(hand, base)], Prune::default());
             let chances: Vec<f64> = (0..10)
-                .map(|t| root(&graph, &FREE, t, Payoff::Win))
+                .map(|t| root(&graph, &free(), t, Payoff::Win))
                 .collect();
             assert!(
                 chances.windows(2).all(|w| w[0] <= w[1] + 1e-15),

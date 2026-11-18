@@ -61,6 +61,10 @@ name = "nodes"
 required-features = ["rand"]
 
 [[example]]
+name = "outlook"
+required-features = ["rand"]
+
+[[example]]
 name = "safe"
 required-features = ["rand"]
 

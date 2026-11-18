@@ -24,7 +24,7 @@
 | --- | --- | --- | --- | --- |
 | 0 | 這份文件 | 否 | 無 | 完成 |
 | 1 | 核心：圖、掃描、測試、計時 | 否，要量到零分歧 | 測試全過；10 張平均 50 毫秒以內 | 完成：14 毫秒 |
-| 2 | 牌桌模型的四個常數，從自對局量 | 否 | 預測的胡牌率對得上實際的（見「校準」） | 未開始 |
+| 2 | 牌桌模型的四個常數，從自對局量 | 否 | 預測的胡牌率對得上實際的（見「校準」） | 完成：偏高，由 h 解釋 |
 | 3 | `ExpectBot`，10 張的閘門，A/B | 候選 | win 才 commit | 未開始 |
 | 4 | 應用，見下表 | 各自 | 批次 3 是 win | 未開始 |
 
@@ -36,6 +36,15 @@
 毫秒、掃描 0.9 毫秒；12 張 52 毫秒，13 張 132 毫秒。閘門過了，所以四個常數
 可以開始量。`ab/run.sh 200000`（seed base 1794971744，對照 `7d3157a`）讀到
 0 局分歧：沒有 bot 呼叫這個模組。
+
+批次 2 量到（`research/outlook.md`，`HeuristicBot` 自對局，常數 10,000 局
+seed 20，校準 10,000 局 seed 21）：h 與每摸一張的公開牌數都隨牌堆變很多
+（h 0.018 到 0.12，牌數 3.2 到 1.3），所以兩者都成了依還能摸幾張的表；
+e 0.277、L −12.3、將帥 0.216。預測的胡牌率十組裡九組偏高，整體 0.382 對
+0.291，形狀是單調的。一次改一個常數（seed 23），h × 1.5 讓整體變成 0.306
+對 0.290、低的四組進區間，e 與牌數都只動一點：偏差有方向，由 h 解釋，閘門
+過了。`Outlook::default()` 仍是量到的值；h 的倍數是批次 3 的一個問題。`ab/run.sh 200000`
+（seed base 1794984588，對照 `c0aea83`）讀到 0 局分歧。
 
 ## 模型
 
@@ -122,20 +131,20 @@ t 是這一局還會出現幾張公開的牌，V(s, t) 是這個狀態值幾分�
 
 - **打牌：** 每一張能打的牌 d，值是 V(手 − d, T)。
 - **吃碰：** 放過是 V(手, T)；每一種吃碰是它之後最好的那一張棄牌的值。
-- **T** 由牌堆算：還能摸的張數是 `pile_len − dead_tail`，再乘上「每摸一張
-  平均出現幾張公開的牌」（吃碰之後的棄牌也是一張）。
+- **T** 由牌堆算：還能摸的張數是 `pile_len − dead_tail`，每一段（一次摸牌
+  與它之前的棄牌）的公開牌數照表加起來，減掉正在決定的那一張。
 
 ### 牌桌模型：四個常數
 
 別家的一切都收在這裡。全部從 `HeuristicBot` 自對局量，用固定的 seed，
 不在 A/B 的牌上調；量的工具是一個 example，數字進 `research/`。
 
-| 常數 | 意思 | 第一版 |
-| --- | --- | --- |
-| h | 每張公開的牌之前，別家結束這一局的機率 | 依「還能摸幾張」分段的表 |
-| L | 別家胡時我付的分 | 一個數：別家胡牌的平均胡數，取負 |
-| e | 公開的牌輪得到我吃的機率 | 兩個數：將帥、其他 |
-| 每摸一張的公開牌數 | T 的換算 | 一個數 |
+| 常數 | 意思 | 第一版 | 量到的（批次 2） |
+| --- | --- | --- | --- |
+| h | 每張公開的牌之前，別家結束這一局的機率 | 依「還能摸幾張」分段的表 | 表，0.018 到 0.12 |
+| L | 別家胡時我付的分 | 一個數：別家胡牌的平均胡數，取負 | −12.3 |
+| e | 公開的牌輪得到我吃的機率 | 兩個數：將帥、其他 | 0.216、0.277 |
+| 每摸一張的公開牌數 | T 的換算 | 一個數 | 也成了表，3.2 到 1.3 |
 
 `research/safe-cards.md` 量到別家的暗牌張數把被胡的機率拉開兩百倍，所以
 h 之後最該加的維度是別家最短的暗牌張數（`View::concealed_len`）。第一版
@@ -180,8 +189,12 @@ h 之後最該加的維度是別家最短的暗牌張數（`View::concealed_len`
 `ExpectBot` 還是提議：
 
 ```rust
-/// The table as one seat models it: h, L, and e for generals and the rest
-pub struct Outlook { pub end: f64, pub loss: f64, pub eat: f64, pub general: f64 }
+/// The table as one seat models it: h and the public cards a draw, both by
+/// draws left, L, and e for the rest and for generals
+pub struct Outlook {
+    pub end: Vec<f64>, pub cards: Vec<f64>, pub loss: f64, pub eat: f64, pub general: f64,
+}
+impl Default for Outlook { /* measured, research/outlook.md */ }
 
 /// The hands a chain of claims can reach from the roots of one decision,
 /// each a settled hand and its exposed 胡, and the edges between them
@@ -191,9 +204,9 @@ impl Graph {
     pub fn new(rules: &Rules, live: Hand, roots: &[(Hand, u32)], prune: Prune) -> Self;
     pub fn roots(&self) -> &[usize];
 
-    /// The value of every node with `cards` public cards to come, under
-    /// `payoff`: points for the bot, 1 for a win to get its probability
-    pub fn values(&self, outlook: &Outlook, cards: usize, payoff: Payoff) -> Vec<f64>;
+    /// The value of every node with `draws` draws left, under `payoff`:
+    /// points for the bot, 1 for a win to get its probability
+    pub fn values(&self, outlook: &Outlook, draws: usize, payoff: Payoff) -> Vec<f64>;
 }
 
 /// Plays by `Graph` with `cards` concealed cards or fewer, greedily before
@@ -206,8 +219,8 @@ impl ExpectBot {
 impl Strategy for ExpectBot { /* the first of each */ }
 ```
 
-- 每摸一張的公開牌數不在 `Outlook` 裡：它只用來在根把牌堆換成 T，
-  `ExpectBot` 寫的時候和它一起加。
+- 每摸一張的公開牌數批次 2 量出來隨牌堆從 3.2 降到 1.3，所以它和 h 一樣
+  成了 `Outlook` 裡的表，`values` 收還能摸幾張，自己排出每一張牌的 h。
 - `Prune` 有兩項：天花板用幾張外來的將帥（`None` 不剪），以及
   `research/dp-nodes.md` 的四種棄牌剪法（`Discards`）。預設是 1 張將帥、
   不剪棄牌：10 張的閘門用不著剪，剪了每個決定約少 0.02 分。
@@ -336,7 +349,10 @@ A/B。
 ## 未決問題
 
 - ~~掃描真的比建圖便宜嗎？~~ 是，十幾倍（批次 1）。
-- 四個常數夠不夠？校準的偏差落在哪一個？（批次 2）
+- ~~四個常數夠不夠？校準的偏差落在哪一個？~~ 預測一律偏高，h × 1.5 吃掉
+  大部分（批次 2）。h 為什麼量起來偏低，或者它在替哪一個近似補，還不知道；
+  依別家最短暗牌張數分的 h 是第一個要試的。
+- `ExpectBot` 用量到的 h，還是 h × 1.5？（批次 3）
 - 沒有取樣雜訊、之後照最佳打，值不值 Monte Carlo 的 +0.070 以上？還是
   單人的假設把它吃掉了？（批次 3）
 - 閘門該開在幾張？（應用 D）
