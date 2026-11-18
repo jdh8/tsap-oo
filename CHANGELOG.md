@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Prune::depth`, batch 2 of `doc/eval.md`: a node that many claims from
+  the nearest root is a leaf, not expanded, and `Graph::values_with` reads
+  its value from a curve by public cards to come; `Graph::curves`,
+  `Graph::leaves` and `Graph::state` go with it.  No bot uses it yet.
+  `nodes` takes the depth as a fifth argument (200 deals, seed 1795500000):
+  depth 1 builds a 20-card decision in 29 ms, depth 2 in 0.5 s.
+  `examples/leaves` measures what error the leaves bear (2,000 deals, seed
+  base 1795600000, base `93b2d7b`): at depth 1, an offset of σ = 2 points
+  for each leaf, one of ±1 shared by all, or every value halved costs at
+  most 0.03 points a decision at 11 to 14 cards, under half of what
+  `HeuristicBot` gives up; at depth 0 the per-leaf σ must stay within 0.4.
+  No bot changes: `ab/run.sh 20000` against `93b2d7b` (seed base
+  1795700000, `RESHUFFLE=8`) read 0 deals that part.
 - `examples/regret`, batch 1 of `doc/eval.md`: at each decision of the
   desktop `ExpectBot` (gate 14) among three `HeuristicBot`s, what
   `HeuristicBot`'s first choice gives up by the DP's values, and the DP's

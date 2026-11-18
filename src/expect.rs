@@ -122,6 +122,10 @@ pub struct Prune {
     pub generals: Option<usize>,
     /// The discards each node tries
     pub discards: Discards,
+    /// A node this many claims from the nearest root is a leaf, not
+    /// expanded: [`Graph::values_with`] reads its value from a curve.
+    /// `None` expands every node.
+    pub depth: Option<u32>,
 }
 
 impl Default for Prune {
@@ -129,6 +133,7 @@ impl Default for Prune {
         Self {
             generals: Some(1),
             discards: Discards::All,
+            depth: None,
         }
     }
 }
@@ -168,6 +173,10 @@ pub struct Graph {
     roots: Vec<usize>,
     /// The hand of each node
     hands: Vec<Hand>,
+    /// The exposed 胡 of each node
+    bases: Vec<u32>,
+    /// The nodes [`Prune::depth`] leaves unexpanded, in order
+    leaves: Vec<usize>,
     /// Each node's entries end here in `entries`
     ends: Vec<u32>,
     entries: Vec<Entry>,
@@ -193,11 +202,14 @@ impl Graph {
             win: Solver::new(rules.concealed, None).locked(),
             layouts: [1, 16].map(|cost| Solver::new(rules.concealed, Some(cost)).locked()),
             index: HashMap::new(),
-            bases: vec![0],
+            depth: 0,
+            depths: vec![0],
             graph: Self {
                 threshold: rules.threshold,
                 roots: Vec::new(),
                 hands: vec![Hand::EMPTY],
+                bases: vec![0],
+                leaves: Vec::new(),
                 ends: Vec::new(),
                 entries: Vec::new(),
                 groups: Vec::new(),
@@ -212,8 +224,16 @@ impl Graph {
         build.graph.ends.push(0);
         build.graph.rest.push(1.0);
         let mut node = 1;
+        // Breadth first, so a node's depth is its fewest claims from a root
         while node < build.graph.hands.len() {
-            build.expand(node);
+            if prune.depth.is_some_and(|depth| build.depths[node] >= depth) {
+                build.graph.leaves.push(node);
+                build.graph.ends.push(build.graph.entries.len() as u32);
+                build.graph.rest.push(1.0);
+            } else {
+                build.depth = build.depths[node] + 1;
+                build.expand(node);
+            }
             node += 1;
         }
         build.graph
@@ -243,17 +263,88 @@ impl Graph {
         self.children.len()
     }
 
+    /// The nodes [`Prune::depth`] left unexpanded, in order
+    #[must_use]
+    pub fn leaves(&self) -> &[usize] {
+        &self.leaves
+    }
+
+    /// The concealed hand and exposed 胡 of `node`
+    #[must_use]
+    pub fn state(&self, node: usize) -> (Hand, u32) {
+        (self.hands[node], self.bases[node])
+    }
+
     /// The value of every node, under `payoff`, with `draws` draws left
     /// after the public card being decided on, or the discard
+    ///
+    /// # Panics
+    ///
+    /// If the graph has [`leaves`](Self::leaves): see
+    /// [`values_with`](Self::values_with).
     #[must_use]
     pub fn values(&self, outlook: &Outlook, draws: usize, payoff: Payoff) -> Vec<f64> {
+        self.sweep(outlook, draws, payoff, &[], |_| ())
+    }
+
+    /// As [`values`](Self::values), each leaf worth its curve: `leaves[i]`
+    /// is the value of leaf `i` by public cards to come, from 0, its last
+    /// entry holding for more
+    ///
+    /// # Panics
+    ///
+    /// If `leaves` is not one curve a leaf.
+    #[must_use]
+    pub fn values_with(
+        &self,
+        outlook: &Outlook,
+        draws: usize,
+        payoff: Payoff,
+        leaves: &[Vec<f64>],
+    ) -> Vec<f64> {
+        self.sweep(outlook, draws, payoff, leaves, |_| ())
+    }
+
+    /// The value of each of `nodes` by public cards to come, from 0 to
+    /// every card [`values`](Self::values) sweeps
+    ///
+    /// # Panics
+    ///
+    /// As [`values`](Self::values).
+    #[must_use]
+    pub fn curves(
+        &self,
+        outlook: &Outlook,
+        draws: usize,
+        payoff: Payoff,
+        nodes: &[usize],
+    ) -> Vec<Vec<f64>> {
+        let mut curves = vec![vec![0.0]; nodes.len()];
+        self.sweep(outlook, draws, payoff, &[], |values| {
+            for (curve, &node) in curves.iter_mut().zip(nodes) {
+                curve.push(values[node]);
+            }
+        });
+        curves
+    }
+
+    /// The sweep, with `each` shown the values after every public card
+    fn sweep(
+        &self,
+        outlook: &Outlook,
+        draws: usize,
+        payoff: Payoff,
+        leaves: &[Vec<f64>],
+        mut each: impl FnMut(&[f64]),
+    ) -> Vec<f64> {
+        assert_eq!(leaves.len(), self.leaves.len(), "one curve a leaf");
         let (loss, foul) = match payoff {
             Payoff::Points => (outlook.loss, -3.0 * f64::from(self.threshold)),
             Payoff::Win => (0.0, 0.0),
         };
         let mut before = vec![0.0; self.len()];
         let mut after = before.clone();
-        for end in outlook.ends(draws) {
+        for (step, end) in outlook.ends(draws).into_iter().enumerate() {
             let best = |group: u32| {
                 let first = if group == 0 {
                     0
@@ -304,7 +395,11 @@ impl Graph {
                 }
                 *value = end * loss + (1.0 - end) * sum;
             }
+            for (&leaf, curve) in self.leaves.iter().zip(leaves) {
+                after[leaf] = curve[(step + 1).min(curve.len() - 1)];
+            }
             std::mem::swap(&mut before, &mut after);
+            each(&before);
         }
         before
     }
@@ -494,8 +589,10 @@ struct Build<'a> {
     /// `HeuristicBot`'s two layouts, for [`Discards`]
     layouts: [Solver; 2],
     index: HashMap<(Hand, u32), u32>,
-    /// The exposed 胡 of each node
-    bases: Vec<u32>,
+    /// The depth of the nodes being added
+    depth: u32,
+    /// The depth of each node
+    depths: Vec<u32>,
     graph: Graph,
 }
 
@@ -511,7 +608,8 @@ impl Build<'_> {
         });
         let node = if reaches {
             self.graph.hands.push(hand);
-            self.bases.push(base);
+            self.graph.bases.push(base);
+            self.depths.push(self.depth);
             u32::try_from(self.graph.hands.len() - 1).expect("nodes fit in u32")
         } else {
             0
@@ -551,7 +649,7 @@ impl Build<'_> {
     }
 
     fn expand(&mut self, node: usize) {
-        let (hand, base) = (self.graph.hands[node], self.bases[node]);
+        let (hand, base) = self.graph.state(node);
         let total = self.live.len() as f64;
         let mut rest = 1.0;
         for (card, count) in self.live.distinct() {
@@ -805,7 +903,7 @@ mod tests {
         let mut rng = Rng(0x9e37_79b9_7f4a_7c15);
         let unpruned = Prune {
             generals: None,
-            discards: Discards::All,
+            ..Prune::default()
         };
         let mut claimed = 0;
         for _ in 0..200 {
@@ -862,7 +960,7 @@ mod tests {
             let graph = |generals| {
                 let prune = Prune {
                     generals,
-                    discards: Discards::All,
+                    ..Prune::default()
                 };
                 Graph::new(&rules, live, &[(hand, base)], prune)
             };
@@ -879,6 +977,54 @@ mod tests {
             pruned > 20 && winning > 20,
             "{pruned} pruned, {winning} winning"
         );
+    }
+
+    #[test]
+    fn exact_leaves_are_the_whole_graph() {
+        let rules = Rules::new();
+        let mut rng = Rng(0x0123_4567_89ab_cdef);
+        let mut cut = 0;
+        for _ in 0..40 {
+            let n = 6 + rng.below(4);
+            let hand = rng.hand(Hand::FULL, n);
+            let base = rng.below(10) as u32;
+            let live = rng.hand(Hand::FULL - hand, 40);
+            let roots: Vec<_> = hand
+                .distinct()
+                .map(|(c, _)| (hand.without(c), base))
+                .collect();
+            let outlook = Outlook::default();
+            let whole = Graph::new(&rules, live, &roots, Prune::default());
+            let index: HashMap<_, _> = (1..whole.len()).map(|n| (whole.state(n), n)).collect();
+            let want = whole.values(&outlook, 12, Payoff::Points);
+            for depth in 0..4 {
+                let prune = Prune {
+                    depth: Some(depth),
+                    ..Prune::default()
+                };
+                let graph = Graph::new(&rules, live, &roots, prune);
+                let nodes: Vec<_> = graph
+                    .leaves()
+                    .iter()
+                    .map(|&l| index[&graph.state(l)])
+                    .collect();
+                let curves = whole.curves(&outlook, 12, Payoff::Points, &nodes);
+                let got = graph.values_with(&outlook, 12, Payoff::Points, &curves);
+                cut += usize::from(graph.edges() < whole.edges());
+                for (&g, &w) in graph.roots().iter().zip(whole.roots()) {
+                    assert_eq!(got[g].to_bits(), want[w].to_bits(), "depth {depth}");
+                }
+            }
+            // A depth past the graph's leaves nothing and changes nothing
+            let deep = Prune {
+                depth: Some(20),
+                ..Prune::default()
+            };
+            let graph = Graph::new(&rules, live, &roots, deep);
+            assert!(graph.leaves().is_empty());
+            assert_eq!(graph.values(&outlook, 12, Payoff::Points), want);
+        }
+        assert!(cut > 30, "only {cut} graphs cut");
     }
 
     #[test]

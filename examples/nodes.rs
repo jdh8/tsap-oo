@@ -7,8 +7,12 @@
 //! them all and reports how often the best root differs and what that
 //! costs by the unpruned values.
 //!
+//! With a depth, the graph stops that many claims from the roots
+//! ([`Prune::depth`]); its leaves are swept as worth 0, the time the curves
+//! of an eval would take aside.
+//!
 //! ```sh
-//! cargo run --release --example nodes -- [rounds] [seed] [most cards after the discard] [discards 0-3]
+//! cargo run --release --example nodes -- [rounds] [seed] [most cards after the discard] [discards 0-3] [depth]
 //! ```
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
@@ -35,6 +39,7 @@ struct Row {
     roots: u64,
     nodes: u64,
     edges: u64,
+    leaves: u64,
     most_nodes: u64,
     build: f64,
     sweep: f64,
@@ -53,6 +58,7 @@ impl Row {
         self.roots += other.roots;
         self.nodes += other.nodes;
         self.edges += other.edges;
+        self.leaves += other.leaves;
         self.most_nodes = self.most_nodes.max(other.most_nodes);
         self.build += other.build;
         self.sweep += other.sweep;
@@ -65,11 +71,12 @@ impl Row {
     fn print(&self, label: &str, compare: bool) {
         let per = |n: f64| n / self.decisions as f64;
         print!(
-            "{label:>5}  {:6}  {:5.1}  {:8.1}  {:9.1}  {:9}  {:8.2}  {:8.2}",
+            "{label:>5}  {:6}  {:5.1}  {:8.1}  {:9.1}  {:9.1}  {:9}  {:8.2}  {:8.2}",
             self.decisions,
             per(self.roots as f64),
             per(self.nodes as f64),
             per(self.edges as f64),
+            per(self.leaves as f64),
             self.most_nodes,
             per(self.build) * 1e3,
             per(self.sweep) * 1e3,
@@ -98,11 +105,13 @@ fn main() {
         2 => Discards::Alone,
         _ => Discards::Live,
     };
+    let depth = args.next().flatten().map(|d| d as u32);
     let prune = Prune {
         discards,
+        depth,
         ..Prune::default()
     };
-    let compare = discards != Discards::All;
+    let compare = discards != Discards::All && depth.is_none();
     let rules = Rules::new();
     let outlook = Outlook::default();
     let mut game = Game::new(rules, Seat::ALL[0]);
@@ -141,12 +150,14 @@ fn main() {
                     let start = Instant::now();
                     let graph = Graph::new(&rules, live, &roots, prune);
                     let built = start.elapsed().as_secs_f64();
-                    let values = graph.values(&outlook, draws, Payoff::Points);
+                    let zeros = vec![vec![0.0]; graph.leaves().len()];
+                    let values = graph.values_with(&outlook, draws, Payoff::Points, &zeros);
                     let row = &mut by_size[hand.len() - 1];
                     row.decisions += 1;
                     row.roots += roots.len() as u64;
                     row.nodes += graph.len() as u64 - 1;
                     row.edges += graph.edges() as u64;
+                    row.leaves += graph.leaves().len() as u64;
                     row.most_nodes = row.most_nodes.max(graph.len() as u64 - 1);
                     row.build += built;
                     row.sweep += start.elapsed().as_secs_f64() - built;
@@ -172,9 +183,9 @@ fn main() {
     }
 
     println!(
-        "{rounds} rounds, seed {seed}, {discards:?} discards: a graph from every discard of a decision"
+        "{rounds} rounds, seed {seed}, {discards:?} discards, depth {depth:?}: a graph from every discard of a decision"
     );
-    print!("\ncards  points  roots  nodes/pt   edges/pt  max nodes  build ms  sweep ms");
+    print!("\ncards  points  roots  nodes/pt   edges/pt  leaves/pt  max nodes  build ms  sweep ms");
     if compare {
         print!("  changed  regret  max reg  bias");
     }
