@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `examples/regret`, batch 1 of `doc/eval.md`: at each decision of the
+  desktop `ExpectBot` (gate 14) among three `HeuristicBot`s, what
+  `HeuristicBot`'s first choice gives up by the DP's values, and the DP's
+  win chance against the outcome.  1,000 deals, seed base 1795400000, base
+  `9794936`: scaled by application D's +0.132, the decisions at 15 to 20
+  cards are worth +0.35 ± 0.07 points a deal, past the 0.05 gate.  The
+  win chance runs 11% high at 10 cards or fewer and 24% low at 15 or more.
+  Measurement only; no bot plays differently.
 - `cargo desktop`, an alias in `.cargo/config.toml` that runs the desktop
   client from the repository root (`cd tauri && cargo run --release`).
 - `ExpectBot`: with 10 concealed cards or fewer it plays every claim and

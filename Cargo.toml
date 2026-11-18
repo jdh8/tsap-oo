@@ -65,6 +65,10 @@ name = "outlook"
 required-features = ["rand"]
 
 [[example]]
+name = "regret"
+required-features = ["rand"]
+
+[[example]]
 name = "safe"
 required-features = ["rand"]
 
