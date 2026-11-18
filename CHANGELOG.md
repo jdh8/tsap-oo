@@ -58,6 +58,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   milliseconds (`research/dp-nodes.md`).  Batch 4 of `doc/hu-ceiling.md`
   stays four separate candidates.  No bot changes.
 
+- `examples/nodes.rs` takes a pruning level and counts the same graph when
+  a node discards only loose cards: 1 the cards loose in one of
+  `HeuristicBot`'s two layouts, 2 only those no other loose card goes
+  with, 3 as 2 while a card that finishes the two is still live.  A fresh
+  hand of twenty falls from 7.0 × 10⁵ states to 1.0 × 10⁵, 3.4 × 10⁴ and
+  3.5 × 10⁴ (22 s to 5.2 s, 1.2 s and 1.3 s), still too slow; thirteen
+  cards fall from 114 ms to 30 ms and sixteen cost 74 ms, so the pruning
+  widens the gate rather than removing it.  Leaving hands of N cards or
+  fewer unpruned doubles the cost at N = 7 and quadruples it at N = 10.
+  Sizes only: what the pruning costs in value waits for the core of
+  `doc/expectation.md` (`research/dp-nodes.md`).  No bot changes.
+
 - `ceiling`, the most 胡 a hand can still win with if every card it wants
   came and at most a given number of generals from outside; `None` when no
   layout of 21 cards exists (`doc/hu-ceiling.md`, batch 1).  It lays the

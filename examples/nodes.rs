@@ -10,19 +10,81 @@
 //! with none are counted too.
 //!
 //! ```sh
-//! cargo run --release --example nodes -- [rounds] [seed] [most cards in hand]
+//! cargo run --release --example nodes -- [rounds] [seed] [most cards in hand] [prune] [exact]
 //! ```
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
-use tsap_oo::susik::{Hand, Meld, Rank, locked_completions};
+use tsap_oo::susik::{Card, Hand, Meld, Rank, Solver, locked_completions};
 use tsap_oo::{
     Game, HeuristicBot, Phase, Rules, Seat, Step, Strategy, Table, View, ceiling, discardable,
 };
 
 /// Nodes kept with one general from outside, nodes that need none, edges
-fn census(rules: &Rules, exposed: &[Meld], hand: Hand, live: Hand) -> [u64; 3] {
+/// Whether two loose cards wait on a third to make a meld
+fn mates(a: Card, b: Card) -> bool {
+    let court = |rank| matches!(rank, Rank::General | Rank::Advisor | Rank::Elephant);
+    match (a.rank, b.rank) {
+        (Rank::Soldier, Rank::Soldier) => a.color != b.color,
+        (Rank::Soldier, _) | (_, Rank::Soldier) => false,
+        (x, y) => a.color == b.color && x != y && court(x) == court(y),
+    }
+}
+
+/// The discards a node tries.  `prune` 0: all of them.  1: only the cards
+/// loose in one of the two layouts `HeuristicBot` grades, when there are
+/// any.  2: of those, only the ones no other loose card goes with, when
+/// there are any.  3: as 2, but two loose cards go together only while a
+/// card that finishes them is live.  A hand left with `exact` cards or fewer tries them all.
+fn discards(
+    solvers: &mut [Solver; 2],
+    rest: Hand,
+    locked: Card,
+    prune: u64,
+    exact: usize,
+    live: Hand,
+) -> Hand {
+    let all = discardable(rest, Some(locked));
+    if prune == 0 || rest.len() <= exact + 1 {
+        return all;
+    }
+    let mut loose = Hand::EMPTY;
+    for solver in solvers {
+        loose += solver.layout(rest).expect("loose layouts exist").loose;
+    }
+    let free: Hand = all.iter().filter(|&card| loose.contains(card)).collect();
+    if free.is_empty() {
+        return all;
+    }
+    let alone: Hand = free
+        .iter()
+        .filter(|&card| {
+            !loose.iter().any(|other| {
+                mates(card, other)
+                    && (prune == 2
+                        || live
+                            .distinct()
+                            .any(|(third, _)| mates(card, third) && mates(other, third)))
+            })
+        })
+        .collect();
+    if prune == 1 || alone.is_empty() {
+        free
+    } else {
+        alone
+    }
+}
+
+fn census(
+    rules: &Rules,
+    exposed: &[Meld],
+    hand: Hand,
+    live: Hand,
+    prune: u64,
+    exact: usize,
+) -> [u64; 3] {
+    let mut solvers = [1, 16].map(|cost| Solver::new(rules.concealed, Some(cost)).locked());
     let reaches = |exposed: &[Meld], hand, generals| {
         ceiling(rules, exposed, hand, live, generals).is_some_and(|hu| hu >= rules.threshold)
     };
@@ -45,7 +107,9 @@ fn census(rules: &Rules, exposed: &[Meld], hand: Hand, live: Hand) -> [u64; 3] {
                 let rest = hand - meld.cards().without(card);
                 let mut shown = exposed.clone();
                 shown.push(meld);
-                for (discard, _) in discardable(rest, Some(card)).distinct() {
+                for (discard, _) in
+                    discards(&mut solvers, rest, card, prune, exact, live).distinct()
+                {
                     let next = rest.without(discard);
                     let kept = *seen.entry((next, base(&shown))).or_insert_with(|| {
                         reaches(&shown, next, 1).then(|| {
@@ -68,6 +132,8 @@ fn main() {
     let rounds = args.next().flatten().unwrap_or(100);
     let seed = args.next().flatten().unwrap_or(0);
     let most = args.next().flatten().unwrap_or(20) as usize;
+    let prune = args.next().flatten().unwrap_or(0);
+    let exact = args.next().flatten().unwrap_or(0) as usize;
     let rules = Rules::new();
     let mut game = Game::new(rules, Seat::ALL[0]);
     let mut rng = SmallRng::seed_from_u64(seed);
@@ -97,7 +163,7 @@ fn main() {
                 .chain(view.offer().map(|offer| offer.card));
             let live = shown.fold(Hand::FULL - hand, Hand::without);
             let start = Instant::now();
-            let [nodes, sure, edges] = census(&rules, view.exposed(seat), hand, live);
+            let [nodes, sure, edges] = census(&rules, view.exposed(seat), hand, live, prune, exact);
             let row = &mut by_size[hand.len()];
             row[0] += 1;
             row[1] += nodes;
@@ -111,7 +177,9 @@ fn main() {
         game.settle(&result);
     }
 
-    println!("{rounds} rounds, seed {seed}: nodes reachable with the ceiling at the threshold");
+    println!(
+        "{rounds} rounds, seed {seed}, prune {prune} above {exact} cards: nodes reachable with the ceiling at the threshold"
+    );
     println!("\ncards  points  nodes/pt  sure/pt  edges/pt  max nodes  max edges  ms/pt");
     let mut total = [0u64; 7];
     for (size, row) in by_size.iter().enumerate().rev() {
