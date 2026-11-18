@@ -19,11 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   7,526 deals part, a win; h × 1.5 (seed base 1795088309) +0.076 ± 0.008,
   [+0.060, +0.093], 7,631 part, a win.  The two are within error of each
   other; the higher was declared the default.  That matches the gated
-  Monte Carlo's +0.070 ± 0.026 at a fraction of the cost.  Neither the
-  web nor the desktop client uses it yet.
+  Monte Carlo's +0.070 ± 0.026 at a fraction of the cost.
+- `ab/` takes `BASELINE_SAMPLES=<n>`: the control's seat 1 is then a
+  `MonteCarloBot` of n samples gated at `GATE_CARDS`, for a head to head
+  of two bots that each beat `HeuristicBot`.
 
 ### Changed
 
+- The desktop client's opponents are `ExpectBot`s gated at 10 cards
+  instead of 128-sample `MonteCarloBot`s: a decision at the gate takes
+  some 14 ms instead of 0.9 s.  Batch 4 of `doc/expectation.md`, head to
+  head in seat 1 against the gated Monte Carlo, the others `HeuristicBot`
+  (control `e123ba4`, `RESHUFFLE=0`, 100,000 deals declared before the
+  data, seed base 1794990944): +0.047 ± 0.019 points a deal, 95% CI
+  [+0.011, +0.084], 4,336 deals part, a win.
 - The `census` and `outlook` examples play their rounds on every core
   (`examples/common/mod.rs`), 11× and 8× faster on 16 threads, and print
   the same output as before at the same seed: each deals the same piles

@@ -9,17 +9,15 @@ use rand::{RngExt as _, SeedableRng as _};
 use serde::{Deserialize, Serialize};
 use tsap_oo::susik::{Card, Color, Hand, Meld, Rank, Solver};
 use tsap_oo::{
-    Claim, Event, Game, HeuristicBot, MonteCarloBot, Phase, Round, Rules, Seat, Strategy, Table,
-    View, discardable,
+    Claim, Event, ExpectBot, Game, HeuristicBot, Phase, Round, Rules, Seat, Strategy, Table, View,
+    discardable,
 };
 use wasm_bindgen::prelude::*;
 
 const HUMAN: Seat = Seat::ALL[0];
 
-/// The searching opponents' deals a decision, and the most concealed cards
-/// they search with: the one gate measured to beat the greedy bot
-/// (`research/gated-monte-carlo.md`)
-const SAMPLES: usize = 128;
+/// The most concealed cards the searching opponents search with: the one
+/// gate with an A/B verdict (`doc/expectation.md`, batch 3)
 const GATE_CARDS: usize = 10;
 
 /// What the human calls each seat, counting on from them in turn order
@@ -484,12 +482,7 @@ impl Core {
             if seat == HUMAN {
                 None
             } else if search {
-                // ponytail: one thread a decision, a second or so at the
-                // gate; fan the samples out over the cores if that drags.
-                let rng = StdRng::seed_from_u64(rng.random());
-                Some(Box::new(
-                    MonteCarloBot::new(rules, SAMPLES, rng).gated(GATE_CARDS, None),
-                ))
+                Some(Box::new(ExpectBot::new(rules).gated(GATE_CARDS)))
             } else {
                 Some(Box::new(HeuristicBot::new(rules)))
             }
@@ -657,10 +650,10 @@ impl WebGame {
 }
 
 impl WebGame {
-    /// [`WebGame::new`] with opponents that search: a [`MonteCarloBot`] of
-    /// 128 samples that searches with 10 concealed cards or fewer and plays
-    /// greedily before.  For the desktop client, as plain Rust; a search
-    /// takes a second or so of native code and several as wasm.
+    /// [`WebGame::new`] with opponents that search: an [`ExpectBot`] that
+    /// plays by the single-player DP with 10 concealed cards or fewer and
+    /// greedily before.  For the desktop client, as plain Rust; a decision
+    /// at the gate takes some 14 ms of native code, unmeasured as wasm.
     #[must_use]
     pub fn searching(seed: &str, settings: &str) -> Self {
         Self {

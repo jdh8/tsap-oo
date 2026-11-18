@@ -9,7 +9,10 @@
 //! the `MonteCarloBot` (`MonteCarloBot::gated`): it searches only with that
 //! many concealed cards or fewer, or within that 向聽數.  Set `EXPECT` to
 //! seat an `ExpectBot` instead, its measured h scaled by that factor (1.5 is `ExpectBot::new`'s) and gated at
-//! `GATE_CARDS` (default 10).
+//! `GATE_CARDS` (default 10).  Set `BASELINE_SAMPLES` to seat the control's
+//! `MonteCarloBot` of that many samples in seat 1 on the control side, gated
+//! at `GATE_CARDS` (default 10), in place of its `HeuristicBot`: a head to
+//! head of two bots that each beat it.
 //!
 //! Set `RESHUFFLE` to K to average out the luck after the two first part
 //! ways: the deal is played once with the candidate, and at its first choice
@@ -22,7 +25,6 @@
 mod peeker;
 
 use new::susik::Card;
-use old::Strategy as _;
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom as _;
@@ -85,6 +87,15 @@ fn candidate_bot(rules: &new::Rules, seed: u64) -> Box<dyn new::Strategy> {
     Box::new(new::MonteCarloBot::new(rules, n, rng).gated(cards, shanten))
 }
 
+fn baseline_bot(rules: &old::Rules, seed: u64) -> Option<Box<dyn old::Strategy>> {
+    let n = std::env::var("BASELINE_SAMPLES").ok()?.parse().unwrap();
+    let cards = std::env::var("GATE_CARDS").map_or(10, |s| s.parse().unwrap());
+    let rng = SmallRng::seed_from_u64(!seed);
+    Some(Box::new(
+        old::MonteCarloBot::new(rules, n, rng).gated(cards, None),
+    ))
+}
+
 fn to_new(claim: old::Claim) -> new::Claim {
     match claim {
         old::Claim::Pass => new::Claim::Pass,
@@ -116,6 +127,7 @@ fn play(
     let mut a = new::Round::from_pile(nr, new::Seat::ALL[dealer], deck.to_vec()).unwrap();
     let mut b = old::Round::from_pile(or, old::Seat::ALL[dealer], deck.to_vec()).unwrap();
     let mut bot = candidate_bot(&nr, seed);
+    let mut baseline = baseline_bot(&or, seed);
     let mut done: Vec<Act> = Vec::new();
     loop {
         let (s, t, claim) = match (a.phase(), b.phase()) {
@@ -125,9 +137,16 @@ fn play(
             phases => panic!("the rounds fell out of step: {phases:?}"),
         };
         assert_eq!(s.index(), t.index());
-        let control = || {
+        let mut control = || {
             let view = old::View::new(&b, t);
-            let mut bot = old::HeuristicBot::new(&or);
+            let mut heuristic;
+            let bot: &mut dyn old::Strategy = match baseline.as_deref_mut() {
+                Some(bot) if s.index() == CANDIDATE => bot,
+                _ => {
+                    heuristic = old::HeuristicBot::new(&or);
+                    &mut heuristic
+                }
+            };
             if claim {
                 Act::Claim(to_new(bot.claim(&view, &b.claim_options(t))))
             } else {
