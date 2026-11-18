@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `ExpectBot`: with 10 concealed cards or fewer it plays every claim and
+  discard by the single-player DP of `doc/expectation.md` (`Graph`), in
+  points; before that it plays as `HeuristicBot`.  Its table model is
+  `Outlook::default` with h × 1.5 (`END_SCALE`).  `ab/` seats it with
+  `EXPECT=<h scale>`.  Batch 3, against `b920a26` (`RESHUFFLE=8`, 100,000
+  deals each, declared before the data): measured h (seed base
+  1794988309) +0.071 ± 0.008 points a deal, 95% CI [+0.055, +0.087],
+  7,526 deals part, a win; h × 1.5 (seed base 1795088309) +0.076 ± 0.008,
+  [+0.060, +0.093], 7,631 part, a win.  The two are within error of each
+  other; the higher was declared the default.  That matches the gated
+  Monte Carlo's +0.070 ± 0.026 at a fraction of the cost.  Neither the
+  web nor the desktop client uses it yet.
+
 ### Changed
 
 - The `census` and `outlook` examples play their rounds on every core

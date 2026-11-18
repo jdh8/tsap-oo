@@ -267,7 +267,9 @@ mod playouts {
     use rand::SeedableRng as _;
     use rand::rngs::SmallRng;
     use susik::Meld;
-    use tsap_oo::{Event, Game, HeuristicBot, Phase, Rules, Seat, Step, Table, View};
+    use tsap_oo::{
+        Event, ExpectBot, Game, HeuristicBot, Phase, Rules, Seat, Step, Strategy, Table, View,
+    };
 
     /// Bots play out whole rounds; cards are conserved after every step,
     /// every win reaches the threshold, and none comes on a card the winner
@@ -283,11 +285,23 @@ mod playouts {
         playout(Rules::eight());
     }
 
+    /// The same with an `ExpectBot` in the second seat, which plays by the
+    /// DP once its hand is short
+    #[test]
+    fn expect_bot_finishes_rounds() {
+        let rules = Rules::new();
+        std::thread::scope(|scope| {
+            for seed in 0..4 {
+                scope.spawn(move || game(rules, 4052 + seed, 4, true));
+            }
+        });
+    }
+
     /// Eight games of 25 rounds, a thread each
     fn playout(rules: Rules) {
         let [wins, proven] = std::thread::scope(|scope| {
             let games: Vec<_> = (0..8)
-                .map(|seed| scope.spawn(move || game(rules, 2026 + seed)))
+                .map(|seed| scope.spawn(move || game(rules, 2026 + seed, 25, false)))
                 .collect();
             games.into_iter().fold([0, 0], |[wins, proven], game| {
                 let [w, p] = game.join().expect("a game panicked");
@@ -298,13 +312,18 @@ mod playouts {
         assert!(proven > 0, "no card was ever proven safe");
     }
 
-    /// Wins and the cards proven safe
-    fn game(rules: Rules, seed: u64) -> [usize; 2] {
+    /// Wins and the cards proven safe over `rounds`, with an `ExpectBot`
+    /// in the second seat if `expect`
+    fn game(rules: Rules, seed: u64, rounds: usize, expect: bool) -> [usize; 2] {
         let mut game = Game::new(rules, FIRST);
         let mut rng = SmallRng::seed_from_u64(seed);
         let (mut wins, mut exhausted, mut fouls, mut proven) = (0, 0, 0, 0);
-        for _ in 0..25 {
-            let bots = Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as _));
+        for _ in 0..rounds {
+            let mut bots =
+                Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as Box<dyn Strategy>));
+            if expect {
+                bots[1] = Some(Box::new(ExpectBot::new(&rules)));
+            }
             let mut table = Table::new(game.deal(&mut rng), bots);
             let mut safe = Seat::ALL.map(|_| susik::Hand::EMPTY);
             loop {
@@ -360,7 +379,7 @@ mod playouts {
                 None => exhausted += 1,
             }
         }
-        assert_eq!(wins + exhausted + fouls, 25);
+        assert_eq!(wins + exhausted + fouls, rounds);
         assert_eq!(game.scores().iter().sum::<i32>(), 0);
         [wins, proven]
     }

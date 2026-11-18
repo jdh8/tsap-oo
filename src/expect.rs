@@ -12,7 +12,7 @@
 //! card to come.
 
 use crate::ceiling::reach;
-use crate::{Rules, discardable};
+use crate::{Claim, ClaimOptions, HeuristicBot, Rules, Seat, Strategy, View, discardable};
 use std::collections::HashMap;
 use susik::{Card, Hand, Meld, Rank, Solver, locked_completions};
 
@@ -307,6 +307,181 @@ impl Graph {
             std::mem::swap(&mut before, &mut after);
         }
         before
+    }
+}
+
+/// What [`ExpectBot::new`] scales the measured h by
+// ponytail: the calibration's factor (`research/outlook.md`).  It and 1 both
+// beat `HeuristicBot` by the same margin within error (doc/expectation.md,
+// batch 3); this one scored higher.
+pub const END_SCALE: f64 = 1.5;
+
+/// A bot that plays by [`Graph`] while its hand is short and as
+/// [`HeuristicBot`] before
+///
+/// Inside the gate every answer is worth the best value, in points, of the
+/// hands it can leave after a discard; equals keep `HeuristicBot`'s order.
+#[derive(Debug, Clone)]
+pub struct ExpectBot {
+    policy: HeuristicBot,
+    outlook: Outlook,
+    /// The most concealed cards the bot plays by the DP with, once it has
+    /// discarded
+    cards: usize,
+}
+
+impl ExpectBot {
+    /// A bot for `rules` with [`Outlook::default`], its h scaled by
+    /// [`END_SCALE`], gated at 10 cards
+    #[must_use]
+    pub fn new(rules: &Rules) -> Self {
+        let mut outlook = Outlook::default();
+        outlook.end.iter_mut().for_each(|h| *h *= END_SCALE);
+        Self {
+            policy: HeuristicBot::new(rules),
+            outlook,
+            cards: 10,
+        }
+    }
+
+    /// The same bot with another table model
+    #[must_use]
+    pub fn with_outlook(mut self, outlook: Outlook) -> Self {
+        self.outlook = outlook;
+        self
+    }
+
+    /// The same bot playing by the DP with `cards` concealed cards or fewer
+    /// once it has discarded, as [`MonteCarloBot::gated`](crate::MonteCarloBot)
+    #[must_use]
+    pub const fn gated(mut self, cards: usize) -> Self {
+        self.cards = cards;
+        self
+    }
+
+    /// The cards `view`'s seat has not seen, and the 胡 of its exposed melds
+    fn table(view: &View<'_>) -> (Hand, u32) {
+        let shown = Seat::ALL
+            .into_iter()
+            .flat_map(|seat| view.exposed(seat))
+            .flat_map(|meld| meld.cards())
+            .chain(view.discards().iter().map(|&(_, card)| card))
+            .chain(view.offer().map(|offer| offer.card));
+        let live = shown.fold(Hand::FULL - view.hand(), Hand::without);
+        let rules = view.rules();
+        let base = view
+            .exposed(view.seat())
+            .iter()
+            .map(|meld| rules.exposed.score(meld))
+            .sum();
+        (live, base)
+    }
+
+    /// The value of each group of roots: the best of its nodes
+    // ponytail: a drawn offer counts one public card fewer than is left;
+    // `Graph::values` takes draws, not cards.
+    fn values(&self, view: &View<'_>, live: Hand, groups: &[Vec<(Hand, u32)>]) -> Vec<f64> {
+        let roots: Vec<_> = groups.iter().flatten().copied().collect();
+        let graph = Graph::new(view.rules(), live, &roots, Prune::default());
+        let draws = view.pile_len().saturating_sub(view.rules().dead_tail);
+        let values = graph.values(&self.outlook, draws, Payoff::Points);
+        let mut nodes = graph.roots().iter();
+        groups
+            .iter()
+            .map(|group| {
+                nodes
+                    .by_ref()
+                    .take(group.len())
+                    .map(|&node| values[node])
+                    .fold(f64::NEG_INFINITY, f64::max)
+            })
+            .collect()
+    }
+
+    /// The answers to the offer, best first, each with its value in points;
+    /// outside the gate `HeuristicBot`'s, with its grades
+    pub fn claims(&mut self, view: &View<'_>, options: &ClaimOptions) -> Vec<(Claim, f64)> {
+        let graded = self.policy.claims(view, options);
+        let hand = view.hand();
+        if hand.len() > self.cards {
+            return graded
+                .into_iter()
+                .map(|(claim, grade)| (claim, f64::from(grade)))
+                .collect();
+        }
+        let card = view.offer().expect("claims answer an offer").card;
+        // `HeuristicBot` leaves some eats out; the DP weighs them all.
+        let mut claims: Vec<Claim> = graded.into_iter().map(|(claim, _)| claim).collect();
+        let every = (!options.forced())
+            .then_some(Claim::Pass)
+            .into_iter()
+            .chain(options.pong.then_some(Claim::Pong))
+            .chain(options.eats.iter().map(|&meld| Claim::Eat(meld)));
+        for claim in every {
+            if !claims.contains(&claim) {
+                claims.push(claim);
+            }
+        }
+        let (live, base) = Self::table(view);
+        let exposed = view.rules().exposed;
+        let groups: Vec<Vec<(Hand, u32)>> = claims
+            .iter()
+            .map(|&claim| {
+                let meld = match claim {
+                    Claim::Pass => return vec![(hand, base)],
+                    Claim::Pong => Meld::Triplet(card),
+                    Claim::Eat(meld) => meld,
+                };
+                let rest = hand - meld.cards().without(card);
+                let base = base + exposed.score(&meld);
+                discardable(rest, Some(card))
+                    .distinct()
+                    .map(|(discard, _)| (rest.without(discard), base))
+                    .collect()
+            })
+            .collect();
+        rank(claims, self.values(view, live, &groups))
+    }
+
+    /// The legal discards, best first, each with its value in points;
+    /// outside the gate `HeuristicBot`'s, with its grades
+    pub fn discards(&mut self, view: &View<'_>) -> Vec<(Card, f64)> {
+        let graded = self.policy.discards(view);
+        let hand = view.hand();
+        if hand.len() > self.cards + 1 {
+            return graded
+                .into_iter()
+                .map(|(card, grade)| (card, f64::from(grade)))
+                .collect();
+        }
+        let (live, base) = Self::table(view);
+        let cards: Vec<Card> = graded.into_iter().map(|(card, _)| card).collect();
+        let groups: Vec<_> = cards
+            .iter()
+            .map(|&card| vec![(hand.without(card), base)])
+            .collect();
+        rank(cards, self.values(view, live, &groups))
+    }
+}
+
+/// `actions` with their values, best first; equals keep their order
+fn rank<A>(actions: Vec<A>, values: Vec<f64>) -> Vec<(A, f64)> {
+    let mut ranked: Vec<_> = actions.into_iter().zip(values).collect();
+    ranked.sort_by(|a, b| b.1.total_cmp(&a.1));
+    ranked
+}
+
+impl Strategy for ExpectBot {
+    fn claim(&mut self, view: &View<'_>, options: &ClaimOptions) -> Claim {
+        self.claims(view, options)[0].0
+    }
+
+    fn discard(&mut self, view: &View<'_>) -> Card {
+        self.discards(view)[0].0
+    }
+
+    fn name(&self) -> &str {
+        "expect"
     }
 }
 

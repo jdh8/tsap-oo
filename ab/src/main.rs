@@ -7,7 +7,9 @@
 //! seat a `MonteCarloBot` of that many samples as the candidate instead, and
 //! `PEEK` as well to seat the Peeker.  `GATE_CARDS` and `GATE_SHANTEN` gate
 //! the `MonteCarloBot` (`MonteCarloBot::gated`): it searches only with that
-//! many concealed cards or fewer, or within that 向聽數.
+//! many concealed cards or fewer, or within that 向聽數.  Set `EXPECT` to
+//! seat an `ExpectBot` instead, its measured h scaled by that factor (1.5 is `ExpectBot::new`'s) and gated at
+//! `GATE_CARDS` (default 10).
 //!
 //! Set `RESHUFFLE` to K to average out the luck after the two first part
 //! ways: the deal is played once with the candidate, and at its first choice
@@ -58,6 +60,15 @@ enum Outcome {
 }
 
 fn candidate_bot(rules: &new::Rules, seed: u64) -> Box<dyn new::Strategy> {
+    let gate = |name| std::env::var(name).ok().map(|s| s.parse().unwrap());
+    // `EXPECT` puts an ExpectBot in the candidate seat, h scaled by it.
+    if let Ok(scale) = std::env::var("EXPECT") {
+        let scale: f64 = scale.parse().unwrap();
+        let mut outlook = new::Outlook::default();
+        outlook.end.iter_mut().for_each(|h| *h *= scale);
+        let bot = new::ExpectBot::new(rules).with_outlook(outlook);
+        return Box::new(bot.gated(gate("GATE_CARDS").unwrap_or(10)));
+    }
     // `SAMPLES` puts a MonteCarloBot in the candidate seat, its rng
     // derived from the deal's seed so a deal replays.
     let Ok(n) = std::env::var("SAMPLES") else {
@@ -69,7 +80,6 @@ fn candidate_bot(rules: &new::Rules, seed: u64) -> Box<dyn new::Strategy> {
         return Box::new(peeker::Peeker::new(rules, n, rng));
     }
     // `GATE_CARDS` and `GATE_SHANTEN` are `MonteCarloBot::gated`'s two.
-    let gate = |name| std::env::var(name).ok().map(|s| s.parse().unwrap());
     let cards = gate("GATE_CARDS").unwrap_or(usize::MAX);
     let shanten = gate("GATE_SHANTEN").map(|n| n as u32);
     Box::new(new::MonteCarloBot::new(rules, n, rng).gated(cards, shanten))

@@ -15,7 +15,7 @@ pub mod view;
 
 pub use ceiling::ceiling;
 pub use driver::{Step, Table};
-pub use expect::{Discards, Graph, Outlook, Payoff, Prune};
+pub use expect::{Discards, ExpectBot, Graph, Outlook, Payoff, Prune};
 pub use game::Game;
 pub use heuristic::{HeuristicBot, Terms};
 #[cfg(feature = "rand")]
