@@ -37,6 +37,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `expect`: the single-player DP of `doc/expectation.md`, batch 1.
+  `Graph::new` lays out every (hand, exposed 胡) a chain of claims reaches
+  from the roots of one decision, pruned by the ceiling and optionally by
+  discard (`Prune`, `Discards`); `Graph::values` sweeps it once per public
+  card to come under an `Outlook` of the other seats, in points or as the
+  chance to win (`Payoff`).  Tested against a brute-force expansion of the
+  recurrence that judges claims by the round's own rules.  No bot uses it
+  yet.  `examples/nodes.rs` now builds it at every discard of
+  `HeuristicBot` self-play (200 rounds, seed 2): a decision left with 10
+  cards builds in 13.0 ms and sweeps in 0.9 ms, within the 50 ms gate
+  declared before; 12 cards take 52 ms and 13 take 132 ms.  Pruning the
+  discards changes the best root in 1% to 8% of decisions at about 0.02
+  points each, so the default prunes none (`research/dp-nodes.md`).
+  `ab/run.sh 200000` against `7d3157a` (seed base 1794971744): 0 deals
+  part.
 - The pair rule in `draw`, measured and not shipped (`doc/hu-ceiling.md`,
   batch 4): `HeuristicBot::draw` leaving out the pair eats that
   `claims` leaves out since batch 3.  `ab/run.sh 400000` against

@@ -2,8 +2,8 @@
 
 寫於 2026-11-18，基準 `7034b41`。這份文件接手 `doc/stronger-bot.md` 路線三：
 核心是一個算「這一手牌還值幾分」的動態規劃，只在手牌短的時候開；應用一個
-一個掛上去，各自有閘門。還沒有任何程式，下面的成本除了註明「量過」的都是
-估計。
+一個掛上去，各自有閘門。批次 1 的核心在 `src/expect.rs`；下面的成本除了
+註明「量過」的都是估計。
 
 ## 要回答的問題
 
@@ -23,13 +23,19 @@
 | 批次 | 產出 | 改變打法 | 閘門 | 狀態 |
 | --- | --- | --- | --- | --- |
 | 0 | 這份文件 | 否 | 無 | 完成 |
-| 1 | 核心：圖、掃描、測試、計時 | 否，要量到零分歧 | 測試全過；10 張平均 50 毫秒以內 | 未開始 |
+| 1 | 核心：圖、掃描、測試、計時 | 否，要量到零分歧 | 測試全過；10 張平均 50 毫秒以內 | 完成：14 毫秒 |
 | 2 | 牌桌模型的四個常數，從自對局量 | 否 | 預測的胡牌率對得上實際的（見「校準」） | 未開始 |
 | 3 | `ExpectBot`，10 張的閘門，A/B | 候選 | win 才 commit | 未開始 |
 | 4 | 應用，見下表 | 各自 | 批次 3 是 win | 未開始 |
 
 批次 1 的 50 毫秒是預先宣告的：普查 10 張是 11 毫秒，核心若慢過它五倍，
 表示下面的成本估計錯了，要先弄清楚再往下做。
+
+批次 1 量到（`research/dp-nodes.md`「一個決定的圖」，200 局，seed 2）：
+打掉之後 10 張的一個打牌決定，從每一張能打的牌建一張共用的圖，建圖 13.0
+毫秒、掃描 0.9 毫秒；12 張 52 毫秒，13 張 132 毫秒。閘門過了，所以四個常數
+可以開始量。`ab/run.sh 200000`（seed base 1794971744，對照 `7d3157a`）讀到
+0 局分歧：沒有 bot 呼叫這個模組。
 
 ## 模型
 
@@ -107,7 +113,7 @@ t 是這一局還會出現幾張公開的牌，V(s, t) 是這個狀態值幾分�
 | 20 | 7.0 × 10⁵ | 5.8 × 10⁷ | 22 秒 | 用不起 |
 
 所以 `research/dp-nodes.md` 說的「剩幾次機會是個約 60 的乘數」只乘在掃描
-上，不乘在建圖上。這是這份設計最需要批次 1 驗證的一句話。
+上，不乘在建圖上。批次 1 量過：掃描是建圖的 6% 到 9%。
 
 ### 根節點
 
@@ -170,18 +176,20 @@ h 之後最該加的維度是別家最短的暗牌張數（`View::concealed_len`
 
 ## 程式的形狀
 
-一個模組 `src/expect.rs`，三樣東西，名字是提議：
+一個模組 `src/expect.rs`。`Outlook`、`Graph` 與 `Payoff` 批次 1 已經寫了，
+`ExpectBot` 還是提議：
 
 ```rust
-/// The table as one seat models it: the four constants above
-pub struct Outlook { /* h, L, e, cards shown per draw */ }
+/// The table as one seat models it: h, L, and e for generals and the rest
+pub struct Outlook { pub end: f64, pub loss: f64, pub eat: f64, pub general: f64 }
 
-/// The hands a chain of claims can reach from one decision, and the edges
-/// between them; built once a decision
+/// The hands a chain of claims can reach from the roots of one decision,
+/// each a settled hand and its exposed 胡, and the edges between them
 pub struct Graph { /* nodes, flat edges */ }
 
 impl Graph {
-    pub fn new(rules: &Rules, exposed: &[Meld], hand: Hand, live: Hand) -> Self;
+    pub fn new(rules: &Rules, live: Hand, roots: &[(Hand, u32)], prune: Prune) -> Self;
+    pub fn roots(&self) -> &[usize];
 
     /// The value of every node with `cards` public cards to come, under
     /// `payoff`: points for the bot, 1 for a win to get its probability
@@ -198,6 +206,11 @@ impl ExpectBot {
 impl Strategy for ExpectBot { /* the first of each */ }
 ```
 
+- 每摸一張的公開牌數不在 `Outlook` 裡：它只用來在根把牌堆換成 T，
+  `ExpectBot` 寫的時候和它一起加。
+- `Prune` 有兩項：天花板用幾張外來的將帥（`None` 不剪），以及
+  `research/dp-nodes.md` 的四種棄牌剪法（`Discards`）。預設是 1 張將帥、
+  不剪棄牌：10 張的閘門用不著剪，剪了每個決定約少 0.02 分。
 - `claims` 與 `discards` 的形狀照 `HeuristicBot` 的同名函式，最好的排第一，
   所以網頁的提示換一個型別就能用，分數的單位從評分變成分。
 - 閘門照 `MonteCarloBot::gated` 的第一個條件：棄牌之後的暗牌張數。閘門外
@@ -208,13 +221,20 @@ impl Strategy for ExpectBot { /* the first of each */ }
 
 ### 測試
 
+`src/expect.rs` 的測試，批次 1：
+
 - **算得出來的手。** 聽一種牌、`live` 裡有 k 張、總共 n 張、h = 0：
   V = 3 × 胡數 ×（1 −（1 − k∕n）ᵗ）。
-- **對暴力解。** 6 張以下的手，不建圖、直接照遞迴展開，兩者逐位相同。
-- **單調。** h = 0 時 V 隨 t 不減；`live` 多一張要的牌時 V 不減。
-- **剪枝無損。** 小手牌上不剪枝的值與剪枝的相同（`generals` 取 `live` 裡
-  將帥的張數時）。
-- **合法。** `tests/round.rs` 的四人對局裡放一家 `ExpectBot`，打完不犯規。
+- **對暴力解。** 6 張以下的手，不建圖、直接照遞迴展開，吃碰由
+  `round.rs` 的 `options` 判定；兩者相差 10⁻⁹ 以內（加法的順序不同，不是
+  逐位相同）。
+- **單調。** h = 0、沒有三張、不吃將帥時，胡牌機率隨 t 不減，而且在 0 與 1
+  之間。「`live` 多一張要的牌時 V 不減」拿掉了：多一張要的牌也讓別的牌的
+  機率變小，它不是定理。
+- **剪枝無損。** 天花板取 `live` 裡全部將帥的張數時，剪與不剪的胡牌機率
+  相同。要不吃將帥：`live` 固定在根，一張將帥可以被吃好幾次，天花板只算
+  一次。
+- **合法**，批次 3。 `tests/round.rs` 的四人對局裡放一家 `ExpectBot`，打完不犯規。
 
 ## 應用
 
@@ -315,7 +335,7 @@ A/B。
 
 ## 未決問題
 
-- 掃描真的比建圖便宜嗎？（批次 1）
+- ~~掃描真的比建圖便宜嗎？~~ 是，十幾倍（批次 1）。
 - 四個常數夠不夠？校準的偏差落在哪一個？（批次 2）
 - 沒有取樣雜訊、之後照最佳打，值不值 Monte Carlo 的 +0.070 以上？還是
   單人的假設把它吃掉了？（批次 3）

@@ -1,130 +1,100 @@
-//! How big the single-player DP of `doc/stronger-bot.md` (route 3) would
-//! be: from every settled hand of `HeuristicBot` self-play, the sub-hands a
-//! chain of claims and discards could reach while [`ceiling`] still reaches
-//! the threshold, and the edges between them.
+//! What the single-player DP of `doc/expectation.md` costs a decision: at
+//! every discard of `HeuristicBot` self-play, the [`Graph`] from each
+//! discard the hand may make, its size, the time to build it and to sweep
+//! it over the public cards left.
 //!
-//! A node is (concealed hand, 胡 still needed); the cards not yet seen are
-//! fixed at the root, as the DP would fix them.  An edge claims one such
-//! card into a meld and discards one card.  A node is kept when the ceiling
-//! with one general from outside reaches the threshold; those that reach it
-//! with none are counted too.
+//! With a pruning of the discards, it also builds the graph that tries
+//! them all and reports how often the best root differs and what that
+//! costs by the unpruned values.
 //!
 //! ```sh
-//! cargo run --release --example nodes -- [rounds] [seed] [most cards in hand] [prune] [exact]
+//! cargo run --release --example nodes -- [rounds] [seed] [most cards after the discard] [discards 0-3]
 //! ```
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
-use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
-use tsap_oo::susik::{Card, Hand, Meld, Rank, Solver, locked_completions};
+use tsap_oo::susik::Hand;
 use tsap_oo::{
-    Game, HeuristicBot, Phase, Rules, Seat, Step, Strategy, Table, View, ceiling, discardable,
+    Discards, Game, Graph, HeuristicBot, Outlook, Payoff, Phase, Prune, Rules, Seat, Step,
+    Strategy, Table, View, discardable,
 };
 
-/// Nodes kept with one general from outside, nodes that need none, edges
-/// Whether two loose cards wait on a third to make a meld
-fn mates(a: Card, b: Card) -> bool {
-    let court = |rank| matches!(rank, Rank::General | Rank::Advisor | Rank::Elephant);
-    match (a.rank, b.rank) {
-        (Rank::Soldier, Rank::Soldier) => a.color != b.color,
-        (Rank::Soldier, _) | (_, Rank::Soldier) => false,
-        (x, y) => a.color == b.color && x != y && court(x) == court(y),
-    }
-}
+// ponytail: guesses until batch 2 measures the four constants from
+// self-play; they set the values compared, not the sizes or the times.
+const OUTLOOK: Outlook = Outlook {
+    end: 0.015,
+    loss: -12.0,
+    eat: 0.45,
+    general: 0.25,
+};
+const PER_DRAW: f64 = 1.3;
 
-/// The discards a node tries.  `prune` 0: all of them.  1: only the cards
-/// loose in one of the two layouts `HeuristicBot` grades, when there are
-/// any.  2: of those, only the ones no other loose card goes with, when
-/// there are any.  3: as 2, but two loose cards go together only while a
-/// card that finishes them is live.  A hand left with `exact` cards or fewer tries them all.
-fn discards(
-    solvers: &mut [Solver; 2],
-    rest: Hand,
-    locked: Card,
-    prune: u64,
-    exact: usize,
-    live: Hand,
-) -> Hand {
-    let all = discardable(rest, Some(locked));
-    if prune == 0 || rest.len() <= exact + 1 {
-        return all;
-    }
-    let mut loose = Hand::EMPTY;
-    for solver in solvers {
-        loose += solver.layout(rest).expect("loose layouts exist").loose;
-    }
-    let free: Hand = all.iter().filter(|&card| loose.contains(card)).collect();
-    if free.is_empty() {
-        return all;
-    }
-    let alone: Hand = free
+/// The node of the best root and its value
+fn best(graph: &Graph, values: &[f64]) -> (usize, f64) {
+    graph
+        .roots()
         .iter()
-        .filter(|&card| {
-            !loose.iter().any(|other| {
-                mates(card, other)
-                    && (prune == 2
-                        || live
-                            .distinct()
-                            .any(|(third, _)| mates(card, third) && mates(other, third)))
-            })
-        })
-        .collect();
-    if prune == 1 || alone.is_empty() {
-        free
-    } else {
-        alone
-    }
+        .enumerate()
+        .map(|(i, &node)| (i, values[node]))
+        .fold((0, f64::NEG_INFINITY), |a, b| if b.1 > a.1 { b } else { a })
 }
 
-fn census(
-    rules: &Rules,
-    exposed: &[Meld],
-    hand: Hand,
-    live: Hand,
-    prune: u64,
-    exact: usize,
-) -> [u64; 3] {
-    let mut solvers = [1, 16].map(|cost| Solver::new(rules.concealed, Some(cost)).locked());
-    let reaches = |exposed: &[Meld], hand, generals| {
-        ceiling(rules, exposed, hand, live, generals).is_some_and(|hu| hu >= rules.threshold)
-    };
-    let base =
-        |exposed: &[Meld]| -> u32 { exposed.iter().map(|meld| rules.exposed.score(meld)).sum() };
-    // By (hand, exposed 胡): kept with whether it needs no general, or dropped
-    let mut seen = HashMap::new();
-    let mut queue = VecDeque::new();
-    let mut edges = 0;
-    if reaches(exposed, hand, 1) {
-        seen.insert((hand, base(exposed)), Some(reaches(exposed, hand, 0)));
-        queue.push_back((hand, exposed.to_vec()));
+#[derive(Default)]
+struct Row {
+    decisions: u64,
+    roots: u64,
+    nodes: u64,
+    edges: u64,
+    most_nodes: u64,
+    build: f64,
+    sweep: f64,
+    /// Decisions whose best root the pruning changes
+    changed: u64,
+    /// What the pruned choice gives up by the unpruned values
+    regret: f64,
+    most_regret: f64,
+    /// Unpruned less pruned value of the best root
+    bias: f64,
+}
+
+impl Row {
+    fn add(&mut self, other: &Self) {
+        self.decisions += other.decisions;
+        self.roots += other.roots;
+        self.nodes += other.nodes;
+        self.edges += other.edges;
+        self.most_nodes = self.most_nodes.max(other.most_nodes);
+        self.build += other.build;
+        self.sweep += other.sweep;
+        self.changed += other.changed;
+        self.regret += other.regret;
+        self.most_regret = self.most_regret.max(other.most_regret);
+        self.bias += other.bias;
     }
-    while let Some((hand, exposed)) = queue.pop_front() {
-        for (card, _) in live.distinct() {
-            for meld in locked_completions(hand, card) {
-                if matches!(meld, Meld::Pair(_)) && card.rank == Rank::General {
-                    continue;
-                }
-                let rest = hand - meld.cards().without(card);
-                let mut shown = exposed.clone();
-                shown.push(meld);
-                for (discard, _) in
-                    discards(&mut solvers, rest, card, prune, exact, live).distinct()
-                {
-                    let next = rest.without(discard);
-                    let kept = *seen.entry((next, base(&shown))).or_insert_with(|| {
-                        reaches(&shown, next, 1).then(|| {
-                            queue.push_back((next, shown.clone()));
-                            reaches(&shown, next, 0)
-                        })
-                    });
-                    edges += u64::from(kept.is_some());
-                }
-            }
+
+    fn print(&self, label: &str, compare: bool) {
+        let per = |n: f64| n / self.decisions as f64;
+        print!(
+            "{label:>5}  {:6}  {:5.1}  {:8.1}  {:9.1}  {:9}  {:8.2}  {:8.2}",
+            self.decisions,
+            per(self.roots as f64),
+            per(self.nodes as f64),
+            per(self.edges as f64),
+            self.most_nodes,
+            per(self.build) * 1e3,
+            per(self.sweep) * 1e3,
+        );
+        if compare {
+            print!(
+                "  {:6.2}%  {:7.4}  {:7.3}  {:7.4}",
+                per(self.changed as f64) * 100.0,
+                per(self.regret),
+                self.most_regret,
+                per(self.bias),
+            );
         }
+        println!();
     }
-    let kept = seen.values().flatten();
-    let sure = kept.clone().filter(|&&sure| sure).count() as u64;
-    [kept.count() as u64, sure, edges]
 }
 
 fn main() {
@@ -132,14 +102,22 @@ fn main() {
     let rounds = args.next().flatten().unwrap_or(100);
     let seed = args.next().flatten().unwrap_or(0);
     let most = args.next().flatten().unwrap_or(20) as usize;
-    let prune = args.next().flatten().unwrap_or(0);
-    let exact = args.next().flatten().unwrap_or(0) as usize;
+    let discards = match args.next().flatten().unwrap_or(0) {
+        0 => Discards::All,
+        1 => Discards::Loose,
+        2 => Discards::Alone,
+        _ => Discards::Live,
+    };
+    let prune = Prune {
+        discards,
+        ..Prune::default()
+    };
+    let compare = discards != Discards::All;
     let rules = Rules::new();
     let mut game = Game::new(rules, Seat::ALL[0]);
     let mut rng = SmallRng::seed_from_u64(seed);
-    // By cards in hand: points, nodes, sure nodes, edges, most nodes, most
-    // edges, nanoseconds
-    let mut by_size = [[0u64; 7]; 21];
+    // By cards in hand after the discard
+    let mut by_size: Vec<Row> = (0..21).map(|_| Row::default()).collect();
 
     for _ in 0..rounds {
         let round = game.deal(&mut rng);
@@ -147,65 +125,77 @@ fn main() {
             Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as Box<dyn Strategy>));
         let mut table = Table::new(round, bots);
         loop {
-            let step = table.step().expect("bots act legally");
-            let Step::Acted(seat) = step else { break };
             let round = table.round();
-            let view = View::new(round, seat);
-            let hand = view.hand();
-            if round.phase() == Phase::Discard(seat) || hand.len() > most {
-                continue;
+            if let Phase::Discard(seat) = round.phase() {
+                let view = View::new(round, seat);
+                let hand = view.hand();
+                if hand.len() <= most + 1 {
+                    let base = view
+                        .exposed(seat)
+                        .iter()
+                        .map(|meld| rules.exposed.score(meld))
+                        .sum();
+                    let roots: Vec<(Hand, u32)> = discardable(hand, view.locked())
+                        .distinct()
+                        .map(|(card, _)| (hand.without(card), base))
+                        .collect();
+                    let shown = Seat::ALL
+                        .into_iter()
+                        .flat_map(|seat| view.exposed(seat))
+                        .flat_map(|meld| meld.cards())
+                        .chain(view.discards().iter().map(|&(_, card)| card));
+                    let live = shown.fold(Hand::FULL - hand, Hand::without);
+                    let cards =
+                        ((view.pile_len() - rules.dead_tail) as f64 * PER_DRAW).round() as usize;
+
+                    let start = Instant::now();
+                    let graph = Graph::new(&rules, live, &roots, prune);
+                    let built = start.elapsed().as_secs_f64();
+                    let values = graph.values(&OUTLOOK, cards, Payoff::Points);
+                    let row = &mut by_size[hand.len() - 1];
+                    row.decisions += 1;
+                    row.roots += roots.len() as u64;
+                    row.nodes += graph.len() as u64 - 1;
+                    row.edges += graph.edges() as u64;
+                    row.most_nodes = row.most_nodes.max(graph.len() as u64 - 1);
+                    row.build += built;
+                    row.sweep += start.elapsed().as_secs_f64() - built;
+
+                    if compare {
+                        let whole = Graph::new(&rules, live, &roots, Prune::default());
+                        let full = whole.values(&OUTLOOK, cards, Payoff::Points);
+                        let (choice, value) = best(&graph, &values);
+                        let (right, top) = best(&whole, &full);
+                        let regret = top - full[whole.roots()[choice]];
+                        row.changed += u64::from(choice != right && regret > 0.0);
+                        row.regret += regret;
+                        row.most_regret = row.most_regret.max(regret);
+                        row.bias += top - value;
+                    }
+                }
             }
-            let shown = Seat::ALL
-                .into_iter()
-                .flat_map(|seat| view.exposed(seat))
-                .flat_map(|meld| meld.cards())
-                .chain(view.discards().iter().map(|&(_, card)| card))
-                .chain(view.offer().map(|offer| offer.card));
-            let live = shown.fold(Hand::FULL - hand, Hand::without);
-            let start = Instant::now();
-            let [nodes, sure, edges] = census(&rules, view.exposed(seat), hand, live, prune, exact);
-            let row = &mut by_size[hand.len()];
-            row[0] += 1;
-            row[1] += nodes;
-            row[2] += sure;
-            row[3] += edges;
-            row[4] = row[4].max(nodes);
-            row[5] = row[5].max(edges);
-            row[6] += start.elapsed().as_nanos() as u64;
+            let step = table.step().expect("bots act legally");
+            let Step::Acted(_) = step else { break };
         }
         let result = table.round().result().expect("finished").clone();
         game.settle(&result);
     }
 
     println!(
-        "{rounds} rounds, seed {seed}, prune {prune} above {exact} cards: nodes reachable with the ceiling at the threshold"
+        "{rounds} rounds, seed {seed}, {discards:?} discards: a graph from every discard of a decision"
     );
-    println!("\ncards  points  nodes/pt  sure/pt  edges/pt  max nodes  max edges  ms/pt");
-    let mut total = [0u64; 7];
+    print!("\ncards  points  roots  nodes/pt   edges/pt  max nodes  build ms  sweep ms");
+    if compare {
+        print!("  changed  regret  max reg  bias");
+    }
+    println!();
+    let mut total = Row::default();
     for (size, row) in by_size.iter().enumerate().rev() {
-        if row[0] == 0 {
+        if row.decisions == 0 {
             continue;
         }
-        for (t, r) in total.iter_mut().zip(row) {
-            *t += r;
-        }
-        total[4] = total[4].max(row[4]);
-        total[5] = total[5].max(row[5]);
-        print(&size.to_string(), row);
+        total.add(row);
+        row.print(&size.to_string(), compare);
     }
-    print("all", &total);
-}
-
-fn print(label: &str, row: &[u64; 7]) {
-    let per = |n: u64| n as f64 / row[0] as f64;
-    println!(
-        "{label:>5}  {:6}  {:8.1}  {:7.1}  {:8.1}  {:9}  {:9}  {:6.2}",
-        row[0],
-        per(row[1]),
-        per(row[2]),
-        per(row[3]),
-        row[4],
-        row[5],
-        per(row[6]) / 1e6,
-    );
+    total.print("all", compare);
 }
