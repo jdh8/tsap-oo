@@ -26,6 +26,8 @@ from any browser's.
 cargo run --release
 ```
 
+From the repository root, `cargo desktop` is the same command.
+
 No Tauri CLI and no wasm build are needed: `cargo` embeds the three files
 `tauri.conf.json` lists.  A change to `web/` shows after the next build.
 

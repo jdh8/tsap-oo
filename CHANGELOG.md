@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `cargo desktop`, an alias in `.cargo/config.toml` that runs the desktop
+  client from the repository root (`cd tauri && cargo run --release`).
 - `ExpectBot`: with 10 concealed cards or fewer it plays every claim and
   discard by the single-player DP of `doc/expectation.md` (`Graph`), in
   points; before that it plays as `HeuristicBot`.  Its table model is

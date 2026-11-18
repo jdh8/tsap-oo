@@ -15,7 +15,8 @@ the Taiwanese reading, which no other game shares.
 
 Play it in the browser at [jdh8.github.io/tsap-oo][web]; the front end in
 [`web/`](web/) is the engine compiled to WebAssembly.  [`tauri/`](tauri/)
-puts the same page in a desktop window, against opponents that search.
+puts the same page in a desktop window, against opponents that search:
+`cargo desktop` from the repository root.
 
 [susik]: https://github.com/jdh8/susik
 [web]: https://jdh8.github.io/tsap-oo/
