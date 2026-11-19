@@ -3,6 +3,7 @@
 
 pub mod ceiling;
 pub mod driver;
+pub mod eval;
 pub mod expect;
 pub mod game;
 pub mod heuristic;
@@ -15,6 +16,7 @@ pub mod view;
 
 pub use ceiling::ceiling;
 pub use driver::{Step, Table};
+pub use eval::Eval;
 pub use expect::{Discards, ExpectBot, Graph, Outlook, Payoff, Prune};
 pub use game::Game;
 pub use heuristic::{HeuristicBot, Terms};

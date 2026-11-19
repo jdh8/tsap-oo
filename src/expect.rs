@@ -177,6 +177,8 @@ pub struct Graph {
     bases: Vec<u32>,
     /// The nodes [`Prune::depth`] leaves unexpanded, in order
     leaves: Vec<usize>,
+    /// The fewest claims from a root to each node
+    depths: Vec<u32>,
     /// Each node's entries end here in `entries`
     ends: Vec<u32>,
     entries: Vec<Entry>,
@@ -203,13 +205,13 @@ impl Graph {
             layouts: [1, 16].map(|cost| Solver::new(rules.concealed, Some(cost)).locked()),
             index: HashMap::new(),
             depth: 0,
-            depths: vec![0],
             graph: Self {
                 threshold: rules.threshold,
                 roots: Vec::new(),
                 hands: vec![Hand::EMPTY],
                 bases: vec![0],
                 leaves: Vec::new(),
+                depths: vec![0],
                 ends: Vec::new(),
                 entries: Vec::new(),
                 groups: Vec::new(),
@@ -226,12 +228,15 @@ impl Graph {
         let mut node = 1;
         // Breadth first, so a node's depth is its fewest claims from a root
         while node < build.graph.hands.len() {
-            if prune.depth.is_some_and(|depth| build.depths[node] >= depth) {
+            if prune
+                .depth
+                .is_some_and(|depth| build.graph.depths[node] >= depth)
+            {
                 build.graph.leaves.push(node);
                 build.graph.ends.push(build.graph.entries.len() as u32);
                 build.graph.rest.push(1.0);
             } else {
-                build.depth = build.depths[node] + 1;
+                build.depth = build.graph.depths[node] + 1;
                 build.expand(node);
             }
             node += 1;
@@ -267,6 +272,13 @@ impl Graph {
     #[must_use]
     pub fn leaves(&self) -> &[usize] {
         &self.leaves
+    }
+
+    /// The fewest claims from a root to `node`, 0 for the node that cannot
+    /// win
+    #[must_use]
+    pub fn depth(&self, node: usize) -> u32 {
+        self.depths[node]
     }
 
     /// The concealed hand and exposed 胡 of `node`
@@ -591,8 +603,6 @@ struct Build<'a> {
     index: HashMap<(Hand, u32), u32>,
     /// The depth of the nodes being added
     depth: u32,
-    /// The depth of each node
-    depths: Vec<u32>,
     graph: Graph,
 }
 
@@ -609,7 +619,7 @@ impl Build<'_> {
         let node = if reaches {
             self.graph.hands.push(hand);
             self.graph.bases.push(base);
-            self.depths.push(self.depth);
+            self.graph.depths.push(self.depth);
             u32::try_from(self.graph.hands.len() - 1).expect("nodes fit in u32")
         } else {
             0

@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Eval`, batch 3 of `doc/eval.md`: what a hand is worth in points by each
+  count of public cards to come, from nine pattern tables (each colour's
+  將士象 and 車馬包, and the soldiers, symmetric patterns merged), the
+  exposed 胡 and the live count, summed past a ReLU.  `Eval::default` is
+  the width-16 table built in (`src/eval-16.bin`, 359 KB), learnt from
+  `Graph`'s values; `Graph::depth` goes with it.  No bot uses it yet.
+  `examples/eval` labels, trains and measures: labels from 2,000 deals
+  (seed base 1795800000), held-out RMSE 0.78 points against 3.37 for the
+  mean.  On 500 fresh deals (seed base 1795900000, base `7f0d5f1`) a graph
+  one claim deep with these leaves would gain +0.34 ± 0.06 points a deal on
+  the web at 11 to 20 cards, and two deep to 17 cards and one beyond
+  +0.27 ± 0.06 on the desktop, past the 0.05 gate; the leaves' mean error is
+  −0.03 points, slope 0.97, residual SD 0.65.  Predicted, not played: the
+  A/B is batch 4.  No bot changes: `ab/run.sh 20000` against `7f0d5f1`
+  (seed base 1796300000, `RESHUFFLE=8`) read 0 deals that part.
 - `Prune::depth`, batch 2 of `doc/eval.md`: a node that many claims from
   the nearest root is a leaf, not expanded, and `Graph::values_with` reads
   its value from a curve by public cards to come; `Graph::curves`,

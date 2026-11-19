@@ -49,6 +49,10 @@ name = "dealt"
 required-features = ["rand"]
 
 [[example]]
+name = "eval"
+required-features = ["rand"]
+
+[[example]]
 name = "fit"
 required-features = ["rand"]
 
