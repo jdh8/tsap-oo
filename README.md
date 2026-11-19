@@ -73,7 +73,8 @@ allow two to five.  A smaller table deals and scores the same: twenty cards
 each, one more to the dealer, the rest to the pile, and a win or a 相公
 settled with each other seat.  The five-player game 八胡 is often named for
 is not modelled (`Seat::COUNT` is four).  The bots were tuned at four and
-play smaller tables untuned.
+at ten 胡, and play smaller tables and 八胡 untuned:
+[`doc/variants.md`](doc/variants.md) lists what is missing.
 
 Open questions, played provisionally:
 

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `doc/variants.md`: what 八胡 and tables of two and three still lack.  The
+  rules are complete; the bots' constants, `Outlook` and `Eval` come from
+  four players at ten 胡 and are used as they are.
+
 - `ab/` takes `THRESHOLD`, the 胡 to win on both sides (default 10), to
   measure a bot at 八胡.  At 八胡 `ExpectBot` plays past its gate by the
   shallow graph on the ten-胡 `Eval` tables, which had not been measured.
