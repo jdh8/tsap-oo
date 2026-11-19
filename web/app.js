@@ -406,7 +406,7 @@ async function showHint() {
     for (const el of els(code)) {
       const mark = document.createElement('span');
       mark.className = 'grade';
-      // Inside the bot's gate, expected points given up; outside, a priority
+      // Where the bot searches, expected points given up; elsewhere, a priority
       // without a unit that orders the moves and prices nothing.
       mark.textContent = behind == null ? '死' : points ? behind.toFixed(2) : behind;
       mark.title =

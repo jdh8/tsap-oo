@@ -12,7 +12,7 @@
 //! card to come.
 
 use crate::ceiling::reach;
-use crate::{Claim, ClaimOptions, HeuristicBot, Rules, Seat, Strategy, View, discardable};
+use crate::{Claim, ClaimOptions, Eval, HeuristicBot, Rules, Seat, Strategy, View, discardable};
 use std::collections::HashMap;
 use susik::{Card, Hand, Meld, Rank, Solver, locked_completions};
 
@@ -427,7 +427,7 @@ impl Graph {
 pub const END_SCALE: f64 = 1.5;
 
 /// A bot that plays by [`Graph`] while its hand is short and as
-/// [`HeuristicBot`] before
+/// [`HeuristicBot`] before, or by a shallow graph read with [`Eval`]
 ///
 /// Inside the gate every answer is worth the best value, in points, of the
 /// hands it can leave after a discard; equals keep `HeuristicBot`'s order.
@@ -438,6 +438,9 @@ pub struct ExpectBot {
     /// The most concealed cards the bot plays by the DP with, once it has
     /// discarded
     cards: usize,
+    /// Past the gate: the tables that value a leaf, and the most cards a
+    /// graph two claims deep is built for, one deep beyond
+    shallow: Option<(Eval, usize)>,
 }
 
 impl ExpectBot {
@@ -451,6 +454,7 @@ impl ExpectBot {
             policy: HeuristicBot::new(rules),
             outlook,
             cards: 10,
+            shallow: None,
         }
     }
 
@@ -467,6 +471,32 @@ impl ExpectBot {
     pub const fn gated(mut self, cards: usize) -> Self {
         self.cards = cards;
         self
+    }
+
+    /// The same bot playing past its gate by a graph two claims deep with
+    /// `deep` concealed cards or fewer once it has discarded, and one claim
+    /// deep beyond, each leaf valued by `eval` (`doc/eval.md`)
+    #[must_use]
+    pub fn shallow(mut self, eval: Eval, deep: usize) -> Self {
+        self.shallow = Some((eval, deep));
+        self
+    }
+
+    /// How deep a graph is built with `cards` concealed cards once
+    /// discarded: `Some(None)` whole, `None` none, as `HeuristicBot` plays
+    fn depth(&self, cards: usize) -> Option<Option<u32>> {
+        if cards <= self.cards {
+            return Some(None);
+        }
+        let (_, deep) = self.shallow.as_ref()?;
+        Some(Some(if cards <= *deep { 2 } else { 1 }))
+    }
+
+    /// Whether the bot values its answers in points with `cards` concealed
+    /// cards once discarded, rather than by `HeuristicBot`'s grades
+    #[must_use]
+    pub fn searches(&self, cards: usize) -> bool {
+        self.depth(cards).is_some()
     }
 
     /// The cards `view`'s seat has not seen, and the 胡 of its exposed melds
@@ -490,11 +520,30 @@ impl ExpectBot {
     /// The value of each group of roots: the best of its nodes
     // ponytail: a drawn offer counts one public card fewer than is left;
     // `Graph::values` takes draws, not cards.
-    fn values(&self, view: &View<'_>, live: Hand, groups: &[Vec<(Hand, u32)>]) -> Vec<f64> {
+    fn values(
+        &self,
+        view: &View<'_>,
+        live: Hand,
+        groups: &[Vec<(Hand, u32)>],
+        depth: Option<u32>,
+    ) -> Vec<f64> {
         let roots: Vec<_> = groups.iter().flatten().copied().collect();
-        let graph = Graph::new(view.rules(), live, &roots, Prune::default());
+        let prune = Prune {
+            depth,
+            ..Prune::default()
+        };
+        let graph = Graph::new(view.rules(), live, &roots, prune);
         let draws = view.pile_len().saturating_sub(view.rules().dead_tail);
-        let values = graph.values(&self.outlook, draws, Payoff::Points);
+        let curves: Vec<_> = graph
+            .leaves()
+            .iter()
+            .map(|&leaf| {
+                let (hand, base) = graph.state(leaf);
+                let (eval, _) = self.shallow.as_ref().expect("leaves only past the gate");
+                eval.curve(hand, base, live)
+            })
+            .collect();
+        let values = graph.values_with(&self.outlook, draws, Payoff::Points, &curves);
         let mut nodes = graph.roots().iter();
         groups
             .iter()
@@ -509,16 +558,17 @@ impl ExpectBot {
     }
 
     /// The answers to the offer, best first, each with its value in points;
-    /// outside the gate `HeuristicBot`'s, with its grades
+    /// outside the gate, unless [`shallow`](Self::shallow), `HeuristicBot`'s,
+    /// with its grades
     pub fn claims(&mut self, view: &View<'_>, options: &ClaimOptions) -> Vec<(Claim, f64)> {
         let graded = self.policy.claims(view, options);
         let hand = view.hand();
-        if hand.len() > self.cards {
+        let Some(depth) = self.depth(hand.len()) else {
             return graded
                 .into_iter()
                 .map(|(claim, grade)| (claim, f64::from(grade)))
                 .collect();
-        }
+        };
         let card = view.offer().expect("claims answer an offer").card;
         // `HeuristicBot` leaves some eats out; the DP weighs them all.
         let mut claims: Vec<Claim> = graded.into_iter().map(|(claim, _)| claim).collect();
@@ -550,27 +600,28 @@ impl ExpectBot {
                     .collect()
             })
             .collect();
-        rank(claims, self.values(view, live, &groups))
+        rank(claims, self.values(view, live, &groups, depth))
     }
 
     /// The legal discards, best first, each with its value in points;
-    /// outside the gate `HeuristicBot`'s, with its grades
+    /// outside the gate, unless [`shallow`](Self::shallow), `HeuristicBot`'s,
+    /// with its grades
     pub fn discards(&mut self, view: &View<'_>) -> Vec<(Card, f64)> {
         let graded = self.policy.discards(view);
         let hand = view.hand();
-        if hand.len() > self.cards + 1 {
+        let Some(depth) = self.depth(hand.len() - 1) else {
             return graded
                 .into_iter()
                 .map(|(card, grade)| (card, f64::from(grade)))
                 .collect();
-        }
+        };
         let (live, base) = Self::table(view);
         let cards: Vec<Card> = graded.into_iter().map(|(card, _)| card).collect();
         let groups: Vec<_> = cards
             .iter()
             .map(|&card| vec![(hand.without(card), base)])
             .collect();
-        rank(cards, self.values(view, live, &groups))
+        rank(cards, self.values(view, live, &groups, depth))
     }
 }
 

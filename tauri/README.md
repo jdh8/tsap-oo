@@ -8,15 +8,15 @@ calls the commands in `src/main.rs` instead of loading the wasm.
 
 What native buys is opponents that search.  The three bots are
 `ExpectBot`s that play by the single-player DP of
-[`doc/expectation.md`](../doc/expectation.md) with 10 concealed cards or fewer
-and as `HeuristicBot` before; head to head against the gated Monte Carlo that
-sat here before, +0.047 ± 0.019 points a deal.  A decision at the gate takes
-some 14 ms of native code, on an engine thread, so the window never stalls on
-it.  The gate is not a setting: no other gate has a verdict.
+[`doc/expectation.md`](../doc/expectation.md) with 14 concealed cards or fewer,
+and before by a graph two claims deep to 17 cards and one beyond, its leaves
+valued by the pattern tables of [`doc/eval.md`](../doc/eval.md).  A decision
+takes some 60 ms of native code on average, 1.4 s at worst, on an engine
+thread, so the window never stalls on it.  The gate is not a setting: no other
+gate has a verdict.
 
-The hint is the same `ExpectBot`'s, as in the browser: inside the gate its
-marks are the expected points a move gives up, outside they are
-`HeuristicBot`'s grades.
+The hint is the same `ExpectBot`'s, as in the browser: its marks are the
+expected points a move gives up.
 
 Settings are the page's: they live in the webview's `localStorage`, apart
 from any browser's.

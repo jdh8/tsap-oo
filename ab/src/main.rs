@@ -9,12 +9,15 @@
 //! the `MonteCarloBot` (`MonteCarloBot::gated`): it searches only with that
 //! many concealed cards or fewer, or within that 向聽數.  Set `EXPECT` to
 //! seat an `ExpectBot` instead, its measured h scaled by that factor (1.5 is `ExpectBot::new`'s) and gated at
-//! `GATE_CARDS` (default 10).  Set `BASELINE_SAMPLES` to seat the control's
+//! `GATE_CARDS` (default 10), and with `SHALLOW` as well playing past the
+//! gate by `ExpectBot::shallow` with that many cards two claims deep.  Set
+//! `BASELINE_SAMPLES` to seat the control's
 //! `MonteCarloBot` of that many samples in seat 1 on the control side, gated
 //! at `GATE_CARDS` (default 10), in place of its `HeuristicBot`: a head to
 //! head of two bots that each beat it.  Set `BASELINE_EXPECT` to seat the
 //! control's `ExpectBot::new` there instead, gated as it ships whatever
-//! `GATE_CARDS` says: a wider gate against the one in place.
+//! `GATE_CARDS` says, or at `BASELINE_GATE`: a wider gate against the one in
+//! place.
 //!
 //! Set `RESHUFFLE` to K to average out the luck after the two first part
 //! ways: the deal is played once with the candidate, and at its first choice
@@ -70,8 +73,13 @@ fn candidate_bot(rules: &new::Rules, seed: u64) -> Box<dyn new::Strategy> {
         let scale: f64 = scale.parse().unwrap();
         let mut outlook = new::Outlook::default();
         outlook.end.iter_mut().for_each(|h| *h *= scale);
-        let bot = new::ExpectBot::new(rules).with_outlook(outlook);
-        return Box::new(bot.gated(gate("GATE_CARDS").unwrap_or(10)));
+        let mut bot = new::ExpectBot::new(rules)
+            .with_outlook(outlook)
+            .gated(gate("GATE_CARDS").unwrap_or(10));
+        if let Some(deep) = gate("SHALLOW") {
+            bot = bot.shallow(new::Eval::default(), deep);
+        }
+        return Box::new(bot);
     }
     // `SAMPLES` puts a MonteCarloBot in the candidate seat, its rng
     // derived from the deal's seed so a deal replays.
@@ -91,7 +99,11 @@ fn candidate_bot(rules: &new::Rules, seed: u64) -> Box<dyn new::Strategy> {
 
 fn baseline_bot(rules: &old::Rules, seed: u64) -> Option<Box<dyn old::Strategy>> {
     if std::env::var_os("BASELINE_EXPECT").is_some() {
-        return Some(Box::new(old::ExpectBot::new(rules)));
+        let bot = old::ExpectBot::new(rules);
+        return Some(match std::env::var("BASELINE_GATE") {
+            Ok(cards) => Box::new(bot.gated(cards.parse().unwrap())),
+            Err(_) => Box::new(bot),
+        });
     }
     let n = std::env::var("BASELINE_SAMPLES").ok()?.parse().unwrap();
     let cards = std::env::var("GATE_CARDS").map_or(10, |s| s.parse().unwrap());

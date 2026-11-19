@@ -5,13 +5,15 @@
 //! the browser's wasm engine:
 //!
 //! ```sh
-//! cargo run --release --example expect_time -- [rounds] [seed base] [gate]
+//! cargo run --release --example expect_time -- [rounds] [seed base] [gate] [deep]
 //! cargo build --release --example expect_time --target wasm32-wasip1
-//! node --no-warnings research/wasi.mjs target/wasm32-wasip1/release/examples/expect_time.wasm [rounds] [seed base] [gate]
+//! node --no-warnings research/wasi.mjs target/wasm32-wasip1/release/examples/expect_time.wasm [rounds] [seed base] [gate] [deep]
 //! ```
 //!
 //! `gate` (default 10) is [`ExpectBot::gated`]'s; a wider one adds a row for
-//! each card count above 10.
+//! each card count above 10.  With `deep`, the bot plays past the gate by
+//! [`ExpectBot::shallow`] with that `deep`, and every count up to 20 has a
+//! row.
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use std::cell::RefCell;
@@ -19,8 +21,8 @@ use std::rc::Rc;
 use std::time::Instant;
 use tsap_oo::susik::Card;
 use tsap_oo::{
-    Claim, ClaimOptions, ExpectBot, HeuristicBot, Phase, Round, Rules, Seat, Step, Strategy, Table,
-    View,
+    Claim, ClaimOptions, Eval, ExpectBot, HeuristicBot, Phase, Round, Rules, Seat, Step, Strategy,
+    Table, View,
 };
 
 /// Concealed cards once discarded, and the microseconds the ranking took
@@ -60,6 +62,11 @@ fn main() {
     let mut args = std::env::args().skip(1);
     let mut arg = |default: u64| args.next().and_then(|s| s.parse().ok()).unwrap_or(default);
     let (rounds, base, gate) = (arg(1000), arg(0), arg(10) as usize);
+    let deep = args.next().map(|s| s.parse::<usize>().unwrap());
+    let mut bot = ExpectBot::new(&Rules::new()).gated(gate);
+    if let Some(deep) = deep {
+        bot = bot.shallow(Eval::default(), deep);
+    }
     let rules = Rules::new();
     let log = Rc::<RefCell<Vec<Decision>>>::default();
 
@@ -69,7 +76,7 @@ fn main() {
         let mut seats =
             Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as Box<dyn Strategy>));
         seats[1] = Some(Box::new(Timed {
-            bot: ExpectBot::new(&rules).gated(gate),
+            bot: bot.clone(),
             log: Rc::clone(&log),
         }));
         assert_eq!(Table::new(round, seats).run(), Ok(Step::Finished));
@@ -84,7 +91,8 @@ fn main() {
         (format!("over {gate}"), gate + 1..=usize::MAX),
         (format!("{gate} or fewer"), 0..=gate),
     ];
-    rows.extend((11..=gate).map(|cards| (cards.to_string(), cards..=cards)));
+    let last = if deep.is_some() { 20 } else { gate };
+    rows.extend((11..=last).map(|cards| (cards.to_string(), cards..=cards)));
     for (label, keep) in rows {
         let mut micros: Vec<u128> = log
             .borrow()

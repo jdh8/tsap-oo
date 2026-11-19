@@ -10,18 +10,24 @@ use rand::{RngExt as _, SeedableRng as _};
 use serde::{Deserialize, Serialize};
 use tsap_oo::susik::{Card, Color, Hand, Meld, Rank, Solver};
 use tsap_oo::{
-    Claim, Event, ExpectBot, Game, HeuristicBot, Phase, Round, Rules, Seat, Strategy, Table, View,
-    discardable,
+    Claim, Eval, Event, ExpectBot, Game, HeuristicBot, Phase, Round, Rules, Seat, Strategy, Table,
+    View, discardable,
 };
 use wasm_bindgen::prelude::*;
 
 const HUMAN: Seat = Seat::ALL[0];
 
-/// The most concealed cards [`ExpectBot`] plays by the DP with: 10 as wasm,
-/// where a decision must fit a frame or so, and 14 as the desktop's native
-/// code, some 190 ms a decision there (`doc/expectation.md`, batch 3 and D)
-const fn gate(search: bool) -> usize {
-    if search { 14 } else { 10 }
+/// The hint's bot, and with `search` the opponents' too.  It plays by the DP
+/// with 10 concealed cards or fewer as wasm, where a decision must fit a
+/// frame or so, and 14 as the desktop's native code, some 190 ms a decision
+/// there (`doc/expectation.md`, batch 3 and D).  Past the gate it plays by a
+/// graph one claim deep, two to 17 cards on the desktop (`doc/eval.md`,
+/// batch 4).
+fn bot(rules: &Rules, search: bool) -> ExpectBot {
+    let (gate, deep) = if search { (14, 17) } else { (10, 0) };
+    ExpectBot::new(rules)
+        .gated(gate)
+        .shallow(Eval::default(), deep)
 }
 
 /// What the human calls each seat at a table of `players`, counting on from
@@ -83,8 +89,8 @@ impl Settings {
 
 /// One move the hint rates: a card code to discard, or `pass`, `pong`,
 /// `eat<index>`, and how far it falls behind the bot's pick, `null` when it
-/// leaves the hand dead.  Inside [`ExpectBot`]'s gate (`points`) that is
-/// the expected points it gives up; outside, `HeuristicBot`'s grade, a
+/// leaves the hand dead.  Where [`ExpectBot`] searches (`points`) that is
+/// the expected points it gives up; elsewhere, `HeuristicBot`'s grade, a
 /// priority without a unit.
 #[derive(Serialize)]
 struct HintJson {
@@ -506,7 +512,7 @@ impl Core {
             if seat == HUMAN {
                 None
             } else if search {
-                Some(Box::new(ExpectBot::new(rules).gated(gate(true))))
+                Some(Box::new(bot(rules, true)))
             } else {
                 Some(Box::new(HeuristicBot::new(rules)))
             }
@@ -548,13 +554,10 @@ impl Core {
     /// first; empty when it is not the human's decision
     fn hint(&self) -> Vec<HintJson> {
         let round = self.table.round();
-        let gate = gate(self.search);
-        let mut bot = ExpectBot::new(self.game.rules()).gated(gate);
+        let mut bot = bot(self.game.rules(), self.search);
         let view = View::new(round, HUMAN);
-        // ponytail: mirrors `ExpectBot`'s own gate test; give the bot a
-        // `searches` method if the gate ever stops being a card count.
         let discarding = matches!(round.phase(), Phase::Discard(_));
-        let points = round.hand(HUMAN).len() - usize::from(discarding) <= gate;
+        let points = bot.searches(round.hand(HUMAN).len() - usize::from(discarding));
         let rated: Vec<(String, f64)> = match round.phase() {
             Phase::Claim(HUMAN) => {
                 let options = round.claim_options(HUMAN);
@@ -664,8 +667,8 @@ impl WebGame {
     /// The greedy bot's rating of your moves as a JSON array, its pick
     /// first: `[{"code": "RK", "behind": 0, "points": true}, ...]`, where
     /// `code` is a card code, `pass`, `pong` or `eat<index>` and `behind` how
-    /// far it falls behind the pick: expected points when `points`, inside
-    /// [`ExpectBot`]'s gate, else `HeuristicBot`'s grade, `null` for a move
+    /// far it falls behind the pick: expected points when `points`, where
+    /// [`ExpectBot`] searches, else `HeuristicBot`'s grade, `null` for a move
     /// that leaves the hand dead (short of the 胡 to win however the cards
     /// come); empty when it is not your decision
     #[must_use]
@@ -682,10 +685,10 @@ impl WebGame {
 
 impl WebGame {
     /// [`WebGame::new`] with opponents that search: an [`ExpectBot`] that
-    /// plays by the single-player DP with 14 concealed cards or fewer and
-    /// greedily before, and the hint by the same.  For the desktop client,
-    /// as plain Rust: a decision at the gate takes some 190 ms of native
-    /// code, 1.4 s at worst.
+    /// plays by the single-player DP with 14 concealed cards or fewer and by
+    /// a shallow graph before, and the hint by the same.  For the desktop
+    /// client, as plain Rust: a decision at the gate takes some 190 ms of
+    /// native code, 1.4 s at worst.
     #[must_use]
     pub fn searching(seed: &str, settings: &str) -> Self {
         Self {

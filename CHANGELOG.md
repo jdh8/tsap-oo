@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ExpectBot::shallow`, batch 4 of `doc/eval.md`: past its gate the bot
+  plays by a graph two claims deep up to a card count and one deep beyond,
+  each leaf valued by `Eval`, in place of `HeuristicBot`.
+  `ExpectBot::searches` says where it values its answers in points.  The
+  web's hint plays it one claim deep past its 10-card gate, and the
+  desktop's opponents and hint two deep to 17 cards and one beyond past their
+  14-card gate, so the hint marks the expected points given up on every
+  move.  A/B against `5c3cc24`, `RESHUFFLE=8`: on the web +0.191 ± 0.046
+  points a deal, 95% CI [+0.100, +0.281], 30,000 deals, seed base
+  1795055385, win; on the desktop +0.204 ± 0.052, 95% CI [+0.102, +0.306],
+  20,000 deals, seed base 1795155385, win.  A wasm decision takes 18 ms on
+  average, p95 55 ms, 1.1 s at worst; a native desktop one 62 ms, p95
+  230 ms.  `ab/` takes `SHALLOW` and `BASELINE_GATE`, and
+  `examples/expect_time` a `deep`.
+
 - Tables of two and three: `Rules::players`, 2 to `Seat::COUNT`, 4 by
   default, dealt and scored as at four (twenty each, a win or a 相公 settled
   with each other seat).  The web and desktop clients choose it under 設定 →

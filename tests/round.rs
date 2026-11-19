@@ -268,7 +268,7 @@ mod playouts {
     use rand::rngs::SmallRng;
     use susik::Meld;
     use tsap_oo::{
-        Event, ExpectBot, Game, HeuristicBot, Phase, Rules, Seat, Step, Strategy, Table, View,
+        Eval, Event, ExpectBot, Game, HeuristicBot, Phase, Rules, Seat, Step, Strategy, Table, View,
     };
 
     /// Bots play out whole rounds; cards are conserved after every step,
@@ -297,7 +297,7 @@ mod playouts {
     }
 
     /// The same with an `ExpectBot` in the second seat, which plays by the
-    /// DP once its hand is short
+    /// DP once its hand is short and by a graph one claim deep before
     #[test]
     fn expect_bot_finishes_rounds() {
         let rules = Rules::new();
@@ -333,7 +333,7 @@ mod playouts {
             let mut bots =
                 Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as Box<dyn Strategy>));
             if expect {
-                bots[1] = Some(Box::new(ExpectBot::new(&rules)));
+                bots[1] = Some(Box::new(ExpectBot::new(&rules).shallow(Eval::default(), 0)));
             }
             let mut table = Table::new(game.deal(&mut rng), bots);
             for &seat in &Seat::ALL[rules.players..] {
