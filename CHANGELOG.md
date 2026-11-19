@@ -10,7 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `ab/` takes `THRESHOLD`, the 胡 to win on both sides (default 10), to
-  measure a bot at 八胡.
+  measure a bot at 八胡.  At 八胡 `ExpectBot` plays past its gate by the
+  shallow graph on the ten-胡 `Eval` tables, which had not been measured.
+  A/B at `THRESHOLD=8` against `09eb4c4`, `RESHUFFLE=8`, the control
+  playing past the same gate as `HeuristicBot`: on the web's settings
+  +0.006 ± 0.074 points a deal, 95% CI [−0.138, +0.151], 10,000 deals, seed
+  base 1795200000; on the desktop's +0.080 ± 0.049, 95% CI [−0.015, +0.175],
+  20,000 deals, seed base 1795300000.  Both insufficient data; play is left
+  as it is.
 
 - `ExpectBot::shallow`, batch 4 of `doc/eval.md`: past its gate the bot
   plays by a graph two claims deep up to a card count and one deep beyond,
