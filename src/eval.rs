@@ -12,8 +12,9 @@
 
 use susik::{Card, Color, Hand, Rank};
 
-/// The most public cards to come a curve runs to
-pub const CARDS: usize = 46;
+/// The most public cards to come a curve runs to: what a round of four
+/// starts with, the most the labels hold.  A longer round reads the last.
+pub const CARDS: usize = 45;
 
 /// Patterns of a 車馬包 block: three cards that swap
 const FIELDS: usize = 680;
@@ -342,6 +343,15 @@ mod tests {
     #[test]
     fn the_tables_are_built_in() {
         assert_eq!(Eval::default().dim(), 16);
+    }
+
+    /// A row no label reached keeps its initial bias, 0, and a round longer
+    /// than the labels reads it for every leaf
+    #[test]
+    fn every_row_of_the_tables_is_learnt() {
+        let eval = Eval::default();
+        let biases = &eval.params()[(ROWS + CARDS) * eval.dim()..];
+        assert!(biases.iter().all(|&b| b != 0.0));
     }
 
     #[test]

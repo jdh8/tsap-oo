@@ -557,7 +557,7 @@ impl Core {
         let mut bot = bot(self.game.rules(), self.search);
         let view = View::new(round, HUMAN);
         let discarding = matches!(round.phase(), Phase::Discard(_));
-        let points = bot.searches(round.hand(HUMAN).len() - usize::from(discarding));
+        let points = bot.searches(&view, round.hand(HUMAN).len() - usize::from(discarding));
         let rated: Vec<(String, f64)> = match round.phase() {
             Phase::Claim(HUMAN) => {
                 let options = round.claim_options(HUMAN);

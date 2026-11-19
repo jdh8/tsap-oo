@@ -163,6 +163,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- At a table of two or three the web's hint and the desktop's opponents
+  broke concealed triplets from the deal on: `ExpectBot::shallow` read a row
+  of `Eval` no label had reached.  The labels come from rounds of four,
+  which start with 45 public cards to come, and the table ran to 46, its
+  last row still as initialised; a sweep longer than that held it for every
+  leaf, from 26 draws left (the order turned at 28 in the hand traced, see
+  `doc/eval.md`).  `eval::CARDS` is now 45 and the unlearnt row is cut from
+  `src/eval-16.bin`; while more public cards are to come than that, the bot
+  plays past its gate as `HeuristicBot`, and `ExpectBot::searches` takes the
+  `View` to say so.  Holding the last learnt row instead, or sweeping only
+  the table's length, each lost to `HeuristicBot` past the gate in trials at
+  two (−2.8 ± 0.3 and −2.1 ± 0.3 points a deal, 400 deals, not counted).
+  A/B against `3ddb8f3`, `RESHUFFLE=8`, the control playing the shallow
+  graph as shipped.  At four, play is unchanged: 0 of 20,000 deals part on
+  the web's settings (seed base 1795094000) and 0 of 2,000 on the desktop's
+  (1795114000).  On the web's, at two +11.342 ± 0.157 points a deal, 95% CI
+  [+11.035, +11.649], 2,000 deals, seed base 1795124000, win; at three
+  +11.099 ± 0.230, [+10.648, +11.550], 2,000 deals, 1795134000, win.  On the
+  desktop's, at two +10.367 ± 0.296, [+9.786, +10.948], 500 deals,
+  1795144000, win; at three +10.554 ± 0.431, [+9.709, +11.398], 500 deals,
+  1795154000, win.  `ab/` takes `PLAYERS` and `BASELINE_SHALLOW`.
+
 - The web test `waits_foretell_the_win` checked stale waits when the round
   ended on the draw that the human's discard brought on.
 

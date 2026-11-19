@@ -17,7 +17,8 @@
 //! head of two bots that each beat it.  Set `BASELINE_EXPECT` to seat the
 //! control's `ExpectBot::new` there instead, gated as it ships whatever
 //! `GATE_CARDS` says, or at `BASELINE_GATE`: a wider gate against the one in
-//! place.
+//! place; with `BASELINE_SHALLOW` it plays past its gate as `SHALLOW` has
+//! the candidate.  `PLAYERS` (default 4) is the table's size on both sides.
 //!
 //! Set `RESHUFFLE` to K to average out the luck after the two first part
 //! ways: the deal is played once with the candidate, and at its first choice
@@ -35,6 +36,11 @@ use rand::rngs::SmallRng;
 use rand::seq::SliceRandom as _;
 
 const CANDIDATE: usize = 1;
+
+/// The table's size: `PLAYERS`, or four
+fn players() -> usize {
+    std::env::var("PLAYERS").map_or(new::Seat::COUNT, |s| s.parse().unwrap())
+}
 
 /// How many times the pile is reshuffled where the two part, unless
 /// `RESHUFFLE` says; 0 is the plain paired estimate
@@ -99,11 +105,14 @@ fn candidate_bot(rules: &new::Rules, seed: u64) -> Box<dyn new::Strategy> {
 
 fn baseline_bot(rules: &old::Rules, seed: u64) -> Option<Box<dyn old::Strategy>> {
     if std::env::var_os("BASELINE_EXPECT").is_some() {
-        let bot = old::ExpectBot::new(rules);
-        return Some(match std::env::var("BASELINE_GATE") {
-            Ok(cards) => Box::new(bot.gated(cards.parse().unwrap())),
-            Err(_) => Box::new(bot),
-        });
+        let mut bot = old::ExpectBot::new(rules);
+        if let Ok(cards) = std::env::var("BASELINE_GATE") {
+            bot = bot.gated(cards.parse().unwrap());
+        }
+        if let Ok(deep) = std::env::var("BASELINE_SHALLOW") {
+            bot = bot.shallow(old::Eval::default(), deep.parse().unwrap());
+        }
+        return Some(Box::new(bot));
     }
     let n = std::env::var("BASELINE_SAMPLES").ok()?.parse().unwrap();
     let cards = std::env::var("GATE_CARDS").map_or(10, |s| s.parse().unwrap());
@@ -140,7 +149,8 @@ fn play(
     candidate: bool,
     split: bool,
 ) -> Outcome {
-    let (nr, or) = (new::Rules::new(), old::Rules::new());
+    let (mut nr, mut or) = (new::Rules::new(), old::Rules::new());
+    (nr.players, or.players) = (players(), players());
     let mut a = new::Round::from_pile(nr, new::Seat::ALL[dealer], deck.to_vec()).unwrap();
     let mut b = old::Round::from_pile(or, old::Seat::ALL[dealer], deck.to_vec()).unwrap();
     let mut bot = candidate_bot(&nr, seed);
@@ -295,7 +305,7 @@ fn main() {
                 scope.spawn(move || {
                     let mut acc = Totals::default();
                     for i in (t..n).step_by(threads as usize) {
-                        let dealer = (i % new::Seat::COUNT as u64) as usize;
+                        let dealer = (i % players() as u64) as usize;
                         let (d, cw, tw, within) = deal(base + i, dealer, reshuffles);
                         acc.sum += d;
                         acc.squares += d * d;

@@ -475,28 +475,42 @@ impl ExpectBot {
 
     /// The same bot playing past its gate by a graph two claims deep with
     /// `deep` concealed cards or fewer once it has discarded, and one claim
-    /// deep beyond, each leaf valued by `eval` (`doc/eval.md`)
+    /// deep beyond, each leaf valued by `eval` (`doc/eval.md`); as
+    /// `HeuristicBot` still while more public cards are to come than
+    /// [`eval::CARDS`](crate::eval::CARDS), early at a table of two or three
     #[must_use]
     pub fn shallow(mut self, eval: Eval, deep: usize) -> Self {
         self.shallow = Some((eval, deep));
         self
     }
 
+    /// The draws left at `view`'s table
+    fn draws(view: &View<'_>) -> usize {
+        view.pile_len().saturating_sub(view.rules().dead_tail)
+    }
+
     /// How deep a graph is built with `cards` concealed cards once
     /// discarded: `Some(None)` whole, `None` none, as `HeuristicBot` plays
-    fn depth(&self, cards: usize) -> Option<Option<u32>> {
+    fn depth(&self, view: &View<'_>, cards: usize) -> Option<Option<u32>> {
         if cards <= self.cards {
             return Some(None);
         }
         let (_, deep) = self.shallow.as_ref()?;
+        // A leaf's curve stands still past its end while its parents' clock
+        // runs on, so every claim looks like a loss; and the table was
+        // learnt from rounds of four, which start within it.
+        if self.outlook.ends(Self::draws(view)).len() > crate::eval::CARDS {
+            return None;
+        }
         Some(Some(if cards <= *deep { 2 } else { 1 }))
     }
 
-    /// Whether the bot values its answers in points with `cards` concealed
-    /// cards once discarded, rather than by `HeuristicBot`'s grades
+    /// Whether the bot values its answers in points at `view`'s table with
+    /// `cards` concealed cards once discarded, rather than by
+    /// `HeuristicBot`'s grades
     #[must_use]
-    pub fn searches(&self, cards: usize) -> bool {
-        self.depth(cards).is_some()
+    pub fn searches(&self, view: &View<'_>, cards: usize) -> bool {
+        self.depth(view, cards).is_some()
     }
 
     /// The cards `view`'s seat has not seen, and the 胡 of its exposed melds
@@ -533,7 +547,7 @@ impl ExpectBot {
             ..Prune::default()
         };
         let graph = Graph::new(view.rules(), live, &roots, prune);
-        let draws = view.pile_len().saturating_sub(view.rules().dead_tail);
+        let draws = Self::draws(view);
         let curves: Vec<_> = graph
             .leaves()
             .iter()
@@ -563,7 +577,7 @@ impl ExpectBot {
     pub fn claims(&mut self, view: &View<'_>, options: &ClaimOptions) -> Vec<(Claim, f64)> {
         let graded = self.policy.claims(view, options);
         let hand = view.hand();
-        let Some(depth) = self.depth(hand.len()) else {
+        let Some(depth) = self.depth(view, hand.len()) else {
             return graded
                 .into_iter()
                 .map(|(claim, grade)| (claim, f64::from(grade)))
@@ -609,7 +623,7 @@ impl ExpectBot {
     pub fn discards(&mut self, view: &View<'_>) -> Vec<(Card, f64)> {
         let graded = self.policy.discards(view);
         let hand = view.hand();
-        let Some(depth) = self.depth(hand.len() - 1) else {
+        let Some(depth) = self.depth(view, hand.len() - 1) else {
             return graded
                 .into_iter()
                 .map(|(card, grade)| (card, f64::from(grade)))
@@ -843,6 +857,32 @@ mod tests {
             loss: 0.0,
             eat: 0.5,
             general: 0.0,
+        }
+    }
+
+    /// A round of four starts with 25 draws left, within the tables; a
+    /// round of two with 65, where a leaf's curve would stand still
+    #[test]
+    fn the_shallow_graph_waits_for_its_tables() {
+        for (players, searches) in [(2, false), (4, true)] {
+            let mut rules = Rules::new();
+            rules.players = players;
+            let mut pile: Vec<Card> = Hand::FULL.iter().collect();
+            let mut rng = Rng(7);
+            for i in (1..pile.len()).rev() {
+                pile.swap(i, rng.below(i + 1));
+            }
+            let round = crate::Round::from_pile(rules, Seat::ALL[0], pile).unwrap();
+            assert_eq!(round.phase(), crate::Phase::Discard(Seat::ALL[0]));
+            let view = View::new(&round, Seat::ALL[0]);
+            let mut bot = ExpectBot::new(&rules).shallow(Eval::default(), 0);
+            assert_eq!(bot.searches(&view, 20), searches);
+            let graded: Vec<_> = HeuristicBot::new(&rules)
+                .discards(&view)
+                .into_iter()
+                .map(|(card, grade)| (card, f64::from(grade)))
+                .collect();
+            assert_eq!(bot.discards(&view) == graded, !searches);
         }
     }
 
