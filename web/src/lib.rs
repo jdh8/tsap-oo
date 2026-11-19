@@ -1,4 +1,5 @@
-//! Browser front end for 十胡 and 八胡: one human against three greedy bots.
+//! Browser front end for 十胡 and 八胡: one human against one to three greedy
+//! bots.
 //!
 //! The engine holds the whole game; JS is a thin renderer that calls one
 //! method per user action or bot step and redraws from the JSON snapshot
@@ -23,10 +24,15 @@ const fn gate(search: bool) -> usize {
     if search { 14 } else { 10 }
 }
 
-/// What the human calls each seat, counting on from them in turn order
-fn name(seat: Seat) -> &'static str {
-    const NAMES: [&str; Seat::COUNT] = ["你", "下家", "對家", "上家"];
-    NAMES[(seat.index() + Seat::COUNT - HUMAN.index()) % Seat::COUNT]
+/// What the human calls each seat at a table of `players`, counting on from
+/// them in turn order
+fn name(players: usize, seat: Seat) -> &'static str {
+    let names: &[&str] = match players {
+        2 => &["你", "對家"],
+        3 => &["你", "下家", "上家"],
+        _ => &["你", "下家", "對家", "上家"],
+    };
+    names[(seat.index() + players - HUMAN.index()) % players]
 }
 
 // ---------------------------------------------------------------------------
@@ -41,12 +47,16 @@ fn name(seat: Seat) -> &'static str {
 struct Settings {
     /// 胡 to win: 10 for 十胡, 8 for 八胡
     threshold: u32,
+    /// Players at the table, the human among them
+    players: usize,
 }
 
 impl Default for Settings {
     fn default() -> Self {
+        let rules = Rules::new();
         Self {
-            threshold: Rules::new().threshold,
+            threshold: rules.threshold,
+            players: rules.players,
         }
     }
 }
@@ -60,6 +70,9 @@ impl Settings {
     fn rules(&self) -> Rules {
         let mut rules = Rules::new();
         rules.threshold = self.threshold;
+        // Stored settings are the page's to edit; a table the engine cannot
+        // deal is the nearest one it can.
+        rules.players = self.players.clamp(2, Seat::COUNT);
         rules
     }
 }
@@ -303,7 +316,8 @@ struct Snapshot {
     /// 胡 to win, for the page's wording
     threshold: u32,
     pile: usize,
-    scores: [i32; Seat::COUNT],
+    /// One per seat at the table, as are `seats`
+    scores: Vec<i32>,
     seats: Vec<SeatJson>,
     offer: Option<OfferJson>,
     /// The human's claim options while the round waits on their claim
@@ -320,7 +334,8 @@ struct Snapshot {
     result: Option<ResultJson>,
 }
 
-fn describe(event: &Event) -> String {
+fn describe(players: usize, event: &Event) -> String {
+    let name = |seat| name(players, seat);
     match *event {
         Event::Draw { seat, card } => format!("{}摸 {card}", name(seat)),
         Event::Discard { seat, card } => format!("{}打 {card}", name(seat)),
@@ -339,6 +354,7 @@ fn describe(event: &Event) -> String {
 }
 
 fn snapshot(game: &Game, round: &Round) -> Snapshot {
+    let players = game.rules().players;
     let finished = round.phase() == Phase::Finished;
     let (phase, actor) = match round.phase() {
         Phase::Claim(seat) => ("claim", Some(seat.index())),
@@ -369,13 +385,13 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
         dealer: round.dealer().index(),
         threshold: game.rules().threshold,
         pile: round.pile_len(),
-        scores: game.scores(),
-        seats: Seat::ALL
-            .into_iter()
-            .map(|seat| {
+        scores: game.scores()[..players].to_vec(),
+        seats: Seat::ALL[..players]
+            .iter()
+            .map(|&seat| {
                 let shown = seat == HUMAN || finished;
                 SeatJson {
-                    name: name(seat),
+                    name: name(players, seat),
                     hu: visible_hu(game.rules(), round, seat, shown),
                     concealed: round.hand(seat).len(),
                     exposed: exposed(round, seat),
@@ -424,7 +440,11 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
         } else {
             Vec::new()
         },
-        log: round.events().iter().map(describe).collect(),
+        log: round
+            .events()
+            .iter()
+            .map(|event| describe(players, event))
+            .collect(),
         result: round.result().map(|result| {
             let public = result.winner.map_or(0, |seat| {
                 round.exposed(seat).len() + usize::from(result.winning_card.is_some())
@@ -469,10 +489,8 @@ struct Core {
 impl Core {
     fn new(seed: u64, settings: &Settings, search: bool) -> Self {
         let mut rng = StdRng::seed_from_u64(seed);
-        let game = Game::new(
-            settings.rules(),
-            Seat::ALL[rng.random_range(..Seat::ALL.len())],
-        );
+        let rules = settings.rules();
+        let game = Game::new(rules, Seat::ALL[rng.random_range(..rules.players)]);
         let table = Self::seat(&game, &mut rng, search);
         Self {
             game,
@@ -589,7 +607,7 @@ impl Core {
 // The wasm surface
 // ---------------------------------------------------------------------------
 
-/// A game of 十胡 against three bots
+/// A game of 十胡 against one to three bots
 #[wasm_bindgen]
 pub struct WebGame {
     core: Core,
@@ -598,7 +616,7 @@ pub struct WebGame {
 #[wasm_bindgen]
 impl WebGame {
     /// `seed` is a decimal string from JS (wasm has no entropy); `settings`
-    /// is the settings form as JSON, e.g. `{"threshold":8}`
+    /// is the settings form as JSON, e.g. `{"threshold":8,"players":3}`
     #[wasm_bindgen(constructor)]
     #[must_use]
     pub fn new(seed: &str, settings: &str) -> Self {
@@ -690,6 +708,21 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&core.snapshot()).unwrap();
         assert_eq!(value["threshold"], 8);
         assert_eq!(core.game.rules(), &Rules::eight());
+    }
+
+    /// A table of three shows three seats and is dealt to three; a table
+    /// the engine cannot deal is the nearest it can.
+    #[test]
+    fn settings_pick_the_table() {
+        assert_eq!(Settings::parse("{}").players, 4);
+        assert_eq!(Settings::parse(r#"{"players":9}"#).rules().players, 4);
+        assert_eq!(Settings::parse(r#"{"players":0}"#).rules().players, 2);
+        let core = Core::new(7, &Settings::parse(r#"{"players":3}"#), false);
+        let value: serde_json::Value = serde_json::from_str(&core.snapshot()).unwrap();
+        assert_eq!(value["seats"].as_array().unwrap().len(), 3);
+        assert_eq!(value["scores"].as_array().unwrap().len(), 3);
+        assert_eq!(value["seats"][2]["name"], "上家");
+        assert!(core.table.round().hand(Seat::ALL[3]).is_empty());
     }
 
     /// 大肚: three alike stay a triplet, with the rest of 俥傌炮 loose.
@@ -854,7 +887,7 @@ mod tests {
                         );
                     }
                     assert!(
-                        value["seats"][HUMAN.next().index()]["hand"].is_array(),
+                        value["seats"][HUMAN.next(Seat::COUNT).index()]["hand"].is_array(),
                         "bots reveal at the end"
                     );
                     core.next_round();
@@ -895,7 +928,7 @@ mod tests {
                 _ => {
                     assert!(core.hint().is_empty());
                     assert!(
-                        value["seats"][HUMAN.next().index()]["hand"].is_null(),
+                        value["seats"][HUMAN.next(Seat::COUNT).index()]["hand"].is_null(),
                         "bots stay concealed"
                     );
                     assert!(matches!(core.table.step(), Ok(Step::Acted(_))));

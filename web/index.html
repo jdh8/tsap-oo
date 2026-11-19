@@ -28,13 +28,19 @@
           <option value="10">十胡（滿 10 胡）</option>
           <option value="8">八胡（滿 8 胡）</option>
         </select></label></div>
+      <div class="setting"><label>人數
+        <select name="players">
+          <option value="4">4 人</option>
+          <option value="3">3 人</option>
+          <option value="2">2 人</option>
+        </select></label></div>
       <div class="setting"><label>打牌
         <select name="tap">
           <option value="0">自動（滑鼠點一下，觸控點兩下）</option>
           <option value="1">點一下就打出</option>
           <option value="2">先點選，再點一次打出</option>
         </select></label></div>
-      <p>換玩法會開新局。</p>
+      <p>換玩法或人數會開新局。</p>
       <button class="action">套用</button>
     </form>
   </dialog>
@@ -48,7 +54,7 @@
         <b>吃</b>：只有摸牌的人和下家，湊成下表的組合或一對。吃碰進來的牌，這一回合不能打。</li>
       <li><b>將帥</b>摸到必吃，不能碰，也不能打。</li>
       <li>沒有牌可打就是<b>相公</b>，賠每家 <span class="threshold">10</span> 胡；會相公的按鈕是灰的。</li>
-      <li>手牌全部排成組合、滿 <b><span class="threshold">10</span> 胡</b>就胡牌：向三家各收自己的胡數，並當莊。
+      <li>手牌全部排成組合、滿 <b><span class="threshold">10</span> 胡</b>就胡牌：向其他每家各收自己的胡數，並當莊。
         牌堆剩 6 張時流局，莊家連莊。</li>
     </ul>
     <p>細節在書裡：<a href="https://jdh8.github.io/tsap-oo-book/play.html" target="_blank">流程</a>、<a

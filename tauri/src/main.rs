@@ -3,7 +3,7 @@
 //! The page is `web/`'s, unchanged, embedded at build time.  What differs is
 //! where the engine runs and who sits at the table: `web/app.js` finds
 //! `window.__TAURI__` and calls the commands below instead of loading the
-//! wasm, and the three opponents search ([`WebGame::searching`]), which the
+//! wasm, and the opponents search ([`WebGame::searching`]), which the
 //! browser's do not.  Every command returns the same JSON string its
 //! `WebGame` namesake hands the browser.
 

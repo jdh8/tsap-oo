@@ -33,8 +33,9 @@ python3 -m http.server
 # open http://localhost:8000/
 ```
 
-You play against three bots, named by where they sit from you: 下家 to
-your right plays after you, then 對家 across, then 上家 to your left.  When a public card is
+You play against three bots, or one or two (設定 → 人數), named by where
+they sit from you: 下家 to your right plays after you, then 對家 across,
+then 上家 to your left; at three there is no 對家, and at two only 對家.  When a public card is
 yours to claim, the buttons under your hand offer 碰, each possible 吃, and
 過.  A claim button shows only the cards that leave your hand, not the card
 on the table: 吃 帥相 takes a 仕.  When it is your discard, click a card.  Wins and kongs are compulsory and

@@ -36,13 +36,13 @@ use core::fmt;
 /// A seat at the table, numbered from 0 in turn order
 ///
 /// Seats carry no compass points: the next player (下家) is the next number,
-/// wrapping around after the last.  The only table size modelled is
-/// [`Seat::COUNT`].
+/// wrapping around after the last of the [`Rules::players`] at the table.
+/// [`Seat::COUNT`] is the most; seats beyond the table stay empty.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Seat(u8);
 
 impl Seat {
-    /// Players at the table
+    /// The most players at a table
     pub const COUNT: usize = 4;
 
     /// Seats in turn order
@@ -63,18 +63,18 @@ impl Seat {
         self.0 as usize
     }
 
-    /// The seat `n` places along in turn order
+    /// The seat `n` places along in turn order at a table of `players`
     #[must_use]
     #[inline]
-    pub const fn advance(self, n: usize) -> Self {
-        Self::ALL[(self.index() + n) % Self::COUNT]
+    pub const fn advance(self, n: usize, players: usize) -> Self {
+        Self::ALL[(self.index() + n) % players]
     }
 
-    /// The next player, 下家
+    /// The next player, 下家, at a table of `players`
     #[must_use]
     #[inline]
-    pub const fn next(self) -> Self {
-        self.advance(1)
+    pub const fn next(self, players: usize) -> Self {
+        self.advance(1, players)
     }
 }
 

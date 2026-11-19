@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Tables of two and three: `Rules::players`, 2 to `Seat::COUNT`, 4 by
+  default, dealt and scored as at four (twenty each, a win or a 相公 settled
+  with each other seat).  The web and desktop clients choose it under 設定 →
+  人數.  `Seat::advance` and `Seat::next` take the table size, and
+  `Round::from_pile` rejects a table outside 2 to 4 or a dealer beyond it.
+  `ExpectBot` prices a win and a 相公 by the seats at the table; the rest
+  of every bot is as tuned at four.  Play at four is unchanged:
+  `ab/run.sh 20000` against `6ebab9b` (seed base 1795053807) parts on no
+  deal.
+
 - `Eval`, batch 3 of `doc/eval.md`: what a hand is worth in points by each
   count of public cards to come, from nine pattern tables (each colour's
   將士象 and 車馬包, and the soldiers, symmetric patterns merged), the

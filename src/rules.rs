@@ -9,6 +9,9 @@ use susik::Values;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct Rules {
+    /// Players at the table, 2 to [`Seat::COUNT`](crate::Seat::COUNT): the
+    /// first seats of [`Seat::ALL`](crate::Seat::ALL)
+    pub players: usize,
     /// Minimum 胡 to win: the eponymous ten, or eight in 八胡
     pub threshold: u32,
     /// Cards at the bottom of the pile that are never drawn (廢牌); a round
@@ -24,7 +27,7 @@ pub struct Rules {
 impl Rules {
     /// The common Taiwanese 十胡 table
     ///
-    /// Ten to win, six dead cards, and per meld: lone general 1, pair 0,
+    /// Four players, ten to win, six dead cards, and per meld: lone general 1, pair 0,
     /// 將士象 2, 車馬包 1, soldiers of three colours 3 and of four 5,
     /// triplet 3 concealed or 1 ponged, quad 8 concealed or 6 konged.
     #[must_use]
@@ -40,6 +43,7 @@ impl Rules {
             four_soldiers: 5,
         };
         Self {
+            players: 4,
             threshold: 10,
             dead_tail: 6,
             concealed,

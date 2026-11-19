@@ -301,7 +301,7 @@ fn hands(
         let Some(t) = bot.terms(&View::new(round, other), hand) else {
             continue;
         };
-        let rivals = [1, 2, 3].map(|n| other.advance(n));
+        let rivals = [1, 2, 3].map(|n| other.advance(n, Seat::COUNT));
         let fewest = rivals.iter().map(|&seat| round.hand(seat).len()).min();
         let theirs: u32 = rivals.iter().map(|&seat| shown[seat.index()]).sum();
         let unseen = Hand::FULL.len() - round.hand(other).len() - out;

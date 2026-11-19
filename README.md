@@ -66,9 +66,14 @@ different value for four-colour soldiers, the 將 parity rule — are not
 modelled; all values are fields of `Rules`.
 
 八胡 is `Rules::eight()`: the same table with eight to win, and so eight for
-a 相公.  It is played here at the same table of four with the same deal; the
-five-player game it is often named for is not modelled, as the table size is
-fixed (`Seat::COUNT`).
+a 相公.
+
+The table is `Rules::players`, two to four, four by default; the write-ups
+allow two to five.  A smaller table deals and scores the same: twenty cards
+each, one more to the dealer, the rest to the pile, and a win or a 相公
+settled with each other seat.  The five-player game 八胡 is often named for
+is not modelled (`Seat::COUNT` is four).  The bots were tuned at four and
+play smaller tables untuned.
 
 Open questions, played provisionally:
 

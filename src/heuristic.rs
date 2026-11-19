@@ -451,7 +451,7 @@ impl HeuristicBot {
             let pass = self.value(hand, need);
             // Passing brings the next seat a draw; a claim must beat that
             // too.
-            if view.seat() == offer.source.next() {
+            if view.seat() == offer.source.next(view.rules().players) {
                 (self.draw(hand, need, pass), Claim::Pass)
             } else {
                 (pass, Claim::Pass)

@@ -37,7 +37,7 @@ fn test(tally: &mut Tally, round: &Round, rules: &Rules, seat: Seat, card: Card)
     let mut solver = Solver::new(rules.concealed, None).locked();
     // (at all, pair, triplet, run) over the other seats, and the most 胡
     let (mut wins, mut most) = ([false; 4], 0);
-    for other in [1, 2, 3].map(|n| seat.advance(n)) {
+    for other in [1, 2, 3].map(|n| seat.advance(n, Seat::COUNT)) {
         let hand = round.hand(other);
         let shown: u32 = round
             .exposed(other)
@@ -65,7 +65,7 @@ fn test(tally: &mut Tally, round: &Round, rules: &Rules, seat: Seat, card: Card)
     }
     row[5] += u64::from(most);
     row[6] += u64::from(
-        locked_completions(round.hand(seat.next()), card)
+        locked_completions(round.hand(seat.next(Seat::COUNT)), card)
             .iter()
             .any(run),
     );
@@ -92,7 +92,7 @@ fn play(seed: u64, any: &mut [Tally; 3], made: &mut [Tally; 3]) {
                 };
                 let others = [1, 2, 3]
                     .into_iter()
-                    .flat_map(|n| round.hand(seat.advance(n)).iter())
+                    .flat_map(|n| round.hand(seat.advance(n, Seat::COUNT)).iter())
                     .fold(Hand::EMPTY, Hand::with);
                 for (card, _) in Hand::FULL.distinct() {
                     // Generals stay put, and a card the other seats hold

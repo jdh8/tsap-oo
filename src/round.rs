@@ -256,9 +256,10 @@ pub(crate) fn options(hand: Hand, card: Card, eater: bool) -> ClaimOptions {
     }
 }
 
-/// The pile handed to [`Round::from_pile`] was not the full deck
+/// The pile handed to [`Round::from_pile`] was not the full deck, or the
+/// table not 2 to [`Seat::COUNT`] players with the dealer among them
 #[derive(Debug, Error, Clone, Copy, PartialEq, Eq, Hash)]
-#[error("a deal needs all 112 cards")]
+#[error("a deal needs all 112 cards, 2 to 4 players and a dealer among them")]
 pub struct DealError;
 
 /// One deal of 十胡
@@ -283,20 +284,27 @@ impl Round {
     /// Deal from a pile holding the whole deck in draw order
     ///
     /// Cards come off the end: twenty to the dealer, twenty to each seat
-    /// after, one more to the dealer, who then discards first — unless the
+    /// after at the table of [`Rules::players`], one more to the dealer, who then discards first — unless the
     /// deal already lays out for the threshold (天胡), in which case the
     /// round is finished at once.
     ///
     /// # Errors
     ///
-    /// When `pile` is not a permutation of the 112-card deck.
+    /// When `pile` is not a permutation of the 112-card deck, or
+    /// [`Rules::players`] is not 2 to [`Seat::COUNT`] or `dealer` not among
+    /// them.
     pub fn from_pile(rules: Rules, dealer: Seat, mut pile: Vec<Card>) -> Result<Self, DealError> {
-        if pile.len() != 112 || pile.iter().copied().collect::<Hand>() != Hand::FULL {
+        let players = rules.players;
+        if !(2..=Seat::COUNT).contains(&players)
+            || dealer.index() >= players
+            || pile.len() != 112
+            || pile.iter().copied().collect::<Hand>() != Hand::FULL
+        {
             return Err(DealError);
         }
         let mut hands = [Hand::EMPTY; Seat::COUNT];
-        for i in 0..Seat::COUNT {
-            let hand = &mut hands[dealer.advance(i).index()];
+        for i in 0..players {
+            let hand = &mut hands[dealer.advance(i, players).index()];
             for _ in 0..20 {
                 hand.insert(pile.pop().expect("112 cards suffice"));
             }
@@ -528,7 +536,7 @@ impl Round {
         round.pile = unseen;
         // Who is asked after `seat` depends on the hands just dealt.
         if let (Phase::Claim(_), Some(offer)) = (round.phase, round.offer) {
-            let later: Vec<Seat> = Self::order(offer)
+            let later: Vec<Seat> = Self::order(round.rules.players, offer)
                 .skip_while(|&other| other != seat)
                 .skip(1)
                 .filter(|&other| !round.options_for(offer, other).is_empty())
@@ -545,21 +553,23 @@ impl Round {
         &mut self.pile
     }
 
-    /// The seats a public card is offered to, in priority order
-    fn order(offer: Offer) -> impl Iterator<Item = Seat> {
+    /// The seats of a table of `players` a public card is offered to, in
+    /// priority order
+    fn order(players: usize, offer: Offer) -> impl Iterator<Item = Seat> {
         let (start, n) = if offer.drawn {
-            (offer.source, Seat::COUNT)
+            (offer.source, players)
         } else {
-            (offer.source.next(), Seat::COUNT - 1)
+            (offer.source.next(players), players - 1)
         };
-        (0..n).map(move |i| start.advance(i))
+        (0..n).map(move |i| start.advance(i, players))
     }
 
     fn options_for(&self, offer: Offer, seat: Seat) -> ClaimOptions {
         let card = offer.card;
         let drawer = offer.drawn && seat == offer.source;
         // Only its drawer eats a general.
-        let eater = drawer || (seat == offer.source.next() && card.rank != Rank::General);
+        let eater =
+            drawer || (seat == offer.source.next(self.rules.players) && card.rank != Rank::General);
         options(self.hands[seat.index()], card, eater)
     }
 
@@ -597,14 +607,14 @@ impl Round {
             drawn,
         };
         self.offer = Some(offer);
-        for seat in Self::order(offer) {
+        for seat in Self::order(self.rules.players, offer) {
             if let Some((hu, layout)) = self.win(seat, self.hands[seat.index()], card) {
                 let from = (!(drawn && seat == source)).then_some(source);
                 self.finish(Some(seat), None, hu, layout, Some(card), from);
                 return;
             }
         }
-        for seat in Self::order(offer) {
+        for seat in Self::order(self.rules.players, offer) {
             if self.hands[seat.index()].count(card) == 3 {
                 self.take(seat, Meld::Quad(card), card, Event::Kong { seat, card });
                 return;
@@ -624,7 +634,7 @@ impl Round {
             self.take(source, meld, card, event);
             return;
         }
-        self.queue = Self::order(offer)
+        self.queue = Self::order(self.rules.players, offer)
             .filter(|&seat| !self.options_for(offer, seat).is_empty())
             .collect();
         self.eat = None;
@@ -685,7 +695,7 @@ impl Round {
             });
         }
         self.discards.push((offer.source, offer.card));
-        self.draw(offer.source.next());
+        self.draw(offer.source.next(self.rules.players));
     }
 
     fn draw(&mut self, seat: Seat) {

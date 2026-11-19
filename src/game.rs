@@ -41,7 +41,7 @@ impl Game {
         self.dealer
     }
 
-    /// Scores in [`Seat::ALL`] order
+    /// Scores in [`Seat::ALL`] order; 0 for the seats beyond the table
     #[must_use]
     #[inline]
     pub const fn scores(&self) -> [i32; Seat::COUNT] {
@@ -73,8 +73,9 @@ impl Game {
             (None, Some(foul)) => (foul, -to_i32(self.rules.threshold)),
             (None, None) => return,
         };
-        let others = Seat::COUNT as i32 - 1;
-        for seat in Seat::ALL {
+        let players = self.rules.players;
+        let others = players as i32 - 1;
+        for &seat in &Seat::ALL[..players] {
             self.scores[seat.index()] += if seat == collector { others * hu } else { -hu };
         }
         if let Some(winner) = result.winner {

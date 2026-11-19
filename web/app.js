@@ -11,8 +11,13 @@ const NATIVE = '__TAURI__' in window; // the desktop client injects it
 const PACE_MS = 550; // pause between bot steps, so they can be followed
 
 // Seats are numbers in turn order.  Play runs counterclockwise, so counting
-// on from you, the next player (下家) sits to your right.
-const SLOTS = [null, 'right', 'top', 'left'];
+// on from you, the next player (下家) sits to your right; at a table of two
+// the other player sits across.  By table size, counting on from you.
+const SLOTS = {
+  2: [null, 'top'],
+  3: [null, 'right', 'left'],
+  4: [null, 'right', 'top', 'left'],
+};
 
 let game; // every method answers a JSON string, or a promise of one: always await
 let state;
@@ -54,7 +59,7 @@ function applySettings(e) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   } catch {} // still applies to this visit
   // Scores under different tables do not add up; the rest is the page's own.
-  if (settings.threshold !== state.threshold) newGame();
+  if (settings.threshold !== state.threshold || settings.players !== state.seats.length) newGame();
   else render();
 }
 
@@ -191,7 +196,8 @@ function meldsEl(melds) {
 
 function render() {
   const name = (seat) => state.seats[seat].name;
-  const slot = (seat) => SLOTS[(seat - state.human + state.seats.length) % state.seats.length];
+  const n = state.seats.length;
+  const slot = (seat) => SLOTS[n][(seat - state.human + n) % n];
   const finished = state.phase === 'finished';
 
   // The threshold in force, in the help sheet.
@@ -207,11 +213,11 @@ function render() {
     scores.append(span);
   });
 
-  // Opponents.
+  // Opponents, in their slots; a slot with nobody at it stays empty.
+  for (const box of document.querySelectorAll('.opp')) box.replaceChildren();
   state.seats.forEach((s, seat) => {
     if (seat === state.human) return;
     const box = id(slot(seat));
-    box.replaceChildren();
     const label = document.createElement('div');
     label.className = 'name' + (state.actor === seat ? ' acting' : '');
     label.textContent = name(seat);

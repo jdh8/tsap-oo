@@ -170,6 +170,8 @@ struct Entry {
 #[derive(Debug, Clone)]
 pub struct Graph {
     threshold: u32,
+    /// The seats that pay a win and are paid a foul
+    others: f64,
     roots: Vec<usize>,
     /// The hand of each node
     hands: Vec<Hand>,
@@ -207,6 +209,7 @@ impl Graph {
             depth: 0,
             graph: Self {
                 threshold: rules.threshold,
+                others: (rules.players - 1) as f64,
                 roots: Vec::new(),
                 hands: vec![Hand::EMPTY],
                 bases: vec![0],
@@ -351,7 +354,7 @@ impl Graph {
     ) -> Vec<f64> {
         assert_eq!(leaves.len(), self.leaves.len(), "one curve a leaf");
         let (loss, foul) = match payoff {
-            Payoff::Points => (outlook.loss, -3.0 * f64::from(self.threshold)),
+            Payoff::Points => (outlook.loss, -self.others * f64::from(self.threshold)),
             Payoff::Win => (0.0, 0.0),
         };
         let mut before = vec![0.0; self.len()];
@@ -385,7 +388,7 @@ impl Graph {
                 for entry in &self.entries[first as usize..self.ends[node] as usize] {
                     let answer = match entry.kind {
                         Kind::Win(hu) => match payoff {
-                            Payoff::Points => 3.0 * f64::from(hu),
+                            Payoff::Points => self.others * f64::from(hu),
                             Payoff::Win => 1.0,
                         },
                         Kind::Kong => forced(entry),

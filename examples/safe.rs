@@ -62,7 +62,7 @@ fn play(seed: u64, any: &mut Tally, made: &mut Tally) {
             Phase::Discard(seat) => {
                 let view = View::new(&round, seat);
                 let choice = HeuristicBot::new(&rules).discard(&view);
-                for other in [1, 2, 3].map(|n| seat.advance(n)) {
+                for other in [1, 2, 3].map(|n| seat.advance(n, Seat::COUNT)) {
                     let safe = view.safe(other);
                     let row = (20 - view.concealed_len(other).min(20)) / 2;
                     for (card, _) in discardable(view.hand(), view.locked()).distinct() {

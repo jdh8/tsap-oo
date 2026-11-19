@@ -176,7 +176,7 @@ impl Tally {
                 if card.rank == Rank::General {
                     self.general.add(gated, draw && source == watcher);
                 } else {
-                    let place = (draw && source == watcher) || source.next() == watcher;
+                    let place = (draw && source == watcher) || source.next(Seat::COUNT) == watcher;
                     self.eat.add(gated, place && !blocks(watcher));
                 }
             }

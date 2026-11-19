@@ -285,6 +285,17 @@ mod playouts {
         playout(Rules::eight());
     }
 
+    /// The same at tables of three and two: twenty each still, the seats
+    /// beyond the table never act and never pay.
+    #[test]
+    fn bots_finish_rounds_at_smaller_tables() {
+        for players in [3, 2] {
+            let mut rules = Rules::new();
+            rules.players = players;
+            playout(rules);
+        }
+    }
+
     /// The same with an `ExpectBot` in the second seat, which plays by the
     /// DP once its hand is short
     #[test]
@@ -325,6 +336,9 @@ mod playouts {
                 bots[1] = Some(Box::new(ExpectBot::new(&rules)));
             }
             let mut table = Table::new(game.deal(&mut rng), bots);
+            for &seat in &Seat::ALL[rules.players..] {
+                assert!(table.round().hand(seat).is_empty());
+            }
             let mut safe = Seat::ALL.map(|_| susik::Hand::EMPTY);
             loop {
                 let round = table.round();
@@ -333,6 +347,10 @@ mod playouts {
                 }
                 match table.step().unwrap() {
                     Step::Acted(seat) => {
+                        assert!(
+                            seat.index() < rules.players,
+                            "a seat beyond the table acted"
+                        );
                         let round = table.round();
                         conserved(round);
                         // A claim never strands a seat without a discard.
@@ -381,7 +399,32 @@ mod playouts {
         }
         assert_eq!(wins + exhausted + fouls, rounds);
         assert_eq!(game.scores().iter().sum::<i32>(), 0);
+        assert!(
+            game.scores()[rules.players..]
+                .iter()
+                .all(|&score| score == 0)
+        );
         [wins, proven]
+    }
+}
+
+/// A table is 2 to 4 players, and the dealer sits at it.
+#[test]
+fn a_deal_needs_a_table() {
+    let deck = || Hand::FULL.iter().collect::<Vec<_>>();
+    for (players, dealer, ok) in [
+        (1, FIRST, false),
+        (2, SECOND, true),
+        (2, THIRD, false),
+        (5, FIRST, false),
+    ] {
+        let mut rules = Rules::new();
+        rules.players = players;
+        assert_eq!(
+            Round::from_pile(rules, dealer, deck()).is_ok(),
+            ok,
+            "{players} players"
+        );
     }
 }
 
