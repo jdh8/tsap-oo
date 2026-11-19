@@ -387,8 +387,8 @@ function render() {
 }
 
 // Ring what a bot would do here, a card in your hand or a claim button, and
-// mark every move with how far it grades behind that pick.  The marks last
-// until the next render, i.e. for this one decision.  Of several copies of
+// mark every move with what the bot makes of it.  The marks last until the
+// next render, i.e. for this one decision.  Of several copies of
 // the pick it rings the last: the loose cards are the last group, so a loose
 // copy is ringed before one sitting in a meld.
 async function showHint() {
@@ -402,19 +402,19 @@ async function showHint() {
     ),
   ];
   els(rows[0].code).at(-1)?.classList.add('hint');
-  for (const { code, behind, points } of rows) {
+  for (const { code, value, points } of rows) {
     for (const el of els(code)) {
       const mark = document.createElement('span');
       mark.className = 'grade';
-      // Where the bot searches, expected points given up; elsewhere, a priority
-      // without a unit that orders the moves and prices nothing.
-      mark.textContent = behind == null ? '死' : points ? behind.toFixed(2) : behind;
+      // Where the bot searches, expected points, plus or minus; elsewhere, a
+      // priority without a unit that orders the moves and prices nothing.
+      mark.textContent = value == null ? '死' : points ? value.toFixed(2) : value;
       mark.title =
-        behind == null
+        value == null
           ? '走了這步，手牌再也湊不到胡牌要的胡數'
           : points
-            ? `電腦估計這步比首選少拿 ${behind.toFixed(2)} 點（期望值）`
-            : `電腦把這步排在首選後面 ${behind}（只是排序用的分數，沒有單位）`;
+            ? `電腦估計走了這步，這局的期望值是 ${value.toFixed(2)} 點`
+            : `電腦給這步的分數是 ${value}（只是排序用的分數，沒有單位）`;
       el.append(mark);
     }
   }

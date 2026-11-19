@@ -88,14 +88,14 @@ impl Settings {
 // ---------------------------------------------------------------------------
 
 /// One move the hint rates: a card code to discard, or `pass`, `pong`,
-/// `eat<index>`, and how far it falls behind the bot's pick, `null` when it
-/// leaves the hand dead.  Where [`ExpectBot`] searches (`points`) that is
-/// the expected points it gives up; elsewhere, `HeuristicBot`'s grade, a
-/// priority without a unit.
+/// `eat<index>`, and what the bot makes of it, its pick being the highest.
+/// Where [`ExpectBot`] searches (`points`) that is the expected points,
+/// plus or minus; elsewhere, `HeuristicBot`'s grade, a priority without a
+/// unit, `null` when the move leaves the hand dead.
 #[derive(Serialize)]
 struct HintJson {
     code: String,
-    behind: Option<f64>,
+    value: Option<f64>,
     points: bool,
 }
 
@@ -583,14 +583,13 @@ impl Core {
                 .collect(),
             _ => Vec::new(),
         };
-        let best = rated.first().map_or(0.0, |&(_, value)| value);
         rated
             .into_iter()
             .map(|(code, value)| HintJson {
                 code,
-                // A dead hand grades about 32000 down, far below any live
-                // one; the DP prices a dead hand in points like any other.
-                behind: (points || best - value <= 16_000.0).then_some(best - value),
+                // A dead hand grades about -32000, far below any live one;
+                // the DP prices a dead hand in points like any other.
+                value: (points || value > -16_000.0).then_some(value),
                 points,
             })
             .collect()
@@ -899,7 +898,10 @@ mod tests {
                 Phase::Claim(HUMAN) => {
                     assert!(value["options"].is_object());
                     let hints = core.hint();
-                    assert_eq!(hints[0].behind, Some(0.0), "the pick is the best");
+                    assert!(
+                        hints.iter().all(|hint| hint.value <= hints[0].value),
+                        "the pick is the best"
+                    );
                     let hint = hints[0].code.clone();
                     let eats = value["options"]["eats"].as_array().unwrap().len();
                     assert!(
