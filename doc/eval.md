@@ -612,6 +612,32 @@ SHALLOW=17 BASELINE_EXPECT=1 BASELINE_GATE=14 BASELINE_SHALLOW=17`：
   點數得先有那張桌子的 `Outlook`（`examples/outlook.rs`）與標註，表也要拉長
   到 174 張；上面兩個修法說照四人桌的表硬算是輸的。還沒做。
 
+## 八胡：十胡的表在閘門外
+
+「形狀」說八胡在有它的表之前，閘門外照舊是 `HeuristicBot`。程式不是這樣：
+`web/src/lib.rs` 的 `bot()` 不看門檻，`ExpectBot::depth` 只擋公牌張數，所以
+批次 4 起八胡的四人桌在閘門外用十胡的表打淺層的圖。這個打法沒有量過。圖裡
+的胡與天花板的剪枝照 `Rules` 的門檻，是對的；葉節點的值是十胡的，差 2 胡
+就胡的手被當成還差 4 胡。
+
+`ab/` 多一個開關：`THRESHOLD` 是兩邊的門檻，預設 10。
+
+宣告（2026-11-20，跑之前寫下；對照 `09eb4c4`，`RESHUFFLE=8`，
+`THRESHOLD=8`，四人桌，另外幾家都是 `HeuristicBot`）。候選是現在的打法，
+對照是閘門相同、閘門外照 `HeuristicBot` 打的 `ExpectBot`：
+
+| | 設定 | 局數 | seed base |
+| --- | --- | ---: | ---: |
+| 網頁 | `EXPECT=1.5 GATE_CARDS=10 SHALLOW=0 BASELINE_EXPECT=1` | 10,000 | 1795200000 |
+| 本機 | `EXPECT=1.5 GATE_CARDS=14 SHALLOW=17 BASELINE_EXPECT=1 BASELINE_GATE=14` | 20,000 | 1795300000 |
+
+- 判定各自算。loss：那一種設定在門檻不是 10 時閘門外退回 `HeuristicBot`
+  （`depth` 多一個條件，像兩、三人桌），再跑一次零分歧。win：打法留著，
+  改「形狀」那一句。跨 0：資料不足，打法不動，寫下來。
+- 試跑 400 局（seed base 1，不算數）：網頁 56 秒、84% 分歧、−0.798 ± 0.341；
+  本機 6 分鐘、78% 分歧、−0.113 ± 0.344。所以網頁 10,000 局約 24 分鐘、
+  標準誤約 0.07，本機 20,000 局約 5 小時、約 0.05。
+
 ## 程式的形狀
 
 都還是提議。

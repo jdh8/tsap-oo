@@ -18,7 +18,8 @@
 //! control's `ExpectBot::new` there instead, gated as it ships whatever
 //! `GATE_CARDS` says, or at `BASELINE_GATE`: a wider gate against the one in
 //! place; with `BASELINE_SHALLOW` it plays past its gate as `SHALLOW` has
-//! the candidate.  `PLAYERS` (default 4) is the table's size on both sides.
+//! the candidate.  `PLAYERS` (default 4) is the table's size on both sides, and
+//! `THRESHOLD` (default 10) the 胡 to win: 8 is 八胡.
 //!
 //! Set `RESHUFFLE` to K to average out the luck after the two first part
 //! ways: the deal is played once with the candidate, and at its first choice
@@ -40,6 +41,11 @@ const CANDIDATE: usize = 1;
 /// The table's size: `PLAYERS`, or four
 fn players() -> usize {
     std::env::var("PLAYERS").map_or(new::Seat::COUNT, |s| s.parse().unwrap())
+}
+
+/// The 胡 to win: `THRESHOLD`, or ten
+fn threshold() -> u32 {
+    std::env::var("THRESHOLD").map_or(10, |s| s.parse().unwrap())
 }
 
 /// How many times the pile is reshuffled where the two part, unless
@@ -151,6 +157,7 @@ fn play(
 ) -> Outcome {
     let (mut nr, mut or) = (new::Rules::new(), old::Rules::new());
     (nr.players, or.players) = (players(), players());
+    (nr.threshold, or.threshold) = (threshold(), threshold());
     let mut a = new::Round::from_pile(nr, new::Seat::ALL[dealer], deck.to_vec()).unwrap();
     let mut b = old::Round::from_pile(or, old::Seat::ALL[dealer], deck.to_vec()).unwrap();
     let mut bot = candidate_bot(&nr, seed);

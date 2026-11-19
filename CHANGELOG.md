@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ab/` takes `THRESHOLD`, the 胡 to win on both sides (default 10), to
+  measure a bot at 八胡.
+
 - `ExpectBot::shallow`, batch 4 of `doc/eval.md`: past its gate the bot
   plays by a graph two claims deep up to a card count and one deep beyond,
   each leaf valued by `Eval`, in place of `HeuristicBot`.
