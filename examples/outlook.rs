@@ -15,12 +15,14 @@
 //! graph — one number for h and the cards a draw, a table for h, a table
 //! for both.
 //!
-//! With 0 rounds it measures nothing and calibrates [`Outlook::default`]
+//! With 0 rounds it measures nothing and calibrates [`Outlook::new`]
 //! and three changes to it, one constant each.
 //!
 //! ```sh
 //! cargo run --release --example outlook -- [rounds] [seed] [calibration rounds]
 //! ```
+//!
+//! `THRESHOLD` (default 10) is the 胡 to win: 8 is 八胡.
 use tsap_oo::susik::{Hand, Rank};
 use tsap_oo::{
     Event, Graph, HeuristicBot, Outlook, Payoff, Phase, Prune, Rules, Seat, Step, Strategy, Table,
@@ -404,7 +406,10 @@ fn main() {
     let rounds = args.next().flatten().unwrap_or(1000);
     let seed = args.next().flatten().unwrap_or(0);
     let check = args.next().flatten().unwrap_or(rounds);
-    let rules = Rules::new();
+    let mut rules = Rules::new();
+    if let Ok(threshold) = std::env::var("THRESHOLD") {
+        rules.threshold = threshold.parse().expect("THRESHOLD is a number");
+    }
     if rounds == 0 {
         perturb(&rules, check, seed + 1);
         return;
@@ -445,7 +450,7 @@ fn main() {
 /// The measured outlook and one constant changed at a time, to see which
 /// one the calibration points at
 fn perturb(rules: &Rules, rounds: u64, seed: u64) {
-    let base = Outlook::default();
+    let base = Outlook::new(rules);
     let scale = |table: &[f64], by: f64| table.iter().map(|x| x * by).collect();
     let outlooks = [
         ("measured", base.clone()),

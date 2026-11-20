@@ -40,6 +40,21 @@ pub struct Outlook {
 }
 
 impl Outlook {
+    /// The table measured under `rules`' threshold, or [`Outlook::default`]
+    #[must_use]
+    pub fn new(rules: &Rules) -> Self {
+        match rules.threshold {
+            8 => Self {
+                end: END_8.to_vec(),
+                cards: CARDS_8.to_vec(),
+                loss: -11.30,
+                eat: 0.2599,
+                general: 0.2088,
+            },
+            _ => Self::default(),
+        }
+    }
+
     /// The chance another seat ends the round before each public card to
     /// come, the last card first: segments `0..=draws` less the card being
     /// decided on
@@ -85,6 +100,20 @@ const CARDS: [f64; 26] = [
     0.2791, 1.2594, 1.3112, 1.4403, 1.3689, 1.4043, 1.4298, 1.4611, 1.4954, 1.5066, 1.5715, 1.5844,
     1.6264, 1.6332, 1.7161, 1.7365, 1.8207, 1.9039, 1.9455, 2.0456, 2.1579, 2.2592, 2.3920, 2.5734,
     2.7310, 3.2345,
+];
+
+/// [`END`] at 八胡: `THRESHOLD=8 outlook 10000 800`
+const END_8: [f64; 26] = [
+    0.1734, 0.1734, 0.1429, 0.1479, 0.1221, 0.1462, 0.1350, 0.1432, 0.1146, 0.1238, 0.1087, 0.1058,
+    0.1069, 0.0888, 0.0899, 0.0912, 0.0726, 0.0721, 0.0702, 0.0568, 0.0519, 0.0493, 0.0432, 0.0324,
+    0.0350, 0.0350,
+];
+
+/// [`CARDS`] at 八胡: `THRESHOLD=8 outlook 10000 800`
+const CARDS_8: [f64; 26] = [
+    0.3168, 1.2466, 1.2917, 1.3016, 1.4740, 1.4203, 1.3701, 1.4603, 1.4460, 1.4533, 1.5207, 1.5631,
+    1.5912, 1.6754, 1.6991, 1.7635, 1.8283, 1.9323, 1.9720, 2.0716, 2.1837, 2.3270, 2.4861, 2.6536,
+    2.8891, 3.4176,
 ];
 
 /// What a round is worth to the seat
@@ -448,6 +477,8 @@ impl ExpectBot {
     /// [`END_SCALE`], gated at 10 cards
     #[must_use]
     pub fn new(rules: &Rules) -> Self {
+        // ponytail: the ten-胡 tables at 八胡 too; `Outlook::new`'s measured
+        // insufficient data against them (`research/outlook.md`, 八胡).
         let mut outlook = Outlook::default();
         outlook.end.iter_mut().for_each(|h| *h *= END_SCALE);
         Self {

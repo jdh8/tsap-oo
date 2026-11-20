@@ -8,7 +8,7 @@
 //! `PEEK` as well to seat the Peeker.  `GATE_CARDS` and `GATE_SHANTEN` gate
 //! the `MonteCarloBot` (`MonteCarloBot::gated`): it searches only with that
 //! many concealed cards or fewer, or within that 向聽數.  Set `EXPECT` to
-//! seat an `ExpectBot` instead, its measured h scaled by that factor (1.5 is `ExpectBot::new`'s) and gated at
+//! seat an `ExpectBot` instead, its `Outlook::new` h scaled by that factor (1.5 is `ExpectBot::new`'s) and gated at
 //! `GATE_CARDS` (default 10), and with `SHALLOW` as well playing past the
 //! gate by `ExpectBot::shallow` with that many cards two claims deep.  Set
 //! `BASELINE_SAMPLES` to seat the control's
@@ -83,7 +83,7 @@ fn candidate_bot(rules: &new::Rules, seed: u64) -> Box<dyn new::Strategy> {
     // `EXPECT` puts an ExpectBot in the candidate seat, h scaled by it.
     if let Ok(scale) = std::env::var("EXPECT") {
         let scale: f64 = scale.parse().unwrap();
-        let mut outlook = new::Outlook::default();
+        let mut outlook = new::Outlook::new(rules);
         outlook.end.iter_mut().for_each(|h| *h *= scale);
         let mut bot = new::ExpectBot::new(rules)
             .with_outlook(outlook)

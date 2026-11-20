@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Outlook::new` picks the table model by `Rules::threshold`: at 八胡 one
+  measured from 10,000 rounds of `HeuristicBot` self-play at eight to win,
+  seed 800 (`research/outlook.md`, 八胡).  `examples/outlook.rs` and `ab/`'s
+  `EXPECT` candidate take it; `examples/outlook.rs` takes `THRESHOLD`.
+  `ExpectBot::new` still plays the ten-胡 table: A/B of the 八胡 table at
+  `THRESHOLD=8` against `c922a91`, `RESHUFFLE=8`, h × 1.5 on both sides: on
+  the web's settings +0.022 ± 0.013 points a deal, 95% CI [−0.004, +0.048],
+  40,000 deals, seed base 1795400000; on the desktop's +0.005 ± 0.024, 95%
+  CI [−0.041, +0.052], 20,000 deals, seed base 1795500000.  Both
+  insufficient data; play is left as it is.
+
 - `research/discard-order.md`: 好牌先打 put to the A/B.  `HeuristicBot`
   fines a lone card `COPIES * eaten[kin]`, so the dearest goes first
   (兵卒 3, 將士象 2, 車馬包 1).  Against `b25fb0c`, `RESHUFFLE=8`, 100,000
