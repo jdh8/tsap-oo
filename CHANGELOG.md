@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `research/discard-order.md`: 好牌先打 put to the A/B.  `HeuristicBot`
+  fines a lone card `COPIES * eaten[kin]`, so the dearest goes first
+  (兵卒 3, 將士象 2, 車馬包 1).  Against `b25fb0c`, `RESHUFFLE=8`, 100,000
+  deals each: all at 2, −0.057 ± 0.017 points a deal, 95% CI [−0.090,
+  −0.025], seed base 1795400000, a loss; the order reversed, +0.027 ±
+  0.022, 95% CI [−0.015, +0.070], seed base 1795500000, insufficient data.
+  A trace of the loss's first 20,000 deals puts it in the eats the fine
+  also values, not in the discards (+0.02 ± 0.08 a split).  Play is left
+  as it is.
+
 - `doc/variants.md`: what 八胡 and tables of two and three still lack.  The
   rules are complete; the bots' constants, `Outlook` and `Eval` come from
   four players at ten 胡 and are used as they are.
