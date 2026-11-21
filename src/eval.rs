@@ -16,7 +16,8 @@ use susik::{Card, Color, Hand, Rank};
 /// starts with, the most the labels hold.  A longer round reads the last.
 pub const CARDS: usize = 45;
 
-/// The draws a round of four starts with: [`CARDS`] public cards by
+/// The draws a round starts with at every table
+/// ([`Rules::dead`](crate::Rules::dead)): [`CARDS`] public cards by
 /// [`Outlook::default`](crate::Outlook), and the most the labels hold
 /// whatever a bot's own outlook counts a draw
 pub const DRAWS: usize = 25;

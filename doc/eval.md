@@ -618,6 +618,12 @@ SHALLOW=17 BASELINE_EXPECT=1 BASELINE_GATE=14 BASELINE_SHALLOW=17`：
   `CARDS`」會讓淺層的圖在還能摸 41 張時就用上四人桌的 `Eval`，量到每個
   分歧輸 5.8 分；`ExpectBot::depth` 因此多看還能摸的張數不超過
   `eval::DRAWS`（25）。用 `Outlook::default` 時兩個條件是同一件事。
+- **2026-11-21 再補：小桌的牌堆剪到 25 張，這一節說的情況不再發生。**
+  廢牌改成 6 張加每個空位的 20 張（`Rules::dead`，`variants.md`「小桌的
+  廢牌」），兩、三人桌開局也是 25 draws，掃的張數不超過 `CARDS`，淺層的圖
+  從第一手就用得上。`depth` 的兩個條件留著，擋的是把 `dead_tail` 設短的
+  規則；上面的數字都是改之前量的。葉節點的值還是四人桌的標註，小桌上這個
+  打法的 A/B 在 `research/outlook.md`「空位的手牌算廢牌」。
 
 ## 八胡：十胡的表在閘門外
 

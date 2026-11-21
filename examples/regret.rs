@@ -67,7 +67,7 @@ impl Logged {
         };
         let roots: Vec<_> = groups.iter().flatten().copied().collect();
         let graph = Graph::new(rules, live, &roots, prune);
-        let draws = view.pile_len().saturating_sub(rules.dead_tail);
+        let draws = view.pile_len().saturating_sub(rules.dead());
         let points = graph.values(&self.outlook, draws, Payoff::Points);
         let chances = graph.values(&self.outlook, draws, Payoff::Win);
         // The node each answer leads to: its best root by points

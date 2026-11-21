@@ -699,11 +699,11 @@ impl Round {
     }
 
     fn draw(&mut self, seat: Seat) {
-        if self.pile.len() <= self.rules.dead_tail {
+        if self.pile.len() <= self.rules.dead() {
             self.finish(None, None, 0, Vec::new(), None, None);
             return;
         }
-        let card = self.pile.pop().expect("more than the dead tail remains");
+        let card = self.pile.pop().expect("more than the dead cards remain");
         self.events.push(Event::Draw { seat, card });
         self.resolve(card, seat, true);
     }

@@ -202,6 +202,7 @@ function render() {
 
   // The threshold in force, in the help sheet.
   for (const el of document.querySelectorAll('.threshold')) el.textContent = state.threshold;
+  for (const el of document.querySelectorAll('.dead')) el.textContent = state.dead;
 
   // Header: scores, the dealer marked.
   const scores = id('scores');
@@ -244,7 +245,7 @@ function render() {
   const discards = id('discards');
   discards.replaceChildren();
   for (const d of state.discards) discards.append(cardEl(d.card));
-  id('pile').textContent = `牌堆 ${state.pile} 張（尾 6 張廢牌）`;
+  id('pile').textContent = `牌堆 ${state.pile} 張（尾 ${state.dead} 張廢牌）`;
 
   // You.
   const me = state.seats[state.human];

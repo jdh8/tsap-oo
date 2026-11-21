@@ -365,6 +365,17 @@ mod playouts {
             }
             let result = table.round().result().unwrap();
             conserved(table.round());
+            // Every table draws 25 cards at most, and only those exhaust it.
+            let events = table.round().events();
+            let draws = events
+                .iter()
+                .filter(|event| matches!(event, Event::Draw { .. }))
+                .count();
+            let drawn_out = table.round().pile_len() == rules.dead();
+            assert!(draws <= 25 && table.round().pile_len() >= rules.dead());
+            assert_eq!(result.winner.is_none() && result.foul.is_none(), {
+                drawn_out && draws == 25 && events.last() == Some(&Event::Exhausted)
+            });
             match result.winner {
                 Some(winner) => {
                     wins += 1;
@@ -405,6 +416,19 @@ mod playouts {
                 .all(|&score| score == 0)
         );
         [wins, proven]
+    }
+}
+
+/// The hand of each empty seat is dead with the six, so that every table
+/// has 25 cards to draw.
+#[test]
+fn an_empty_seat_leaves_its_hand_dead() {
+    for (players, dead) in [(4, 6), (3, 26), (2, 46)] {
+        let mut rules = Rules::new();
+        rules.players = players;
+        assert_eq!(rules.dead(), dead, "{players} players");
+        let round = Round::from_pile(rules, FIRST, Hand::FULL.iter().collect()).unwrap();
+        assert_eq!(round.pile_len() - rules.dead(), 25, "{players} players");
     }
 }
 

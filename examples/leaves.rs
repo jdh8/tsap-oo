@@ -96,7 +96,7 @@ impl Logged {
             .chain(view.discards().iter().map(|&(_, card)| card))
             .chain(view.offer().map(|offer| offer.card));
         let live = shown.fold(Hand::FULL - view.hand(), Hand::without);
-        let draws = view.pile_len().saturating_sub(rules.dead_tail);
+        let draws = view.pile_len().saturating_sub(rules.dead());
         let roots: Vec<_> = groups.iter().flatten().copied().collect();
         let sizes: Vec<usize> = groups.iter().map(Vec::len).collect();
 

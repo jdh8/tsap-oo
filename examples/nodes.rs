@@ -145,7 +145,7 @@ fn main() {
                         .flat_map(|meld| meld.cards())
                         .chain(view.discards().iter().map(|&(_, card)| card));
                     let live = shown.fold(Hand::FULL - hand, Hand::without);
-                    let draws = view.pile_len() - rules.dead_tail;
+                    let draws = view.pile_len() - rules.dead();
 
                     let start = Instant::now();
                     let graph = Graph::new(&rules, live, &roots, prune);

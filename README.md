@@ -26,6 +26,10 @@ puts the same page in a desktop window, against opponents that search:
 - 112 cards; the dealer gets 21, the others 20, and the dealer discards
   first.  Play runs counterclockwise.  The last six cards of the pile are
   dead: reaching them ends the round with no winner and the same dealer.
+  At a table of three or two the twenty cards of each empty seat are dead
+  as well, so every table draws 25 cards a round; no source says what a
+  smaller table changes, and [`doc/variants.md`](doc/variants.md) has why
+  this was chosen.
 - A draw is turned face up and never enters a hand: only dealt cards are
   concealed, and a meld laid on the table is never added to or rearranged.
   Any public card — a draw or a discard — can

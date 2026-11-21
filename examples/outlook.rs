@@ -37,7 +37,7 @@ const GATE: usize = 10;
 
 /// Draws in a round: the pile after the deal less the dead tail
 const fn draws(rules: &Rules) -> usize {
-    112 - (20 * rules.players + 1) - rules.dead_tail
+    112 - (20 * rules.players + 1) - rules.dead()
 }
 
 /// Events of `n` trials
@@ -335,7 +335,7 @@ fn calibrate(rules: &Rules, outlooks: &[(&str, Outlook)], rounds: u64, seed: u64
                     view.hand(),
                     base,
                     live,
-                    view.pile_len() - rules.dead_tail,
+                    view.pile_len() - rules.dead(),
                 ))
             } else {
                 None

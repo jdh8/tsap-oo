@@ -66,7 +66,7 @@ impl Spot {
             .chain(view.offer().map(|offer| offer.card));
         Self {
             live: shown.fold(Hand::FULL - view.hand(), Hand::without),
-            draws: view.pile_len().saturating_sub(view.rules().dead_tail),
+            draws: view.pile_len().saturating_sub(view.rules().dead()),
             cards,
             groups,
         }

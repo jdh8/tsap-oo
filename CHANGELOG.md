@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Tables of two and three have their own `Outlook`, measured from 10,000
-  rounds each of `HeuristicBot` self-play (seeds 200 and 300,
+- (Superseded by the dead hands of empty seats, under Changed.)  Tables of
+  two and three had their own `Outlook`, measured from 10,000 rounds each
+  of `HeuristicBot` self-play (seeds 200 and 300,
   `research/outlook.md`, 兩、三人桌): at two a card comes to the seat to eat
   0.75 of the time and at three 0.43, against 0.28 at four.  `Outlook::new`
   picks it by `Rules::players`, `examples/outlook.rs` takes `PLAYERS`, and
@@ -143,7 +144,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `ExpectBot::new` plays a table of two or three at ten 胡 by that table's
+- A table of three or two leaves the hand of each empty seat dead.
+  `Rules::dead()` is the cards never drawn: `dead_tail`, now the six of a
+  full table, and twenty for each seat left empty, so 6 at four, 26 at
+  three and 46 at two, and every table draws 25 cards a round.  With the
+  six alone, as Board Game Arena deals, a table of three had 45 cards to
+  draw and a table of two 65; no source says what a smaller table changes.
+  In `HeuristicBot` self-play a round takes 12 draws whatever the table and
+  the pile, so the longer pile only kept a smaller table from ever
+  exhausting: 0.0% of rounds at three and at two against 3.2% at four, and
+  3.5% and 3.8% with 25 to draw (2,000 rounds a row, `length 2000 7` of
+  `research/dead-tail.patch` on `107032c`; `doc/variants.md`, 小桌的廢牌).
+  The web and desktop clients show the table's dead cards.  Play at four is
+  unchanged: against `107032c`, `RESHUFFLE=8`, no deal parts in 20,000 of
+  `HeuristicBot` (seed base 1798500000), 20,000 of `ExpectBot` on the web's
+  settings (1798600000) or 2,000 on the desktop's (1798700000).
+
+  The smaller tables' own `Outlook`s were measured by draws left over the
+  longer rounds and no longer hold; they are removed, with what the entries
+  here say of them, and `Outlook::new` and `ExpectBot::new` read the table
+  of four at every table size.  Past its gate `ExpectBot` now plays the
+  shallow graph from the deal on at a smaller table too, every round
+  starting within `eval::DRAWS`.
+
+- (Superseded by the entry above.)  `ExpectBot::new` played a table of two
+  or three at ten 胡 by that table's
   `Outlook`, its h scaled by 1.2 and 1.4 as the calibration there has it, so
   the web hint does.  A/B against `4e461d0`, `RESHUFFLE=8`, on the web's
   settings: at two +0.006 ± 0.002 points a deal, 95% CI [+0.002, +0.011],
