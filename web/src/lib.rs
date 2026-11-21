@@ -160,40 +160,18 @@ fn exposed(round: &Round, seat: Seat) -> Vec<Vec<CardJson>> {
         .collect()
 }
 
-/// A hand sorted into its best melds, with the loose cards as a last group.
+/// A hand in card order, colour by colour from 將 down to 包, with the
+/// soldiers last.
 ///
-/// Lone generals go with the loose cards although each is a meld: there
-/// they head their colour, right beside any loose 士 or 象, so the 將士 and
-/// 將象 waits read at a glance.  The page marks them with a coin instead.
-/// Loose soldiers go last, together: beside a 炮 they make nothing, but
-/// with soldiers of other colours they make 三色卒.
-fn arrange(rules: &Rules, hand: Hand) -> Vec<Vec<CardJson>> {
-    // The bots' grading (loose cards at 1 each), so the grouping shows what
-    // they would see in the same hand.
-    let layout = Solver::new(rules.concealed, Some(1))
-        .locked()
-        .layout(hand)
-        .expect("layouts with loose cards always exist");
-    let mut loose = layout.loose;
-    let mut groups = Vec::new();
-    for meld in &layout.melds {
-        match meld {
-            Meld::Single(_) => loose += meld.cards(),
-            _ => groups.push(cards(meld)),
-        }
-    }
-    if !loose.is_empty() {
-        let (soldiers, others): (Vec<Card>, Vec<Card>) =
-            loose.iter().partition(|card| card.rank == Rank::Soldier);
-        groups.push(
-            others
-                .into_iter()
-                .chain(soldiers)
-                .map(CardJson::from)
-                .collect(),
-        );
-    }
-    groups
+/// No melds are set apart: but for the soldiers, a card only ever melds
+/// with its own colour, so the colours already read like the suits of a
+/// bridge hand.  Soldiers go together because across colours they make
+/// 三色卒.
+fn arrange(hand: Hand) -> Vec<CardJson> {
+    let (soldiers, others): (Vec<Card>, Vec<Card>) =
+        hand.iter().partition(|card| card.rank == Rank::Soldier);
+    let cards = others.into_iter().chain(soldiers);
+    cards.map(CardJson::from).collect()
 }
 
 /// The most 胡 the melds within `hand` make, the rest left loose
@@ -228,8 +206,8 @@ struct SeatJson {
     concealed: usize,
     exposed: Vec<Vec<CardJson>>,
     /// The human's hand always; a bot's only once the round is over.
-    /// Grouped by [`arrange`]: the melds, then the loose cards.
-    hand: Option<Vec<Vec<CardJson>>>,
+    /// In [`arrange`]'s order: the soldiers last.
+    hand: Option<Vec<CardJson>>,
 }
 
 #[derive(Serialize)]
@@ -304,11 +282,10 @@ struct ResultJson {
     winner: Option<usize>,
     foul: Option<usize>,
     hu: u32,
-    /// The winner's melds on the table, ending with the meld of the winning
-    /// card: that card is public whoever turned it up
+    /// The winner's melds on the table
     exposed: Vec<Vec<CardJson>>,
-    /// The winner's melds from the hand
-    concealed: Vec<Vec<CardJson>>,
+    /// The winner's hand through [`arrange`], without the winning card
+    hand: Vec<CardJson>,
     winning_card: Option<CardJson>,
     from: Option<usize>,
 }
@@ -404,7 +381,7 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
                     hu: visible_hu(game.rules(), round, seat, shown),
                     concealed: round.hand(seat).len(),
                     exposed: exposed(round, seat),
-                    hand: shown.then(|| arrange(game.rules(), round.hand(seat))),
+                    hand: shown.then(|| arrange(round.hand(seat))),
                 }
             })
             .collect(),
@@ -454,31 +431,18 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
             .iter()
             .map(|event| describe(players, event))
             .collect(),
-        result: round.result().map(|result| {
-            let public = result.winner.map_or(0, |seat| {
-                round.exposed(seat).len() + usize::from(result.winning_card.is_some())
-            });
-            let (exposed, concealed) = result.layout.split_at(public);
-            // The winning card is claimed like the rest, so it too sits in
-            // the middle of its meld.
-            let taken = result
+        result: round.result().map(|result| ResultJson {
+            winner: result.winner.map(Seat::index),
+            foul: result.foul.map(Seat::index),
+            hu: result.hu,
+            exposed: result
                 .winner
-                .into_iter()
-                .flat_map(|seat| claims(round, seat));
-            let taken = taken.chain(result.winning_card);
-            ResultJson {
-                winner: result.winner.map(Seat::index),
-                foul: result.foul.map(Seat::index),
-                hu: result.hu,
-                exposed: exposed
-                    .iter()
-                    .zip(taken)
-                    .map(|(meld, card)| claimed(meld, card))
-                    .collect(),
-                concealed: concealed.iter().map(cards).collect(),
-                winning_card: result.winning_card.map(CardJson::from),
-                from: result.from.map(Seat::index),
-            }
+                .map_or_else(Vec::new, |seat| exposed(round, seat)),
+            hand: result
+                .winner
+                .map_or_else(Vec::new, |seat| arrange(round.hand(seat))),
+            winning_card: result.winning_card.map(CardJson::from),
+            from: result.from.map(Seat::index),
         }),
     }
 }
@@ -730,46 +694,27 @@ mod tests {
         assert!(core.table.round().hand(Seat::ALL[3]).is_empty());
     }
 
-    /// 大肚: three alike stay a triplet, with the rest of 俥傌炮 loose.
+    /// A hand lies in card order, melds or not, with every soldier last; a
+    /// lone general still counts its 胡.
     #[test]
-    fn three_alike_stay_together() {
-        let hand: Hand = ".俥俥俥傌炮..".parse().unwrap();
-        let sizes: Vec<usize> = arrange(&Rules::new(), hand).iter().map(Vec::len).collect();
-        assert_eq!(sizes, [3, 2]);
-    }
-
-    /// A lone general heads its colour among the loose cards.
-    #[test]
-    fn lone_general_sits_with_the_loose_cards() {
-        let stray = Card::new(Color::Red, Rank::Elephant);
-        let general = Card::new(Color::Green, Rank::General);
-        let advisor = Card::new(Color::Green, Rank::Advisor);
-        let hand = Hand::from_iter([general, advisor, stray]);
-        let codes: Vec<Vec<String>> = arrange(&Rules::new(), hand)
-            .into_iter()
-            .map(|group| group.into_iter().map(|card| card.code).collect())
-            .collect();
+    fn a_hand_lies_in_card_order_soldiers_apart() {
+        let card = |color, rank| Card::new(color, rank);
         let code = |card: Card| CardJson::from(card).code;
-        assert_eq!(codes, [[code(stray), code(general), code(advisor)]]);
+        let stray = card(Color::Red, Rank::Elephant);
+        let cannon = card(Color::Red, Rank::Cannon);
+        let red = card(Color::Red, Rank::Soldier);
+        let general = card(Color::Green, Rank::General);
+        let advisor = card(Color::Green, Rank::Advisor);
+        let green = card(Color::Green, Rank::Soldier);
+        let hand = Hand::from_iter([green, advisor, red, general, cannon, stray]);
+        let codes: Vec<String> = arrange(hand).into_iter().map(|card| card.code).collect();
+        let order = [stray, cannon, general, advisor, red, green];
+        assert_eq!(codes, order.map(code));
         // The general alone is 1 胡; its 象 makes 將士象 for 2.
+        let hand = Hand::from_iter([general, advisor, stray]);
         assert_eq!(hand_hu(&Rules::new(), hand), 1);
-        let elephant = Card::new(Color::Green, Rank::Elephant);
+        let elephant = card(Color::Green, Rank::Elephant);
         assert_eq!(hand_hu(&Rules::new(), hand.with(elephant)), 2);
-    }
-
-    /// Loose soldiers of every colour go last, after the 炮.
-    #[test]
-    fn loose_soldiers_go_last() {
-        let red = Card::new(Color::Red, Rank::Soldier);
-        let cannon = Card::new(Color::Red, Rank::Cannon);
-        let green = Card::new(Color::Green, Rank::Soldier);
-        let hand = Hand::from_iter([red, cannon, green]);
-        let codes: Vec<Vec<String>> = arrange(&Rules::new(), hand)
-            .into_iter()
-            .map(|group| group.into_iter().map(|card| card.code).collect())
-            .collect();
-        let code = |card: Card| CardJson::from(card).code;
-        assert_eq!(codes, [[code(cannon), code(red), code(green)]]);
     }
 
     /// With a bot in the human's seat, every win of theirs on a card comes
@@ -844,14 +789,9 @@ mod tests {
             let json = core.snapshot();
             let value: serde_json::Value = serde_json::from_str(&json).unwrap();
             assert_eq!(value["human"], HUMAN.index());
-            let grouped: usize = value["seats"][HUMAN.index()]["hand"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|group| group.as_array().unwrap().len())
-                .sum();
+            let shown = value["seats"][HUMAN.index()]["hand"].as_array().unwrap();
             assert_eq!(
-                grouped,
+                shown.len(),
                 core.table.round().hand(HUMAN).len(),
                 "arranging keeps every card"
             );
@@ -883,12 +823,11 @@ mod tests {
             match core.table.round().phase() {
                 Phase::Finished => {
                     let result = &value["result"];
-                    if let Some(card) = result["winning_card"].as_object() {
-                        let last = result["exposed"].as_array().unwrap().last().unwrap();
-                        let last = last.as_array().unwrap();
+                    if let Some(winner) = result["winner"].as_u64() {
+                        // The winning card stands apart from the hand.
                         assert_eq!(
-                            last[0]["code"], card["code"],
-                            "the winning card leads the last exposed meld"
+                            result["hand"], value["seats"][winner as usize]["hand"],
+                            "the result shows the winner's hand"
                         );
                     }
                     assert!(

@@ -227,7 +227,7 @@ function render() {
     box.append(label);
     const fan = document.createElement('div');
     fan.className = 'fan';
-    if (finished && s.hand) for (const c of s.hand.flat()) fan.append(cardEl(c));
+    if (finished && s.hand) for (const c of s.hand) fan.append(cardEl(c));
     else for (let i = 0; i < s.concealed; i++) fan.append(backEl());
     box.append(fan);
     if (s.exposed.length) box.append(meldsEl(s.exposed));
@@ -266,29 +266,23 @@ function render() {
   if (me.exposed.length) exposed.append(meldsEl(me.exposed));
   const hand = id('hand');
   hand.replaceChildren();
-  hand.style.setProperty('--n', me.hand.flat().length);
+  hand.style.setProperty('--n', me.hand.length);
   const myDiscard = !finished && state.phase === 'discard' && state.actor === state.human;
-  // Grouped by the engine: the best melds, then the loose cards with the
-  // lone generals among them.
-  for (const group of me.hand) {
-    const box = document.createElement('div');
-    box.className = 'group';
-    for (const c of group) {
-      const locked = state.locked.includes(c.code);
-      const el = cardEl(c, locked ? 'locked' : myDiscard ? 'clickable' : '');
-      if (myDiscard && !locked) {
-        el.onclick = () => {
-          if (!twoTaps() || el.classList.contains('picked')) return show(game.discard(c.code));
-          hand.querySelector('.picked')?.classList.remove('picked');
-          el.classList.add('picked');
-          status.firstChild.textContent = '再點一次打出';
-          picked = state.discard_waits.find((w) => w.code === c.code)?.waits ?? [];
-          showWaits(picked);
-        };
-      }
-      box.append(el);
+  // In card order, the soldiers last.
+  for (const c of me.hand) {
+    const locked = state.locked.includes(c.code);
+    const el = cardEl(c, locked ? 'locked' : myDiscard ? 'clickable' : '');
+    if (myDiscard && !locked) {
+      el.onclick = () => {
+        if (!twoTaps() || el.classList.contains('picked')) return show(game.discard(c.code));
+        hand.querySelector('.picked')?.classList.remove('picked');
+        el.classList.add('picked');
+        status.firstChild.textContent = '再點一次打出';
+        picked = state.discard_waits.find((w) => w.code === c.code)?.waits ?? [];
+        showWaits(picked);
+      };
     }
-    hand.append(box);
+    hand.append(el);
   }
 
   // Your waits (聽牌), each card that wins with the 胡 it wins at and the
@@ -375,7 +369,12 @@ function render() {
     if (r.winner != null) {
       const how = r.from != null ? `${name(r.from)}${r.winning_card ? '放' : ''}` : r.winning_card ? '自摸' : '天胡';
       h2.textContent = `${name(r.winner)}胡牌，${r.hu} 胡（${how}）`;
-      result.append(h2, meldsEl(r.exposed), meldsEl(r.concealed));
+      // As at a mahjong table: the melds on the table, then the hand with
+      // the winning card by itself to its right.
+      const hand = meldsEl([r.hand]);
+      hand.classList.add('held');
+      if (r.winning_card) hand.append(meldEl([r.winning_card]));
+      result.append(h2, meldsEl(r.exposed), hand);
     } else if (r.foul != null) {
       h2.textContent = `${name(r.foul)}相公：沒有牌可打，賠每家 ${state.threshold} 胡`;
       result.append(h2);
@@ -389,9 +388,8 @@ function render() {
 
 // Ring what a bot would do here, a card in your hand or a claim button, and
 // mark every move with what the bot makes of it.  The marks last until the
-// next render, i.e. for this one decision.  Of several copies of
-// the pick it rings the last: the loose cards are the last group, so a loose
-// copy is ringed before one sitting in a meld.
+// next render, i.e. for this one decision.  Of several copies of the pick
+// it rings the last.
 async function showHint() {
   const shown = state;
   const rows = JSON.parse(await game.hint());

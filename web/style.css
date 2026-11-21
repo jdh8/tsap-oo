@@ -148,10 +148,10 @@ section.me { display: flex; flex-direction: column; align-items: center; gap: 0.
   align-self: stretch;
   display: flex;
   justify-content: center;
+  gap: min(0.25rem, 0.4cqw);
   padding: 0.8rem 0 1rem;
 }
-.hand .group, .hand .card { flex: 0 1 auto; min-width: 0; }
-.hand .group + .group { margin-left: min(0.9rem, 1.5cqw); }
+.hand .card { flex: 0 1 auto; min-width: 0; }
 .hand .card { flex-basis: var(--card-w); font-size: min(1.25rem, 80cqw / var(--n)); }
 /* A discard that leaves you waiting. */
 .card.tenpai::before {
@@ -164,7 +164,6 @@ section.me { display: flex; flex-direction: column; align-items: center; gap: 0.
   font-weight: 400;
   color: var(--gold);
 }
-.hand .group { display: flex; gap: min(0.25rem, 0.4cqw); }
 .exposed { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; }
 /* Your waits, sized like the melds on the table so they do not read as
    your hand; the 胡 and the copies left under each card. */
@@ -298,6 +297,8 @@ button.action.claim:enabled:hover { background: rgba(255, 255, 255, 0.12); }
 .result h2 { margin: 0; font-size: 1.1rem; }
 .result .melds { justify-content: center; }
 .result .meld { background: rgba(0, 0, 0, 0.06); }
+/* The winner's hand is no meld; only the winning card to its right is boxed. */
+.result .held .meld:first-child { background: none; padding-inline: 0; }
 .result .meld .card { --card-w: var(--small-w); --card-h: var(--small-h); font-size: var(--small-font); }
 
 /* The help sheet: the same paper, as a native modal <dialog>. */

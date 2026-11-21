@@ -153,6 +153,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `web/` (and so the desktop client) no longer sets the melds of a hand
+  apart, in play or on the result sheet: a hand lies in card order, colour
+  by colour, with the soldiers last.  Outside the
+  soldiers a card melds only within its colour, so the colours read like
+  the suits of a bridge hand.  The result sheet shows the winner's melds on
+  the table, then the hand with the winning card by itself to its right, as
+  at a mahjong table.  No bot is touched.
 - A table of three or two leaves the hand of each empty seat dead.
   `Rules::dead()` is the cards never drawn: `dead_tail`, now the six of a
   full table, and twenty for each seat left empty, so 6 at four, 26 at
