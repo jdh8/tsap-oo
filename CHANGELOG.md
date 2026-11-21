@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `examples/arena.rs` breaks the winning layouts down by meld: melds a win
+  and the 胡 they bring, with 碰 and 明槓 apart from 暗刻 and 暗槓, then
+  the same for the winner's dealt hand laid out for the most 胡.  At
+  `4e461d0`, 20,000 rounds, seed 20261117: 12.21 胡 a win, 將帥 2.76,
+  將士象 1.92, 三色兵卒 1.79, 明槓 1.30, 碰 1.28, 暗刻 1.17; the winners
+  were dealt 7.90 胡, against 6.63 for a hand off the deal (`dealt`).
+
 - Tables of two and three have their own `Outlook`, measured under
   `Rules::dead` from 10,000 rounds each of `HeuristicBot` self-play (seeds
   210 and 310, `research/outlook.md`, 空位的手牌算廢牌): at two a card
@@ -19,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   starts with.  Which table plays by its own is under Changed.  The tables
   measured before `Rules::dead`, over rounds of 65 and 45 draws, and their
   A/Bs are in `research/outlook.md`, 兩、三人桌, and no longer hold.
+
 - `Outlook::new` picks the table model by `Rules::threshold`: at 八胡 one
   measured from 10,000 rounds of `HeuristicBot` self-play at eight to win,
   seed 800 (`research/outlook.md`, 八胡).  `examples/outlook.rs` and `ab/`'s
