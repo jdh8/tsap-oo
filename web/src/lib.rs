@@ -8,10 +8,11 @@
 use rand::rngs::StdRng;
 use rand::{RngExt as _, SeedableRng as _};
 use serde::{Deserialize, Serialize};
+use tsap_oo::expect::END_SCALE;
 use tsap_oo::susik::{Card, Color, Hand, Meld, Rank, Solver};
 use tsap_oo::{
-    Claim, Eval, Event, ExpectBot, Game, HeuristicBot, Phase, Round, Rules, Seat, Strategy, Table,
-    View, discardable,
+    Claim, Eval, Event, ExpectBot, Game, HeuristicBot, Outlook, Phase, Round, Rules, Seat,
+    Strategy, Table, View, discardable,
 };
 use wasm_bindgen::prelude::*;
 
@@ -22,12 +23,22 @@ const HUMAN: Seat = Seat::ALL[0];
 /// frame or so, and 14 as the desktop's native code, some 190 ms a decision
 /// there (`doc/expectation.md`, batch 3 and D).  Past the gate it plays by a
 /// graph one claim deep, two to 17 cards on the desktop (`doc/eval.md`,
-/// batch 4).
+/// batch 4).  At a table of two or three the hint's bot models the table
+/// as measured there; the desktop's keeps the table of four.
 fn bot(rules: &Rules, search: bool) -> ExpectBot {
     let (gate, deep) = if search { (14, 17) } else { (10, 0) };
-    ExpectBot::new(rules)
+    let bot = ExpectBot::new(rules)
         .gated(gate)
-        .shallow(Eval::default(), deep)
+        .shallow(Eval::default(), deep);
+    if !search {
+        return bot;
+    }
+    // ponytail: the smaller tables' own outlooks measured insufficient data
+    // at this gate (`research/outlook.md`, 兩、三人桌); a longer A/B may
+    // let this go.
+    let mut four = Outlook::default();
+    four.end.iter_mut().for_each(|h| *h *= END_SCALE);
+    bot.with_outlook(four)
 }
 
 /// What the human calls each seat at a table of `players`, counting on from

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Tables of two and three have their own `Outlook`, measured from 10,000
+  rounds each of `HeuristicBot` self-play (seeds 200 and 300,
+  `research/outlook.md`, 兩、三人桌): at two a card comes to the seat to eat
+  0.75 of the time and at three 0.43, against 0.28 at four.  `Outlook::new`
+  picks it by `Rules::players`, `examples/outlook.rs` takes `PLAYERS`, and
+  `ab/` takes `FOUR` to keep the table of four in the candidate.
+  `eval::DRAWS` is the 25 draws a round of four starts with.
+
 - `Outlook::new` picks the table model by `Rules::threshold`: at 八胡 one
   measured from 10,000 rounds of `HeuristicBot` self-play at eight to win,
   seed 800 (`research/outlook.md`, 八胡).  `examples/outlook.rs` and `ab/`'s
@@ -134,6 +142,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   No bot changes and nothing measured anew.
 
 ### Changed
+
+- `ExpectBot::new` plays a table of two or three at ten 胡 by that table's
+  `Outlook`, its h scaled by 1.2 and 1.4 as the calibration there has it, so
+  the web hint does.  A/B against `4e461d0`, `RESHUFFLE=8`, on the web's
+  settings: at two +0.006 ± 0.002 points a deal, 95% CI [+0.002, +0.011],
+  200,000 deals, seed base 1797000000, win; at three +0.019 ± 0.005, 95% CI
+  [+0.009, +0.029], 100,000 deals, seed base 1797200000, win.  On the
+  desktop's settings at two +0.039 ± 0.020, 95% CI [−0.000, +0.078], 10,000
+  deals, seed base 1797300000; at three +0.016 ± 0.020, 95% CI [−0.024,
+  +0.055], 20,000 deals, seed base 1797400000: both insufficient data, so
+  the desktop's opponents and hint keep the table of four.  八胡 at a
+  smaller table is not measured and keeps it too.  Against `4e461d0`'s
+  `HeuristicBot` the web's bot now scores +0.106 ± 0.007 a deal at two, 95%
+  CI [+0.091, +0.120], seed base 1798300000, and +0.118 ± 0.010 at three,
+  95% CI [+0.098, +0.137], seed base 1798400000, 50,000 deals each, wins.
+
+- Past its gate `ExpectBot` leaves the shallow graph alone while more than
+  `eval::DRAWS` draws are left, whatever its own outlook counts a draw.  A
+  first round of the A/B above lost without it at two on the web's settings
+  (−0.019 ± 0.004 at h × 1.2, 95% CI [−0.027, −0.011], seed base
+  1796400000; −0.011 ± 0.004 at × 1.5, 95% CI [−0.019, −0.003], seed base
+  1796500000; 100,000 deals each): a trace puts the loss in 456 splits where
+  the smaller table's outlook let the four-player `Eval` in up to 41 draws
+  from the end, −5.8 ± 0.3 points each, and none of it inside the gate
+  (+0.12 ± 0.06 a split).  With `Outlook::default` the two conditions are
+  one, and play is unchanged: with the table of four in the candidate
+  (`FOUR`) no deal parts at two, three or four players, 20,000 deals each
+  on the web's settings and 2,000 on the desktop's, seed bases 1797700000
+  to 1798200000.
 
 - The web hint shows what the bot makes of each move in place of how far it
   falls behind the pick: where `ExpectBot` searches, the expected points of

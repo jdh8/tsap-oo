@@ -1,0 +1,72 @@
+diff --git a/ab/src/main.rs b/ab/src/main.rs
+index 81c6994..b246107 100644
+--- a/ab/src/main.rs
++++ b/ab/src/main.rs
+@@ -70,6 +70,9 @@ struct Split {
+     candidate: Act,
+     /// Cards left in the pile: the deck's first `left`
+     left: usize,
++    /// The candidate's concealed cards once it has answered and discarded,
++    /// as `ExpectBot`'s gate counts them when it passes
++    cards: usize,
+ }
+ 
+ /// Seat 1's score and whether it won, or where the candidate first parted
+@@ -204,6 +207,7 @@ fn play(
+                         control: theirs,
+                         candidate: ours,
+                         left: a.pile_len(),
++                        cards: view.hand().len() - usize::from(!claim),
+                     });
+                 }
+             }
+@@ -293,6 +297,12 @@ fn deal(seed: u64, dealer: usize, reshuffles: usize) -> (f64, f64, f64, Option<f
+     }
+     let k = reshuffles as f64;
+     let mean = sum / k;
++    if std::env::var_os("TRACE").is_some() {
++        println!(
++            "T\t{seed}\t{}\t{}\t{:?}\t{:?}\t{mean:.3}",
++            split.left, split.cards, split.control, split.candidate
++        );
++    }
+     let within = if reshuffles > 1 {
+         (squares - k * mean * mean) / (k - 1.0)
+     } else {
+diff --git a/ab/tally.py b/ab/tally.py
+new file mode 100644
+index 0000000..9d74cd7
+--- /dev/null
++++ b/ab/tally.py
+@@ -0,0 +1,31 @@
++"""Group the splits TRACE=1 prints by where the candidate stood: inside the
++gate, or past it with both sides on the shallow graph, or only the candidate.
++
++    python3 tally.py trace.log deals gate
++"""
++import collections, sys
++deals, gate = int(sys.argv[2]), int(sys.argv[3])
++rows = collections.defaultdict(list)
++for line in open(sys.argv[1]):
++    if not line.startswith("T\t"):
++        print(line.rstrip()) ; continue
++    _, seed, left, cards, control, candidate, mean = line.rstrip("\n").split("\t")
++    draws, cards = int(left) - 6, int(cards)
++    kind = "claim" if control.startswith("Claim") else "discard"
++    if kind == "claim":
++        # a claim that eats leaves fewer cards; the gate reads the hand as held
++        pass
++    where = ("in gate" if cards <= gate else
++             "both shallow" if draws <= 25 else
++             "candidate shallow" if draws <= 41 else "neither?")
++    rows[where, kind].append(float(mean))
++    rows[where, "all"].append(float(mean))
++    rows["all", "all"].append(float(mean))
++print(f"{'where':28} {'splits':>7} {'mean':>8} {'se':>6} {'per deal':>9} {'± se':>7}")
++for (where, kind), ds in sorted(rows.items()):
++    n = len(ds); mean = sum(ds) / n
++    sd2 = sum((d - mean) ** 2 for d in ds) / max(n - 1, 1)
++    # per deal: the others count 0
++    per = sum(ds) / deals
++    se_per = ((sum(d * d for d in ds) - deals * per * per) / (deals - 1) / deals) ** 0.5
++    print(f"{where + ' / ' + kind:28} {n:7d} {mean:+8.3f} {(sd2 / n) ** 0.5:6.3f} {per:+9.4f} {se_per:7.4f}")

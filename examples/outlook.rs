@@ -22,7 +22,8 @@
 //! cargo run --release --example outlook -- [rounds] [seed] [calibration rounds]
 //! ```
 //!
-//! `THRESHOLD` (default 10) is the 胡 to win: 8 is 八胡.
+//! `THRESHOLD` (default 10) is the 胡 to win: 8 is 八胡.  `PLAYERS` (default
+//! 4) is the table's size.
 use tsap_oo::susik::{Hand, Rank};
 use tsap_oo::{
     Event, Graph, HeuristicBot, Outlook, Payoff, Phase, Prune, Rules, Seat, Step, Strategy, Table,
@@ -33,8 +34,11 @@ mod common;
 
 /// The concealed cards from which the DP plays
 const GATE: usize = 10;
+
 /// Draws in a round: the pile after the deal less the dead tail
-const DRAWS: usize = 112 - 81 - 6;
+const fn draws(rules: &Rules) -> usize {
+    112 - (20 * rules.players + 1) - rules.dead_tail
+}
 
 /// Events of `n` trials
 #[derive(Default, Clone, Copy)]
@@ -72,6 +76,10 @@ impl Split {
 
 #[derive(Default)]
 struct Tally {
+    /// Seats at the table
+    players: usize,
+    /// Draws in a round
+    span: usize,
     /// Another seat wins on the card, by draws left before it
     end: Vec<Split>,
     /// The same, gated, by the fewest concealed cards of another seat
@@ -88,12 +96,15 @@ struct Tally {
 }
 
 impl Tally {
-    fn new() -> Self {
+    fn new(rules: &Rules) -> Self {
+        let span = draws(rules);
         Self {
-            end: vec![Split::default(); DRAWS + 1],
+            players: rules.players,
+            span,
+            end: vec![Split::default(); span + 1],
             end_by_shortest: vec![Count::default(); 22],
-            draws: vec![0; DRAWS + 1],
-            cards: vec![0; DRAWS + 1],
+            draws: vec![0; span + 1],
+            cards: vec![0; span + 1],
             ..Self::default()
         }
     }
@@ -131,7 +142,7 @@ impl Tally {
                 }
                 Event::Win { .. } | Event::Foul { .. } => break,
             };
-            let left = DRAWS - drawn;
+            let left = self.span - drawn;
             if draw {
                 self.draws[left] += 1;
                 self.cards[left] += pending + 1;
@@ -151,17 +162,18 @@ impl Tally {
                 Some(Event::Eat { seat, .. }) => draw && seat == source && seat != watcher,
                 _ => false,
             };
-            for watcher in Seat::ALL {
+            let seats = &Seat::ALL[..self.players];
+            for &watcher in seats {
                 let gated = concealed[watcher.index()] <= GATE;
                 let other = winner.filter(|&(seat, _)| seat != watcher);
                 self.end[left].add(gated, other.is_some());
                 if gated {
-                    let shortest = Seat::ALL
-                        .into_iter()
-                        .filter(|&seat| seat != watcher)
+                    let shortest = seats
+                        .iter()
+                        .filter(|&&seat| seat != watcher)
                         .map(|seat| concealed[seat.index()])
                         .min()
-                        .expect("three other seats");
+                        .expect("another seat");
                     self.end_by_shortest[shortest].add(other.is_some());
                 }
                 if let Some((_, hu)) = other {
@@ -178,7 +190,7 @@ impl Tally {
                 if card.rank == Rank::General {
                     self.general.add(gated, draw && source == watcher);
                 } else {
-                    let place = (draw && source == watcher) || source.next(Seat::COUNT) == watcher;
+                    let place = (draw && source == watcher) || source.next(self.players) == watcher;
                     self.eat.add(gated, place && !blocks(watcher));
                 }
             }
@@ -191,19 +203,25 @@ impl Tally {
     }
 
     /// The tables, h gated; a segment with fewer than `least` gated cards
-    /// takes h from the nearest that has them
+    /// takes h from the nearest that has them, and one played fewer than
+    /// 100 times its cards: a round of two seldom lasts to the last draws
     fn outlook(&self, least: u64) -> Outlook {
-        let full: Vec<usize> = (0..=DRAWS)
-            .filter(|&k| self.end[k].gated.n >= least)
-            .collect();
-        let near = |k: usize| full.iter().copied().min_by_key(|&j| j.abs_diff(k));
+        let nearest =
+            |full: Vec<usize>| move |k: usize| full.iter().copied().min_by_key(|&j| j.abs_diff(k));
+        let all = || 0..=self.span;
+        let near = nearest(all().filter(|&k| self.end[k].gated.n >= least).collect());
+        let played = nearest(all().filter(|&k| self.draws[k] >= 100).collect());
         let (sum, n) = self.loss[1];
         Outlook {
-            end: (0..=DRAWS)
+            end: all()
                 .map(|k| near(k).map_or(self.end(), |j| self.end[j].gated.rate()))
                 .collect(),
-            cards: (0..=DRAWS)
-                .map(|k| self.cards[k] as f64 / self.draws[k].max(1) as f64)
+            cards: all()
+                .map(|k| {
+                    played(k).map_or(self.per_draw(), |j| {
+                        self.cards[j] as f64 / self.draws[j] as f64
+                    })
+                })
                 .collect(),
             loss: -(sum as f64) / n as f64,
             eat: self.eat.gated.rate(),
@@ -222,7 +240,7 @@ impl Tally {
 
     fn print(&self) {
         println!("\ndraws left  segments  per draw  h all    h gated  gated cards");
-        for left in (0..=DRAWS).rev() {
+        for left in (0..=self.span).rev() {
             let s = self.end[left];
             println!(
                 "{left:>10}  {:8}  {:8.3}  {:.5}  {:.5}  {:11}",
@@ -345,10 +363,11 @@ fn calibrate(rules: &Rules, outlooks: &[(&str, Outlook)], rounds: u64, seed: u64
     });
     for (predictions, result) in played {
         for (seat, i, chance, points) in predictions {
+            let others = (rules.players - 1) as f64;
             let scored = match (result.winner, result.foul) {
-                (Some(winner), _) if winner == seat => 3.0 * f64::from(result.hu),
+                (Some(winner), _) if winner == seat => others * f64::from(result.hu),
                 (Some(_), _) => -f64::from(result.hu),
-                (None, Some(foul)) if foul == seat => -3.0 * f64::from(rules.threshold),
+                (None, Some(foul)) if foul == seat => -others * f64::from(rules.threshold),
                 (None, Some(_)) => f64::from(rules.threshold),
                 (None, None) => 0.0,
             };
@@ -410,11 +429,14 @@ fn main() {
     if let Ok(threshold) = std::env::var("THRESHOLD") {
         rules.threshold = threshold.parse().expect("THRESHOLD is a number");
     }
+    if let Ok(players) = std::env::var("PLAYERS") {
+        rules.players = players.parse().expect("PLAYERS is a number");
+    }
     if rounds == 0 {
         perturb(&rules, check, seed + 1);
         return;
     }
-    let mut tally = Tally::new();
+    let mut tally = Tally::new(&rules);
     let played = common::deals(rules, rounds, seed, |round| {
         let bots =
             Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as Box<dyn Strategy>));
@@ -425,11 +447,14 @@ fn main() {
     for round in &played {
         tally.round(round.events(), round.dealer());
     }
-    println!("{rounds} rounds of HeuristicBot self-play, seed {seed}");
+    println!(
+        "{rounds} rounds of HeuristicBot self-play, seed {seed}, {} players, {} to win",
+        rules.players, rules.threshold
+    );
     tally.print();
     // h from segments with fewer gated cards than this is too noisy
     let tables = tally.outlook(500);
-    println!("\n{tables:?}");
+    println!("\n{tables:.4?}");
     let flat = Outlook {
         end: vec![tally.end()],
         cards: vec![tally.per_draw()],

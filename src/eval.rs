@@ -16,6 +16,11 @@ use susik::{Card, Color, Hand, Rank};
 /// starts with, the most the labels hold.  A longer round reads the last.
 pub const CARDS: usize = 45;
 
+/// The draws a round of four starts with: [`CARDS`] public cards by
+/// [`Outlook::default`](crate::Outlook), and the most the labels hold
+/// whatever a bot's own outlook counts a draw
+pub const DRAWS: usize = 25;
+
 /// Patterns of a 車馬包 block: three cards that swap
 const FIELDS: usize = 680;
 /// Patterns of a 將士象 block: the general, and 士象 that swap

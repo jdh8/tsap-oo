@@ -611,6 +611,13 @@ SHALLOW=17 BASELINE_EXPECT=1 BASELINE_GATE=14 BASELINE_SHALLOW=17`：
 - **兩、三人桌的提示在牌堆還長時是 `HeuristicBot` 的評分，不是點數。** 要
   點數得先有那張桌子的 `Outlook`（`examples/outlook.rs`）與標註，表也要拉長
   到 174 張；上面兩個修法說照四人桌的表硬算是輸的。還沒做。
+- **2026-11-21 補：`Outlook` 有了，條件多一個。** 兩、三人桌的表量了
+  （`research/outlook.md`「兩、三人桌」）。照那張表一局是 81 張（兩人）與
+  64 張（三人）公牌，不是照四人桌的表算出來的 174 張，所以小桌的表要拉長
+  到的是這兩個數。小桌的表每摸一張的公開牌少，光看「掃的張數不超過
+  `CARDS`」會讓淺層的圖在還能摸 41 張時就用上四人桌的 `Eval`，量到每個
+  分歧輸 5.8 分；`ExpectBot::depth` 因此多看還能摸的張數不超過
+  `eval::DRAWS`（25）。用 `Outlook::default` 時兩個條件是同一件事。
 
 ## 八胡：十胡的表在閘門外
 
