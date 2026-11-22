@@ -35,7 +35,7 @@ puts the same page in a desktop window, against opponents that search:
   Any public card — a draw or a discard — can
   be won on by anyone, must be konged by whoever holds its concealed
   triplet, may be ponged by anyone holding its pair, and may be eaten by
-  the drawer or by the next player into 將士象, 車馬包, soldiers of three
+  the drawer or by the next player into 將士象, 車馬炮, soldiers of three
   or four colours, or a pair — even by a seat holding the pair, which may
   pong instead.  Win beats kong beats pong beats eat; equal
   claims go to the earlier seat in turn order.  Winning is compulsory.
@@ -50,15 +50,15 @@ puts the same page in a desktop window, against opponents that search:
   No claim that would lead there is allowed (`ClaimOptions::blocked`), so it
   only follows a drawn general or a forced kong.
 - Three or four identical cards in hand are never split, for a claim or in
-  the winning layout: 車車車馬包 (大肚) is a triplet with 馬包 loose, and wins
-  only on the fourth 車, as 車馬包 beside the triplet.  One of them may still
+  the winning layout: 車車車馬炮 (大肚) is a triplet with 馬炮 loose, and wins
+  only on the fourth 車, as 車馬炮 beside the triplet.  One of them may still
   be discarded, leaving an ordinary pair: no write-up forbids it, and unlike
   a split for a claim, which the meld on the table gives away, a discard in
   the river cannot be traced to its hand.  The card just claimed
   cannot be discarded in the same turn.  A claim must leave another card to
   discard that is not a general, so a hand cannot meld itself out below the
   threshold.
-- 胡: lone general 1, 將士象 2, 車馬包 1, soldiers of three colours 3 and of
+- 胡: lone general 1, 將士象 2, 車馬炮 1, soldiers of three colours 3 and of
   four 5, a triplet 3 concealed or 1 ponged, a quad 8 concealed or 6 konged,
   a pair 0.  "Concealed" means dealt and never shown; every meld formed with
   a public card is exposed.  Ten to win; the winner collects their 胡 from

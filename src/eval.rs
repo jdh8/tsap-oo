@@ -1,9 +1,9 @@
 //! What a hand is worth in points, read from tables instead of searched.
 //!
-//! Cards meld only within nine blocks: each colour's 將士象 and 車馬包, and
+//! Cards meld only within nine blocks: each colour's 將士象 and 車馬炮, and
 //! the soldiers.  A block's **pattern** is, for each card in it, how many
 //! the hand holds and how many are live; patterns that swap the colours, 士
-//! with 象, or 車, 馬 and 包 among themselves are one.  Each pattern, the
+//! with 象, or 車, 馬 and 炮 among themselves are one.  Each pattern, the
 //! exposed 胡 and the count of live cards look up a vector; their sum, past
 //! a ReLU, gives the value by each count of public cards to come.  The
 //! tables are learnt from [`Graph`](crate::Graph)'s values with
@@ -23,7 +23,7 @@ pub const CARDS: usize = 45;
 /// whatever a bot's own outlook counts a draw
 pub const DRAWS: usize = 25;
 
-/// Patterns of a 車馬包 block: three cards that swap
+/// Patterns of a 車馬炮 block: three cards that swap
 const FIELDS: usize = 680;
 /// Patterns of a 將士象 block: the general, and 士象 that swap
 const COURTS: usize = 15 * 120;
@@ -294,7 +294,7 @@ mod tests {
 
     /// A map of the cards that keeps every meld and its score: the colours
     /// of the court and field blocks, the soldiers' colours apart from
-    /// them, 士 with 象, and 車馬包 per colour
+    /// them, 士 with 象, and 車馬炮 per colour
     fn symmetry(rng: &mut Rng) -> impl Fn(Card) -> Card {
         let mut colors = Color::ALL;
         let mut soldiers = Color::ALL;

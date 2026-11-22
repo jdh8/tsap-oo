@@ -66,7 +66,7 @@ pub(crate) fn reach(
 }
 
 /// The nine sets of cards that only meld among themselves: each colour's
-/// 將士象 and 車馬包, and the soldiers
+/// 將士象 and 車馬炮, and the soldiers
 fn blocks() -> impl Iterator<Item = Hand> {
     const COURT: [Rank; 3] = [Rank::General, Rank::Advisor, Rank::Elephant];
     const FIELD: [Rank; 3] = [Rank::Chariot, Rank::Horse, Rank::Cannon];
@@ -281,7 +281,7 @@ mod tests {
 
     #[test]
     fn a_pair_and_a_lone_card_make_nothing() {
-        // 俥傌兵 beside two generals: the eaten 車馬包 forces 兵 out and the
+        // 俥傌兵 beside two generals: the eaten 車馬炮 forces 兵 out and the
         // hand is melded short; only pairs fit, or an outside general
         let exposed = [
             Court(Green),
@@ -342,10 +342,10 @@ mod tests {
         let hand = hand("..車車車馬包.");
         let rules = Rules::new();
         let live = exposed.iter().fold(Hand::FULL - hand, |h, m| h - m.cards());
-        // The kong, 馬 paired and 包 out
+        // The kong, 馬 paired and 炮 out
         assert_eq!(ceiling(&rules, &exposed, hand, live, 0), Some(13));
         // Without the fourth 車 the set must be broken by a discard first:
-        // 車包 eat a 馬 and 車馬 a 包, two 車馬包 for 9, short of ten
+        // 車炮 eat a 馬 and 車馬 a 炮, two 車馬炮 for 9, short of ten
         let gone = live.without(Card::new(Green, Rank::Chariot));
         assert_eq!(ceiling(&rules, &exposed, hand, gone, 0), Some(9));
     }
@@ -367,7 +367,7 @@ mod tests {
         // 紅黃 and 黃綠 each eat a third colour and 車馬 go: 5 + 3 + 3
         assert_eq!(top("兵.兵兵.卒.車馬", live), Some(11));
         assert_eq!(top("兵.兵兵.卒.馬", live), Some(11));
-        // Without the second 黃兵 the three colours and 車馬包 make 9; ten
+        // Without the second 黃兵 the three colours and 車馬炮 make 9; ten
         // takes a white 卒 for four colours and the 車 paired
         assert_eq!(top("兵.兵.卒.車馬", live), Some(10));
         let white = Card::new(White, Rank::Soldier);

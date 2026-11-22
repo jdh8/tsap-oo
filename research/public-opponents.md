@@ -222,7 +222,7 @@ README 的 AI 宣稱。[LICENSE][binh-license]、[主策略][binh-discard]、
 [棄牌策略][lead-discard]
 
 原程式只有玩家與電腦兩席；傳統模式會把摸牌收入手牌、槓後補摸。其
-`solveHu` 的異色組不限兵卒，車馬包算 2 胡，與本 engine 的公開摸牌、
+`solveHu` 的異色組不限兵卒，車馬炮算 2 胡，與本 engine 的公開摸牌、
 無補槓摸牌及胡數／牌型定義不一致。抽取策略的工程量可能比其簡單策略的
 評測價值還大，且未找到明示授權。[App][lead-app]、
 [牌型與判胡][lead-utils]、[指南][lead-guide]

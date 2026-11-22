@@ -126,7 +126,7 @@ fn main() {
         println!("concealed family     pairs  safe%  win% of all  win% of unsafe");
         for (row, families) in tally.into_iter().enumerate() {
             for (family, [safe, not, _, won]) in
-                ["士象", "車馬包", "兵卒"].into_iter().zip(families)
+                ["士象", "車馬炮", "兵卒"].into_iter().zip(families)
             {
                 let all = (safe + not).max(1) as f64;
                 println!(

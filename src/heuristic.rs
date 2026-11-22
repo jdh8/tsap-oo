@@ -324,7 +324,7 @@ impl HeuristicBot {
 /// The eats the bot weighs: all but a pair eaten while holding a pair
 ///
 /// That eat keeps one copy in hand beside a meld it could have finished
-/// instead, as 車馬包包 eating a 包 into 包包 and keeping 車馬包.  Eating
+/// instead, as 車馬炮炮 eating a 炮 into 炮炮 and keeping 車馬炮.  Eating
 /// into the meld keeps the pair, which still waits on the last copy.
 // ponytail: left out since the rules allowed it, so the bots play on as
 // before; A/B before letting them weigh it.
@@ -337,7 +337,7 @@ fn weighed(options: &ClaimOptions, hand: Hand, card: Card) -> impl Iterator<Item
         .filter(move |meld| !(matches!(meld, Meld::Pair(_)) && held == 2))
 }
 
-/// 將士象, 車馬包 or soldiers: the cards that meld together
+/// 將士象, 車馬炮 or soldiers: the cards that meld together
 const fn family(rank: Rank) -> usize {
     match rank {
         Rank::General | Rank::Advisor | Rank::Elephant => 0,
@@ -355,7 +355,7 @@ const fn family(rank: Rank) -> usize {
 /// of the meld it would be eaten into (`eaten`, by [`family`]) for each live
 /// card that would finish it, up to [`COPIES`], and promises half that 胡:
 /// the other half is its partner's.  So a 搭子 is kept, soldiers before
-/// 將士象 before 車馬包, and the one with more cards left to come before the
+/// 將士象 before 車馬炮, and the one with more cards left to come before the
 /// one with fewer.
 ///
 /// A card that goes with nothing is lonely by as much as a 搭子 with every
@@ -364,7 +364,7 @@ const fn family(rank: Rank) -> usize {
 /// which would pair it, counts as its own.
 ///
 /// The second card may be a lone general or one of a pair — 車車 馬 still
-/// eats a 包 — but not one of three or four alike, which are locked and
+/// eats a 炮 — but not one of three or four alike, which are locked and
 /// never eat; nor does a card finish the meld when the hand holds three of
 /// it, since the fourth can only come as a kong.  士象 without their general
 /// are the poorest 搭子: only the seat's own draw brings a general and no

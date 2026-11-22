@@ -12,7 +12,7 @@ use tsap_oo::{HeuristicBot, Phase, Round, Rules, Seat, Strategy as _, View};
 
 /// Stages of a round, by the cards left in the pile
 const STAGES: [&str; 3] = ["early (23+)", "mid (14-22)", "late (-13)"];
-const FAMILIES: [&str; 3] = ["士象", "車馬包", "兵卒"];
+const FAMILIES: [&str; 3] = ["士象", "車馬炮", "兵卒"];
 
 /// Per family: cards tested, then how many of them win for another seat at
 /// all, into a pair, into a triplet, into a run; the 胡 of those wins; and

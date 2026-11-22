@@ -15,7 +15,7 @@ Each claim is tagged **[code]** (read in source or shipped assets),
 - **Hand layout.** Every program found shows the hand as one flat row (two
   rows in one case) of upright narrow strips, sorted, with no gaps between
   groups.  The two Taiwanese 十胡 programs sort **by colour, then by rank**,
-  so 將士象 and 車馬包 of one colour fall next to each other.  Vietnamese
+  so 將士象 and 車馬炮 of one colour fall next to each other.  Vietnamese
   apps either do the same or order the row set by set (complete sets first,
   leftovers at the right end), still without gaps.  Free drag-to-arrange
   exists in two hobby projects only.  Nobody draws the hand as spaced meld

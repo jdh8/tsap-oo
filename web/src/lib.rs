@@ -129,7 +129,7 @@ fn cards(meld: &Meld) -> Vec<CardJson> {
 
 /// A meld on the table with the card it took from the table first, as the
 /// log reads and as a Japanese mahjong table lays out a chi taken from the
-/// left: 車 eaten with 馬包 reads 車馬包, and 包 eaten with 車馬 reads 包車馬.
+/// left: 車 eaten with 馬炮 reads 車馬炮, and 炮 eaten with 車馬 reads 炮車馬.
 fn claimed(meld: &Meld, card: Card) -> Vec<CardJson> {
     let mut row: Vec<Card> = meld.cards().without(card).iter().collect();
     row.insert(0, card);
@@ -160,7 +160,7 @@ fn exposed(round: &Round, seat: Seat) -> Vec<Vec<CardJson>> {
         .collect()
 }
 
-/// A hand in card order, colour by colour from 將 down to 包, with the
+/// A hand in card order, colour by colour from 將 down to 炮, with the
 /// soldiers last.
 ///
 /// No melds are set apart: but for the soldiers, a card only ever melds

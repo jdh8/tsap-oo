@@ -11,7 +11,7 @@
 //!    is applied for the seat without asking.
 //! 3. Then the seats are asked in turn order, the drawer first: anyone
 //!    holding a pair may pong (碰); the drawer and the next player may
-//!    eat (吃) the card into a 將士象, 車馬包, a colour set of soldiers, or
+//!    eat (吃) the card into a 將士象, 車馬炮, a colour set of soldiers, or
 //!    a pair.  A pong beats an eat, and among equal claims the earlier seat
 //!    wins.  A concealed triplet is never split for a claim, and the card
 //!    just claimed cannot be discarded in the same turn.

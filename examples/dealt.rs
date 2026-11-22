@@ -13,7 +13,7 @@ use tsap_oo::{Round, Rules, Seat};
 const KINDS: [&str; 7] = [
     "將帥",
     "將士象",
-    "車馬包",
+    "車馬炮",
     "三色兵卒",
     "四色兵卒",
     "暗刻",

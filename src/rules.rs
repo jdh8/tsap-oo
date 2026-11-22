@@ -30,7 +30,7 @@ impl Rules {
     ///
     /// Four players, ten to win, six dead cards ([`Rules::dead`] at a smaller
     /// table), and per meld: lone general 1, pair 0,
-    /// 將士象 2, 車馬包 1, soldiers of three colours 3 and of four 5,
+    /// 將士象 2, 車馬炮 1, soldiers of three colours 3 and of four 5,
     /// triplet 3 concealed or 1 ponged, quad 8 concealed or 6 konged.
     #[must_use]
     pub const fn new() -> Self {
