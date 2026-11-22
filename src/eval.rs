@@ -8,7 +8,8 @@
 //! a ReLU, gives the value by each count of public cards to come.  The
 //! tables are learnt from [`Graph`](crate::Graph)'s values with
 //! [`Outlook::default`](crate::Outlook) and h × 1.5, under the rules of 十胡
-//! (`doc/eval.md`).
+//! (`doc/eval.md`).  They are a table's own: [`Eval::of`] has another set
+//! for two players.
 
 use susik::{Card, Color, Hand, Rank};
 
@@ -111,6 +112,25 @@ impl Default for Eval {
 }
 
 impl Eval {
+    /// The tables a table of `rules` plays by: its own for two players at
+    /// ten 胡, learnt from `PLAYERS=2 EXPECT=1.3 eval label 2000 1799800000`
+    /// (held-out RMSE 0.53 points), and [`Eval::default`] for any other
+    ///
+    /// The two players' tables go with the outlook
+    /// [`ExpectBot::new`](crate::ExpectBot::new) gives them, which counts 36
+    /// public cards a round: their rows beyond are not learnt.
+    // ponytail: three players' own tables and two players' at 八胡 measured
+    // insufficient data against the four-player ones (`doc/eval.md`,
+    // 兩、三人桌的表), so they stay out of the binary.
+    #[must_use]
+    pub fn of(rules: &crate::Rules) -> Self {
+        if (rules.players, rules.threshold) == (2, 10) {
+            Self::from_bytes(include_bytes!("eval-16-2.bin")).expect("the tables built in")
+        } else {
+            Self::default()
+        }
+    }
+
     /// How many parameters tables of width `dim` have
     #[must_use]
     pub const fn len(dim: usize) -> usize {
@@ -349,6 +369,20 @@ mod tests {
     #[test]
     fn the_tables_are_built_in() {
         assert_eq!(Eval::default().dim(), 16);
+    }
+
+    /// Only two players at ten 胡 have tables of their own
+    #[test]
+    fn two_at_ten_has_its_own_tables() {
+        for rules in [Rules::new(), Rules::eight()] {
+            for players in 2..=4 {
+                let mut rules = rules;
+                rules.players = players;
+                let own = (players, rules.threshold) == (2, 10);
+                assert_eq!(Eval::of(&rules) != Eval::default(), own);
+                assert_eq!(Eval::of(&rules).dim(), 16);
+            }
+        }
     }
 
     /// A row no label reached keeps its initial bias, 0, and a round longer

@@ -22,6 +22,10 @@
 //! cargo run --release --example eval -- train [labels] [prefix] [epochs] [dims...]
 //! cargo run --release --example eval -- loss [rounds] [seed base] [tables...]
 //! ```
+//!
+//! `PLAYERS` (default 4) is the table's size, and `EXPECT` (default 1.5)
+//! what the h of that table's [`Outlook::new`] is scaled by: tables for a
+//! table of two are labelled with `PLAYERS=2 EXPECT=1.3`.
 use rand::rngs::SmallRng;
 use rand::{RngExt as _, SeedableRng as _};
 use std::cell::RefCell;
@@ -179,15 +183,18 @@ fn base(view: &View<'_>) -> u32 {
 /// Play round `seed` and collect what `each` makes of seat 1's decisions at
 /// 11 to 20 cards
 fn play<T: 'static>(seed: u64, mut each: impl FnMut(&Rules, Spot) -> T + 'static) -> Vec<T> {
-    let rules = Rules::new();
+    let rules = rules();
     let mut rng = SmallRng::seed_from_u64(seed);
-    let round = Round::deal(rules, Seat::ALL[(seed % 4) as usize], &mut rng);
+    let dealer = Seat::ALL[(seed % rules.players as u64) as usize];
+    let round = Round::deal(rules, dealer, &mut rng);
     let log = Rc::<RefCell<Vec<T>>>::default();
     let sink = Rc::clone(&log);
     let mut seats =
         Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as Box<dyn Strategy>));
     seats[1] = Some(Box::new(Hook {
-        bot: ExpectBot::new(&rules).gated(GATE),
+        bot: ExpectBot::new(&rules)
+            .with_outlook(outlook(&rules))
+            .gated(GATE),
         greedy: HeuristicBot::new(&rules),
         each: move |view: &View<'_>, spot: Spot| {
             if (11..=20).contains(&spot.cards) {
@@ -225,9 +232,22 @@ fn spread<T: Send>(rounds: u64, base: u64, f: impl Fn(u64) -> T + Sync) -> Vec<T
     out.into_iter().map(|x| x.1).collect()
 }
 
-fn outlook() -> Outlook {
-    let mut outlook = Outlook::default();
-    outlook.end.iter_mut().for_each(|h| *h *= END_SCALE);
+/// The table: [`Rules::new`] with `PLAYERS` seats
+fn rules() -> Rules {
+    let mut rules = Rules::new();
+    if let Ok(players) = std::env::var("PLAYERS") {
+        rules.players = players.parse().expect("PLAYERS is a number");
+    }
+    rules
+}
+
+/// The outlook seat 1 plays by and every graph is valued by: the table's,
+/// its h scaled by `EXPECT` (default [`END_SCALE`])
+fn outlook(rules: &Rules) -> Outlook {
+    let scale =
+        std::env::var("EXPECT").map_or(END_SCALE, |s| s.parse().expect("EXPECT is a number"));
+    let mut outlook = Outlook::new(rules);
+    outlook.end.iter_mut().for_each(|h| *h *= scale);
     outlook
 }
 
@@ -286,7 +306,7 @@ impl Label {
 fn label(rounds: u64, base: u64, path: &str) {
     let start = Instant::now();
     let labels: Vec<Vec<Vec<Label>>> = spread(rounds, base, |seed| {
-        let outlook = outlook();
+        let outlook = outlook(&rules());
         let mut rng = SmallRng::seed_from_u64(!seed);
         let round = (seed - base) as u32;
         play(seed, move |rules, spot| {
@@ -638,7 +658,7 @@ fn loss(rounds: u64, base: u64, paths: &[String]) {
     );
     let start = Instant::now();
     let played: Vec<Vec<Loss>> = spread(rounds, base, |seed| {
-        let outlook = outlook();
+        let outlook = outlook(&rules());
         let tables = Arc::clone(&tables);
         play(seed, move |rules, spot| {
             let whole = spot.exact(rules);

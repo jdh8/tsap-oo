@@ -22,12 +22,12 @@ const HUMAN: Seat = Seat::ALL[0];
 /// frame or so, and 14 as the desktop's native code, some 190 ms a decision
 /// there (`doc/expectation.md`, batch 3 and D).  Past the gate it plays by a
 /// graph one claim deep, two to 17 cards on the desktop (`doc/eval.md`,
-/// batch 4).
+/// batch 4), its leaves read from the tables of that table.
 fn bot(rules: &Rules, search: bool) -> ExpectBot {
     let (gate, deep) = if search { (14, 17) } else { (10, 0) };
     ExpectBot::new(rules)
         .gated(gate)
-        .shallow(Eval::default(), deep)
+        .shallow(Eval::of(rules), deep)
 }
 
 /// What the human calls each seat at a table of `players`, counting on from

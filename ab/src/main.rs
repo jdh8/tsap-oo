@@ -10,9 +10,12 @@
 //! many concealed cards or fewer, or within that 向聽數.  Set `EXPECT` to
 //! seat an `ExpectBot` instead, its `Outlook::new` h scaled by that factor
 //! (1.5 is `ExpectBot::new`'s at four), or with `FOUR` its `Outlook::default`
-//! whatever the table, and gated at
+//! whatever the table, or with `EXPECT=new` the outlook `ExpectBot::new`
+//! ships and, past the gate, `Eval::of`'s tables, and gated at
 //! `GATE_CARDS` (default 10), and with `SHALLOW` as well playing past the
-//! gate by `ExpectBot::shallow` with that many cards two claims deep.  Set
+//! gate by `ExpectBot::shallow` with that many cards two claims deep, its
+//! leaves read from the tables in the file `EVAL` names (an absolute path:
+//! `run.sh` runs in `ab/`) in place of `Eval::default`.  Set
 //! `BASELINE_SAMPLES` to seat the control's
 //! `MonteCarloBot` of that many samples in seat 1 on the control side, gated
 //! at `GATE_CARDS` (default 10), in place of its `HeuristicBot`: a head to
@@ -84,18 +87,34 @@ fn candidate_bot(rules: &new::Rules, seed: u64) -> Box<dyn new::Strategy> {
     let gate = |name| std::env::var(name).ok().map(|s| s.parse().unwrap());
     // `EXPECT` puts an ExpectBot in the candidate seat, h scaled by it.
     if let Ok(scale) = std::env::var("EXPECT") {
-        let scale: f64 = scale.parse().unwrap();
-        let mut outlook = if std::env::var_os("FOUR").is_some() {
-            new::Outlook::default()
-        } else {
-            new::Outlook::new(rules)
-        };
-        outlook.end.iter_mut().for_each(|h| *h *= scale);
-        let mut bot = new::ExpectBot::new(rules)
-            .with_outlook(outlook)
-            .gated(gate("GATE_CARDS").unwrap_or(10));
+        // `EXPECT=new` is the bot as it ships: `ExpectBot::new`'s outlook
+        // and `Eval::of`'s tables.
+        let ships = scale == "new";
+        let mut bot = new::ExpectBot::new(rules);
+        if !ships {
+            let scale: f64 = scale.parse().unwrap();
+            let mut outlook = if std::env::var_os("FOUR").is_some() {
+                new::Outlook::default()
+            } else {
+                new::Outlook::new(rules)
+            };
+            outlook.end.iter_mut().for_each(|h| *h *= scale);
+            bot = bot.with_outlook(outlook);
+        }
+        bot = bot.gated(gate("GATE_CARDS").unwrap_or(10));
         if let Some(deep) = gate("SHALLOW") {
-            bot = bot.shallow(new::Eval::default(), deep);
+            // `EVAL` reads the tables from a file: ones not built in yet.
+            let eval = std::env::var("EVAL").map_or_else(
+                |_| {
+                    if ships {
+                        new::Eval::of(rules)
+                    } else {
+                        new::Eval::default()
+                    }
+                },
+                |path| new::Eval::from_bytes(&std::fs::read(path).unwrap()).unwrap(),
+            );
+            bot = bot.shallow(eval, deep);
         }
         return Box::new(bot);
     }

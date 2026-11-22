@@ -9,15 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- (Superseded by the dead hands of empty seats, under Changed.)  Tables of
-  two and three had their own `Outlook`, measured from 10,000 rounds each
-  of `HeuristicBot` self-play (seeds 200 and 300,
-  `research/outlook.md`, 兩、三人桌): at two a card comes to the seat to eat
-  0.75 of the time and at three 0.43, against 0.28 at four.  `Outlook::new`
-  picks it by `Rules::players`, `examples/outlook.rs` takes `PLAYERS`, and
-  `ab/` takes `FOUR` to keep the table of four in the candidate.
-  `eval::DRAWS` is the 25 draws a round of four starts with.
-
+- Tables of two and three have their own `Outlook`, measured under
+  `Rules::dead` from 10,000 rounds each of `HeuristicBot` self-play (seeds
+  210 and 310, `research/outlook.md`, 空位的手牌算廢牌): at two a card
+  comes to the seat to eat 0.74 of the time and at three 0.42, against 0.28
+  at four.  `Outlook::new` picks it by `Rules::players`,
+  `examples/outlook.rs` takes `PLAYERS`, and `ab/` takes `FOUR` to keep the
+  table of four in the candidate.  `eval::DRAWS` is the 25 draws a round
+  starts with.  Which table plays by its own is under Changed.  The tables
+  measured before `Rules::dead`, over rounds of 65 and 45 draws, and their
+  A/Bs are in `research/outlook.md`, 兩、三人桌, and no longer hold.
 - `Outlook::new` picks the table model by `Rules::threshold`: at 八胡 one
   measured from 10,000 rounds of `HeuristicBot` self-play at eight to win,
   seed 800 (`research/outlook.md`, 八胡).  `examples/outlook.rs` and `ab/`'s
@@ -161,27 +162,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   settings (1798600000) or 2,000 on the desktop's (1798700000).
 
   The smaller tables' own `Outlook`s were measured by draws left over the
-  longer rounds and no longer hold; they are removed, with what the entries
-  here say of them, and `Outlook::new` and `ExpectBot::new` read the table
-  of four at every table size.  Past its gate `ExpectBot` now plays the
-  shallow graph from the deal on at a smaller table too, every round
-  starting within `eval::DRAWS`.
+  longer rounds and no longer hold; `Outlook::new` has them measured anew
+  (the next entry).  Past its gate `ExpectBot` now plays the shallow graph from
+  the deal on at a smaller table too, every round starting within
+  `eval::DRAWS`.
 
-- (Superseded by the entry above.)  `ExpectBot::new` played a table of two
-  or three at ten 胡 by that table's
-  `Outlook`, its h scaled by 1.2 and 1.4 as the calibration there has it, so
-  the web hint does.  A/B against `4e461d0`, `RESHUFFLE=8`, on the web's
-  settings: at two +0.006 ± 0.002 points a deal, 95% CI [+0.002, +0.011],
-  200,000 deals, seed base 1797000000, win; at three +0.019 ± 0.005, 95% CI
-  [+0.009, +0.029], 100,000 deals, seed base 1797200000, win.  On the
-  desktop's settings at two +0.039 ± 0.020, 95% CI [−0.000, +0.078], 10,000
-  deals, seed base 1797300000; at three +0.016 ± 0.020, 95% CI [−0.024,
-  +0.055], 20,000 deals, seed base 1797400000: both insufficient data, so
-  the desktop's opponents and hint keep the table of four.  八胡 at a
-  smaller table is not measured and keeps it too.  Against `4e461d0`'s
-  `HeuristicBot` the web's bot now scores +0.106 ± 0.007 a deal at two, 95%
-  CI [+0.091, +0.120], seed base 1798300000, and +0.118 ± 0.010 at three,
-  95% CI [+0.098, +0.137], seed base 1798400000, 50,000 deals each, wins.
+- Two players at ten 胡 play by tables of their own.  `ExpectBot::new`
+  takes that table's `Outlook`, measured anew under `Rules::dead` (10,000
+  rounds, seed 210; h × 1.3 by its calibration), and `Eval::of(&Rules)`
+  picks tables labelled with it (`src/eval-16-2.bin`, 359 KB, from
+  `PLAYERS=2 EXPECT=1.3 eval label 2000 1799800000`; held-out RMSE 0.53
+  points); the web and desktop clients' hint and opponents use both.
+  Cutting the pile gives a smaller table the draws of a full one, not the
+  share of them: two players still draw twice as often each, and a card
+  comes to the seat to eat 0.74 of the time against 0.28 at four.  The
+  four-player tables read 3.06 points low a leaf at two players and 0.96 at
+  three (300 rounds each, seed bases 1800000000 and 1800100000).  A/Bs
+  against `07d5602` (the dead hands alone, not on the branch),
+  `RESHUFFLE=8`, deal counts declared first (`doc/eval.md`, 兩、三人桌的表):
+
+  - The four-player tables past the gate at a smaller table, against
+    playing as `HeuristicBot` there, web settings: at two −0.184 ± 0.045
+    points a deal, 95% CI [−0.271, −0.096], 10,000 deals, seed base
+    1798800000, loss; at three +0.216 ± 0.051, [+0.116, +0.315], 15,000
+    deals, seed base 1798900000, win.
+  - Two players' own `Outlook` and `Eval`: on the web's settings, against
+    playing as `HeuristicBot` past the gate, +0.375 ± 0.042, [+0.293,
+    +0.457], 10,000 deals, seed base 1800200000, win; on the desktop's,
+    against the four-player tables, +0.320 ± 0.056, [+0.210, +0.431], 4,000
+    deals, seed base 1800400000, win.
+  - Three players' own (h × 1.4, labels of seed base 1799900000) against
+    the four-player tables: web −0.021 ± 0.025, [−0.070, +0.028], 40,000
+    deals, seed base 1800300000; desktop −0.095 ± 0.061, [−0.215, +0.025],
+    6,000 deals, seed base 1800500000.  Both insufficient data: three
+    players keep the tables of four, and theirs are not built in.
+  - Two players at 八胡 by the ten-胡 tables of two against those of four:
+    web +0.302 ± 0.040, [+0.224, +0.380], 10,000 deals, seed base
+    1800600000, win; desktop +0.048 ± 0.056, [−0.061, +0.158], 4,000 deals,
+    seed base 1800700000, insufficient data.  Declared as both or neither,
+    so 八胡 at two keeps the tables of four.
+
+  Every other table plays as before: against `07d5602` no deal parts in
+  2,000 on the web's settings at four, at three, at 八胡 of two, three and
+  four (seed bases 1800800000 to 1801200000) or in 500 on the desktop's at
+  four, three and 八胡 of two (1801300000 to 1801500000).  The web's wasm
+  grows from 620 KB to 982 KB.  `examples/eval` takes `PLAYERS` and
+  `EXPECT`, and `ab/` takes `EVAL`, a file of tables for the candidate, and
+  `EXPECT=new`, the bot as it ships.
 
 - Past its gate `ExpectBot` leaves the shallow graph alone while more than
   `eval::DRAWS` draws are left, whatever its own outlook counts a draw.  A

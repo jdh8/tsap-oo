@@ -40,16 +40,29 @@ pub struct Outlook {
 }
 
 impl Outlook {
-    /// The table measured at four under `rules`' threshold, or
-    /// [`Outlook::default`]
+    /// The table measured at `rules`' table size, or at four under its
+    /// threshold, or [`Outlook::default`]
     ///
-    /// A table of two or three reads the table of four.  Its own were
-    /// measured over rounds of 65 and 45 draws, before [`Rules::dead`] cut
-    /// every round to 25, and do not hold by draws left any more.
+    /// A table of two or three is measured at ten 胡 only, and with the
+    /// 25 draws a round [`Rules::dead`] leaves it.
     #[must_use]
     pub fn new(rules: &Rules) -> Self {
-        match rules.threshold {
-            8 => Self {
+        match (rules.players, rules.threshold) {
+            (2, _) => Self {
+                end: END_2.to_vec(),
+                cards: CARDS_2.to_vec(),
+                loss: -12.11,
+                eat: 0.7442,
+                general: 0.4688,
+            },
+            (3, _) => Self {
+                end: END_3.to_vec(),
+                cards: CARDS_3.to_vec(),
+                loss: -12.18,
+                eat: 0.4164,
+                general: 0.3094,
+            },
+            (_, 8) => Self {
                 end: END_8.to_vec(),
                 cards: CARDS_8.to_vec(),
                 loss: -11.30,
@@ -119,6 +132,34 @@ const CARDS_8: [f64; 26] = [
     0.3168, 1.2466, 1.2917, 1.3016, 1.4740, 1.4203, 1.3701, 1.4603, 1.4460, 1.4533, 1.5207, 1.5631,
     1.5912, 1.6754, 1.6991, 1.7635, 1.8283, 1.9323, 1.9720, 2.0716, 2.1837, 2.3270, 2.4861, 2.6536,
     2.8891, 3.4176,
+];
+
+/// [`END`] at a table of two: `PLAYERS=2 outlook 10000 210`
+const END_2: [f64; 26] = [
+    0.0686, 0.0686, 0.0768, 0.0750, 0.0760, 0.0708, 0.0727, 0.0730, 0.0694, 0.0619, 0.0692, 0.0595,
+    0.0610, 0.0593, 0.0599, 0.0522, 0.0510, 0.0438, 0.0445, 0.0395, 0.0399, 0.0366, 0.0302, 0.0325,
+    0.0325, 0.0325,
+];
+
+/// [`CARDS`] at a table of two: `PLAYERS=2 outlook 10000 210`
+const CARDS_2: [f64; 26] = [
+    0.1044, 1.1260, 1.1395, 1.1434, 1.1617, 1.1500, 1.1740, 1.1620, 1.1928, 1.2160, 1.2223, 1.2512,
+    1.2974, 1.3227, 1.3466, 1.3733, 1.4301, 1.4667, 1.5107, 1.6046, 1.6747, 1.7673, 1.9017, 2.0284,
+    2.2150, 2.7830,
+];
+
+/// [`END`] at a table of three: `PLAYERS=3 outlook 10000 310`
+const END_3: [f64; 26] = [
+    0.1049, 0.1049, 0.0987, 0.0916, 0.1269, 0.1146, 0.1066, 0.0837, 0.0964, 0.0926, 0.0832, 0.0784,
+    0.0782, 0.0759, 0.0648, 0.0639, 0.0603, 0.0631, 0.0473, 0.0490, 0.0397, 0.0299, 0.0315, 0.0293,
+    0.0293, 0.0293,
+];
+
+/// [`CARDS`] at a table of three: `PLAYERS=3 outlook 10000 310`
+const CARDS_3: [f64; 26] = [
+    0.2966, 1.2457, 1.2570, 1.2313, 1.2431, 1.2598, 1.2937, 1.3465, 1.3432, 1.3812, 1.3916, 1.4084,
+    1.4598, 1.5051, 1.5379, 1.5845, 1.6402, 1.6984, 1.7598, 1.8495, 1.9354, 2.0223, 2.1552, 2.2948,
+    2.4743, 2.9898,
 ];
 
 /// What a round is worth to the seat
@@ -479,15 +520,21 @@ pub struct ExpectBot {
 
 impl ExpectBot {
     /// A bot for `rules` gated at 10 cards, with [`Outlook::default`], its h
-    /// scaled by [`END_SCALE`]
+    /// scaled by [`END_SCALE`]; two players at ten 胡 play by
+    /// [`Outlook::new`], its h scaled by 1.3, which [`Eval::of`]'s tables
+    /// for them are learnt with
     #[must_use]
     pub fn new(rules: &Rules) -> Self {
         // ponytail: the four-player ten-胡 tables at 八胡 and at a table of
-        // two or three too.  At four `Outlook::new`'s measured insufficient
-        // data against them, and a smaller table's own are not measured
-        // under `Rules::dead` (`research/outlook.md`).
-        let mut outlook = Outlook::default();
-        outlook.end.iter_mut().for_each(|h| *h *= END_SCALE);
+        // three too.  `Outlook::new`'s measured insufficient data against
+        // them at four and, with tables of their own, at three and at two
+        // players' 八胡 (`doc/eval.md`, 兩、三人桌的表).
+        let (mut outlook, scale) = if (rules.players, rules.threshold) == (2, 10) {
+            (Outlook::new(rules), 1.3)
+        } else {
+            (Outlook::default(), END_SCALE)
+        };
+        outlook.end.iter_mut().for_each(|h| *h *= scale);
         Self {
             policy: HeuristicBot::new(rules),
             outlook,
@@ -924,7 +971,7 @@ mod tests {
             assert_eq!(round.phase(), crate::Phase::Discard(Seat::ALL[0]));
             let view = View::new(&round, Seat::ALL[0]);
             assert_eq!(ExpectBot::draws(&view) <= crate::eval::DRAWS, searches);
-            let mut bot = ExpectBot::new(&rules).shallow(Eval::default(), 0);
+            let mut bot = ExpectBot::new(&rules).shallow(Eval::of(&rules), 0);
             assert_eq!(bot.searches(&view, 20), searches);
             // Nor does an outlook of few cards a draw bring it in early.
             let slow = Outlook {
@@ -941,16 +988,43 @@ mod tests {
         }
     }
 
-    /// Every table plays by the table of four: a smaller one's own is not
-    /// measured under `Rules::dead`.
+    /// Two players at ten 胡 play by their own table, h × 1.3, and every
+    /// other table by the table of four: the only one whose own won its A/B
     #[test]
-    fn every_table_plays_by_the_outlook_of_four() {
+    fn only_two_at_ten_plays_by_its_own_outlook() {
         let four = ExpectBot::new(&Rules::new()).outlook;
         for rules in [Rules::new(), Rules::eight()] {
             for players in 2..=4 {
                 let mut rules = rules;
                 rules.players = players;
-                assert_eq!(ExpectBot::new(&rules).outlook, four);
+                let outlook = ExpectBot::new(&rules).outlook;
+                if (players, rules.threshold) == (2, 10) {
+                    let mut own = Outlook::new(&rules);
+                    own.end.iter_mut().for_each(|h| *h *= 1.3);
+                    assert_eq!(outlook, own);
+                } else {
+                    assert_eq!(outlook, four);
+                }
+            }
+        }
+    }
+
+    /// A row no label reached keeps its initial bias, 0: the tables of two
+    /// are learnt only as far as their own outlook counts
+    #[test]
+    fn every_row_a_table_reads_is_learnt() {
+        for rules in [Rules::new(), Rules::eight()] {
+            for players in 2..=4 {
+                let mut rules = rules;
+                rules.players = players;
+                let rows = ExpectBot::new(&rules)
+                    .outlook
+                    .ends(crate::eval::DRAWS)
+                    .len();
+                let eval = Eval::of(&rules);
+                let biases = &eval.params()[eval.params().len() - crate::eval::CARDS..];
+                assert!(rows <= crate::eval::CARDS);
+                assert!(biases[..rows].iter().all(|&b| b != 0.0), "{players}");
             }
         }
     }

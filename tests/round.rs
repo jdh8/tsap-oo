@@ -333,7 +333,9 @@ mod playouts {
             let mut bots =
                 Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as Box<dyn Strategy>));
             if expect {
-                bots[1] = Some(Box::new(ExpectBot::new(&rules).shallow(Eval::default(), 0)));
+                bots[1] = Some(Box::new(
+                    ExpectBot::new(&rules).shallow(Eval::of(&rules), 0),
+                ));
             }
             let mut table = Table::new(game.deal(&mut rng), bots);
             for &seat in &Seat::ALL[rules.players..] {
