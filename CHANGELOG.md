@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `doc/generals.md`: the plan that follows from `examples/overspend.rs`,
+  in batches with gates: measure how often a public card is a general
+  against the unseen generals over the unseen cards `Graph` takes it for,
+  put the ratio in `Outlook`, relearn `Eval`, then look again at the pairs
+  eaten a general short.  No bot changes.
+
 - `examples/overspend.rs` and `research/overspend.py`: every pair the
   desktop `ExpectBot` may eat, by the hand's `ceiling` before and after
   with no general from outside and with one, and every hand a discard
@@ -18,8 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on nothing else won 50% ± 4 with 15 draws or more left, 39% ± 3 with 8
   to 14 and 23% ± 4 with 7 or fewer, where the DP gave it 65%, 58% and 43%;
   two cards one short of a meld waiting on four cards won 54%, 41% and 27%
-  against 46%, 37% and 27%.  One that also waits on a pong, a kong or a
-  fourth colour is valued within a few points from 8 draws up.  The bot
+  against 46%, 37% and 27%.  One that also waits on three cards or more
+  that extend a concealed meld (a pong, a kong, a fourth colour) is valued
+  within 4 points from 8 draws up; with one or two, up to 14 high.  The bot
   ate 1,039 of the 4,176 pairs that leave the hand a general short of the
   threshold, and 35 of the 39 that leave it 完成形 with nothing else to
   wait on, by its own values 10.7 points better than not.  Measurement
