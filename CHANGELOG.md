@@ -153,6 +153,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `examples/arena.rs` shuffles every deal first, on one thread, and plays
+  four `HeuristicBot`s on every core: the table is the same from each seat,
+  so a deal is played from the first seat and turned to its dealer
+  afterwards.  The output is the same to the byte (`1500 0 7`, `1500`,
+  `40 4 3`), and `20000 0 20261117` takes 2.4 minutes on 16 cores in place
+  of some 33.  A Monte Carlo bot of two samples or more keeps its seat and
+  is played round by round as before.
+
 - `web/` (and so the desktop client) no longer sets the melds of a hand
   apart, in play or on the result sheet: a hand lies in card order, colour
   by colour, with the soldiers last.  Outside the
