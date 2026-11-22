@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `examples/overspend.rs` and `research/overspend.py`: every pair the
+  desktop `ExpectBot` may eat, by the hand's `ceiling` before and after
+  with no general from outside and with one, and every hand a discard
+  leaves waiting, with the DP's chance to win and the outcome.  Seat 1
+  among three `HeuristicBot`s, 20,000 rounds, seed base 1797200000, base
+  `b95dde4`.  A hand that wins on every general not yet seen (完成形) and
+  on nothing else won 50% ± 4 with 15 draws or more left, 39% ± 3 with 8
+  to 14 and 23% ± 4 with 7 or fewer, where the DP gave it 65%, 58% and 43%;
+  two cards one short of a meld waiting on four cards won 54%, 41% and 27%
+  against 46%, 37% and 27%.  One that also waits on a pong, a kong or a
+  fourth colour is valued within a few points from 8 draws up.  The bot
+  ate 1,039 of the 4,176 pairs that leave the hand a general short of the
+  threshold, and 35 of the 39 that leave it 完成形 with nothing else to
+  wait on, by its own values 10.7 points better than not.  Measurement
+  only; no bot plays differently.
+
 - `examples/arena.rs` breaks the winning layouts down by meld: melds a win
   and the 胡 they bring, with 碰 and 明槓 apart from 暗刻 and 暗槓, then
   the same for the winner's dealt hand laid out for the most 胡.  At
