@@ -15,6 +15,11 @@
 //! graph — one number for h and the cards a draw, a table for h, a table
 //! for both.
 //!
+//! The generals' rate (`doc/generals.md`, batch 1) is ρ, the generals
+//! among the public cards over their sum of K ÷ N, K the generals and N
+//! the cards the watching seat has not seen, rebuilt from its dealt hand
+//! and the events: `Graph` takes a public card for a general at K ÷ N.
+//!
 //! With 0 rounds it measures nothing and calibrates [`Outlook::new`]
 //! and three changes to it, one constant each.
 //!
@@ -24,7 +29,7 @@
 //!
 //! `THRESHOLD` (default 10) is the 胡 to win: 8 is 八胡.  `PLAYERS` (default
 //! 4) is the table's size.
-use tsap_oo::susik::{Hand, Rank};
+use tsap_oo::susik::{Hand, Meld, Rank};
 use tsap_oo::{
     Event, Graph, HeuristicBot, Outlook, Payoff, Phase, Prune, Rules, Seat, Step, Strategy, Table,
     View,
@@ -55,6 +60,41 @@ impl Count {
 
     fn rate(self) -> f64 {
         self.k as f64 / self.n.max(1) as f64
+    }
+}
+
+/// Generals that came up against the generals expected
+#[derive(Default, Clone, Copy)]
+struct Rho {
+    n: u64,
+    expected: f64,
+    actual: u64,
+}
+
+impl Rho {
+    fn add(&mut self, expected: f64, general: bool) {
+        self.n += 1;
+        self.expected += expected;
+        self.actual += u64::from(general);
+    }
+
+    fn merge(self, other: Self) -> Self {
+        Self {
+            n: self.n + other.n,
+            expected: self.expected + other.expected,
+            actual: self.actual + other.actual,
+        }
+    }
+
+    fn rate(self) -> f64 {
+        self.actual as f64 / self.expected
+    }
+
+    /// The standard error of the rate, each card a Bernoulli trial at its
+    /// own chance
+    fn se(self) -> f64 {
+        let p = self.actual as f64 / self.n as f64;
+        (self.n as f64 * p * (1.0 - p)).sqrt() / self.expected
     }
 }
 
@@ -93,6 +133,21 @@ struct Tally {
     general: Split,
     /// 胡 another seat wins at: (sum, count), all and gated
     loss: [(u64, u64); 2],
+    /// The generals' rate by draws left: all, gated, and gated less the
+    /// seat's own discards
+    rho: Vec<[Rho; 3]>,
+    /// Every rank's rate, gated, by [`phase`] and rank: with the seat's
+    /// own discards and without
+    ranks: [[[Rho; 2]; 7]; 3],
+}
+
+/// The draws left of `doc/generals.md`: 15 or more, 8 to 14, 7 or fewer
+const fn phase(left: usize) -> usize {
+    match left {
+        15.. => 0,
+        8.. => 1,
+        _ => 2,
+    }
 }
 
 impl Tally {
@@ -105,13 +160,23 @@ impl Tally {
             end_by_shortest: vec![Count::default(); 22],
             draws: vec![0; span + 1],
             cards: vec![0; span + 1],
+            rho: vec![[Rho::default(); 3]; span + 1],
             ..Self::default()
         }
     }
 
-    /// One finished round's events
-    fn round(&mut self, events: &[Event], dealer: Seat) {
+    /// One finished round's events, from the hands dealt
+    fn round(&mut self, events: &[Event], dealer: Seat, dealt: [Hand; 4]) {
         let mut concealed = Seat::ALL.map(|seat| if seat == dealer { 21 } else { 20 });
+        let seats = &Seat::ALL[..self.players];
+        // What each seat has not seen
+        let mut unseen = dealt.map(|hand| Hand::FULL - hand);
+        // The cards of a meld that come from the hand
+        let reveal = |unseen: &mut [Hand; 4], by: Seat, meld: Meld, card| {
+            for &watcher in seats.iter().filter(|&&w| w != by) {
+                unseen[watcher.index()] = unseen[watcher.index()] - meld.cards().without(card);
+            }
+        };
         let (mut drawn, mut pending) = (0, 0);
         for (i, &event) in events.iter().enumerate() {
             let (source, card, draw) = match event {
@@ -123,16 +188,19 @@ impl Tally {
                     concealed[seat.index()] -= 1;
                     (seat, card, false)
                 }
-                Event::Eat { seat, meld, .. } => {
+                Event::Eat { seat, meld, card } => {
                     concealed[seat.index()] -= meld.size() - 1;
+                    reveal(&mut unseen, seat, meld, card);
                     continue;
                 }
-                Event::Pong { seat, .. } => {
+                Event::Pong { seat, card } => {
                     concealed[seat.index()] -= 2;
+                    reveal(&mut unseen, seat, Meld::Triplet(card), card);
                     continue;
                 }
-                Event::Kong { seat, .. } => {
+                Event::Kong { seat, card } => {
                     concealed[seat.index()] -= 3;
+                    reveal(&mut unseen, seat, Meld::Quad(card), card);
                     continue;
                 }
                 Event::Exhausted => {
@@ -162,9 +230,34 @@ impl Tally {
                 Some(Event::Eat { seat, .. }) => draw && seat == source && seat != watcher,
                 _ => false,
             };
-            let seats = &Seat::ALL[..self.players];
+            let general = card.rank == Rank::General;
             for &watcher in seats {
                 let gated = concealed[watcher.index()] <= GATE;
+                let live = &mut unseen[watcher.index()];
+                let mut by_rank = [0.0; 7];
+                for (c, n) in live.distinct() {
+                    by_rank[c.rank as usize] += f64::from(n) / live.len() as f64;
+                }
+                // A seat's own discard is a card it has seen
+                let own = !draw && watcher == source;
+                for (j, rho) in self.rho[left].iter_mut().enumerate() {
+                    if j == 0 || (gated && (j == 1 || !own)) {
+                        rho.add(by_rank[0], general);
+                    }
+                }
+                if gated {
+                    let phase = &mut self.ranks[phase(left)];
+                    for (rank, (rho, expected)) in phase.iter_mut().zip(by_rank).enumerate() {
+                        let hit = card.rank as usize == rank;
+                        rho[0].add(expected, hit);
+                        if !own {
+                            rho[1].add(expected, hit);
+                        }
+                    }
+                }
+                if !own {
+                    *live = live.without(card);
+                }
                 let other = winner.filter(|&(seat, _)| seat != watcher);
                 self.end[left].add(gated, other.is_some());
                 if gated {
@@ -283,6 +376,56 @@ impl Tally {
             self.general.gated.rate()
         );
         println!("per draw {:.4}", self.per_draw());
+
+        println!("\nρ, generals that came up over K ÷ N, ± one standard error");
+        println!("draws left  ρ all            ρ gated          gated, not own   gated cards");
+        let cell = |r: Rho| format!("{:.3} ± {:.3}", r.rate(), r.se());
+        for left in (0..=self.span).rev() {
+            let [all, gated, others] = self.rho[left];
+            if all.n > 0 {
+                println!(
+                    "{left:>10}  {:15}  {:15}  {:15}  {:11}",
+                    cell(all),
+                    cell(gated),
+                    cell(others),
+                    gated.n
+                );
+            }
+        }
+        let names = ["將帥", "士仕", "象相", "車俥", "馬傌", "包炮", "卒兵"];
+        for (j, title) in ["with", "less"].iter().enumerate() {
+            println!("\nevery rank, gated, {title} the seat's own discards: came up over expected");
+            println!("rank  draws 15+        8–14             0–7");
+            for (rank, name) in names.iter().enumerate() {
+                let [a, b, c] = self.ranks.map(|phase| cell(phase[rank][j]));
+                println!("{name}  {a:15}  {b:15}  {c:15}");
+            }
+        }
+        let sum = self.rho.iter().fold([Rho::default(); 3], |a, r| {
+            [0, 1, 2].map(|j| a[j].merge(r[j]))
+        });
+        println!(
+            "{:>10}  {:15}  {:15}  {:15}  {:11}",
+            "all",
+            cell(sum[0]),
+            cell(sum[1]),
+            cell(sum[2]),
+            sum[1].n
+        );
+    }
+
+    /// ρ gated by draws left; a segment with fewer than `least` gated cards
+    /// takes the nearest that has them
+    fn generals(&self, least: u64) -> Vec<f64> {
+        let full: Vec<_> = (0..=self.span)
+            .filter(|&k| self.rho[k][1].n >= least)
+            .collect();
+        (0..=self.span)
+            .map(|k| {
+                let j = full.iter().min_by_key(|&&j| j.abs_diff(k));
+                self.rho[*j.expect("a segment with enough cards")][1].rate()
+            })
+            .collect()
     }
 }
 
@@ -440,12 +583,13 @@ fn main() {
     let played = common::deals(rules, rounds, seed, |round| {
         let bots =
             Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as Box<dyn Strategy>));
+        let dealt = Seat::ALL.map(|seat| round.hand(seat));
         let mut table = Table::new(round, bots);
         table.run().expect("bots act legally");
-        table.round().clone()
+        (dealt, table.round().clone())
     });
-    for round in &played {
-        tally.round(round.events(), round.dealer());
+    for (dealt, round) in &played {
+        tally.round(round.events(), round.dealer(), *dealt);
     }
     println!(
         "{rounds} rounds of HeuristicBot self-play, seed {seed}, {} players, {} to win",
@@ -455,6 +599,7 @@ fn main() {
     // h from segments with fewer gated cards than this is too noisy
     let tables = tally.outlook(500);
     println!("\n{tables:.4?}");
+    println!("generals: {:.4?}", tally.generals(500));
     let flat = Outlook {
         end: vec![tally.end()],
         cards: vec![tally.per_draw()],

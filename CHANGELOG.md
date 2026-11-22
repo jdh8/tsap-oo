@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `examples/outlook.rs` measures the generals' rate ρ (`doc/generals.md`,
+  batch 1): the generals among the public cards over the sum of K ÷ N, K
+  the generals and N the cards the watching seat has not seen, rebuilt
+  from its dealt hand and the events, by draws left; and the same ratio
+  for every rank.  `HeuristicBot` self-play, 20,000 rounds a table, seed
+  base 1795364857, base `74e99e2`, seats with 10 concealed cards or fewer:
+  ρ is 0.406 ± 0.002 at four seats and ten 胡, 0.515 at three, 0.647 at
+  two and 0.383 at 八胡, under the 0.85 gate.  `Graph` takes a public card
+  for a general more than twice as often as it is one.  Discarded ranks
+  (士象車馬包) come up 16 to 33% more often than an even spread, 兵卒
+  32% less early in the round.  Measurement only: `ab/run.sh 20000`
+  against `74e99e2`, seed base 1795365381, reads 0 deals that part.
+
 - `doc/generals.md`: the plan that follows from `examples/overspend.rs`,
   in batches with gates: measure how often a public card is a general
   against the unseen generals over the unseen cards `Graph` takes it for,
