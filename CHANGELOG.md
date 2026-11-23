@@ -28,6 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   put the ratio in `Outlook`, relearn `Eval`, then look again at the pairs
   eaten a general short.  No bot changes.
 
+- `doc/generals.md`, batch 3: `Eval` relearnt under the four-player
+  `Outlook` that won batch 2b (rank rates, h × 1; 2,000 labelled rounds,
+  seed base 1796250000, D = 16, held-out RMSE 0.90) is not adopted.
+  Against `3423521` with `RESHUFFLE=8`, neither setting is a win: web
+  +0.019 ± 0.025 points a deal, 95% CI [−0.030, +0.069] (60,000 deals,
+  37,228 part, seed base 1795429248); desktop +0.020 ± 0.036, 95% CI
+  [−0.050, +0.091] (20,000 deals, 9,262 part, seed base 1796429248).
+  Insufficient data, not a loss; the batch is dropped because an effect
+  of that size is not worth a second table.  No bot changes.
+
 - `examples/overspend.rs` and `research/overspend.py`: every pair the
   desktop `ExpectBot` may eat, by the hand's `ceiling` before and after
   with no general from outside and with one, and every hand a discard
