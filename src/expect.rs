@@ -37,6 +37,18 @@ pub struct Outlook {
     pub eat: f64,
     /// The chance a general is the seat's own draw, which it must eat
     pub general: f64,
+    /// How often a card drawn is of each rank, the general first, over the
+    /// rank's share of the unseen cards, by draws left: a segment's one
+    /// draw is a card at its unseen count times its rank's rate, over the
+    /// sum of those
+    pub drawn: Vec<[f64; 7]>,
+    /// The same of a card another seat discards: the rest of a segment
+    pub discarded: Vec<[f64; 7]>,
+    /// The share of the discards that are the seat's own, which bring it
+    /// nothing, by draws left.  `eat` counts them among its cards, so a
+    /// graph takes `eat` over the share of a segment that is not the
+    /// seat's own.
+    pub own: Vec<f64>,
 }
 
 impl Outlook {
@@ -54,6 +66,7 @@ impl Outlook {
                 loss: -12.11,
                 eat: 0.7442,
                 general: 0.4688,
+                ..Self::even()
             },
             (3, _) => Self {
                 end: END_3.to_vec(),
@@ -61,6 +74,7 @@ impl Outlook {
                 loss: -12.18,
                 eat: 0.4164,
                 general: 0.3094,
+                ..Self::even()
             },
             (_, 8) => Self {
                 end: END_8.to_vec(),
@@ -68,16 +82,30 @@ impl Outlook {
                 loss: -11.30,
                 eat: 0.2599,
                 general: 0.2088,
+                ..Self::even()
             },
             _ => Self::default(),
         }
     }
 
-    /// The chance another seat ends the round before each public card to
-    /// come, the last card first: segments `0..=draws` less the card being
-    /// decided on
-    fn ends(&self, draws: usize) -> Vec<f64> {
-        let at = |table: &[f64], k: usize| table[k.min(table.len() - 1)];
+    /// No table, every public card drawn evenly from the unseen ones, the
+    /// seat's own discards among them
+    fn even() -> Self {
+        Self {
+            end: Vec::new(),
+            cards: Vec::new(),
+            loss: 0.0,
+            eat: 0.0,
+            general: 0.0,
+            drawn: vec![[1.0; 7]],
+            discarded: vec![[1.0; 7]],
+            own: vec![0.0],
+        }
+    }
+
+    /// The segment of each public card to come, the last card first:
+    /// segments `0..=draws` less the card being decided on
+    fn segments(&self, draws: usize) -> Vec<usize> {
         let total: f64 = (0..=draws).map(|k| at(&self.cards, k)).sum();
         let (mut k, mut upto) = (0, at(&self.cards, 0));
         (1..=(total - 1.0).round().max(0.0) as usize)
@@ -86,10 +114,15 @@ impl Outlook {
                     k += 1;
                     upto += at(&self.cards, k);
                 }
-                at(&self.end, k)
+                k
             })
             .collect()
     }
+}
+
+/// `table` at segment `k`, its last entry holding for more
+fn at<T: Copy>(table: &[T], k: usize) -> T {
+    table[k.min(table.len() - 1)]
 }
 
 impl Default for Outlook {
@@ -102,8 +135,19 @@ impl Default for Outlook {
             loss: -12.26,
             eat: 0.2765,
             general: 0.2156,
+            drawn: by_phase(DRAWN),
+            discarded: by_phase(DISCARDED),
+            own: vec![0.0],
         }
     }
+}
+
+/// A table by draws left of one by the three phases the rates are measured
+/// in: 15 draws left or more, 8 to 14, 7 or fewer
+fn by_phase<T: Copy>(rates: [T; 3]) -> Vec<T> {
+    (0..=15)
+        .map(|k| rates[usize::from(k < 15) + usize::from(k < 8)])
+        .collect()
 }
 
 /// h by draws left, 0 to 25: `outlook 10000 20`
@@ -118,6 +162,22 @@ const CARDS: [f64; 26] = [
     0.2791, 1.2594, 1.3112, 1.4403, 1.3689, 1.4043, 1.4298, 1.4611, 1.4954, 1.5066, 1.5715, 1.5844,
     1.6264, 1.6332, 1.7161, 1.7365, 1.8207, 1.9039, 1.9455, 2.0456, 2.1579, 2.2592, 2.3920, 2.5734,
     2.7310, 3.2345,
+];
+
+/// The rates of the cards drawn, by phase, while the seat holds 10
+/// concealed cards or fewer; 士象 share one and 車馬炮 another, as
+/// [`Eval`] takes them for alike: `doc/generals.md`, batch 2b
+const DRAWN: [[f64; 7]; 3] = [
+    [0.7590, 1.1157, 1.1157, 1.0397, 1.0397, 1.0397, 1.0092],
+    [0.6838, 1.1184, 1.1184, 1.0861, 1.0861, 1.0861, 1.0464],
+    [0.6363, 1.1323, 1.1323, 1.1205, 1.1205, 1.1205, 1.1254],
+];
+
+/// The rates of the cards the other seats discard, as [`DRAWN`]
+const DISCARDED: [[f64; 7]; 3] = [
+    [0.0000, 1.2499, 1.2499, 1.5267, 1.5267, 1.5267, 0.3812],
+    [0.0000, 1.2468, 1.2468, 1.5825, 1.5825, 1.5825, 0.4557],
+    [0.0000, 1.3731, 1.3731, 1.5968, 1.5968, 1.5968, 0.5000],
 ];
 
 /// [`END`] at 八胡: `THRESHOLD=8 outlook 10000 800`
@@ -228,8 +288,11 @@ enum Kind {
 
 #[derive(Debug, Clone, Copy)]
 struct Entry {
-    /// The chance the next public card is this one
-    weight: f64,
+    /// How many of this card are unseen
+    count: f64,
+    /// Its rank, which [`Outlook::drawn`] and
+    /// [`discarded`](Outlook::discarded) weigh it by
+    rank: Rank,
     kind: Kind,
     /// Groups `first..last`: the claims, each a list of the nodes its
     /// discards lead to
@@ -247,6 +310,8 @@ pub struct Graph {
     threshold: u32,
     /// The seats that pay a win and are paid a foul
     others: f64,
+    /// The unseen cards of each rank
+    unseen: [f64; 7],
     roots: Vec<usize>,
     /// The hand of each node
     hands: Vec<Hand>,
@@ -262,8 +327,6 @@ pub struct Graph {
     /// Each group's children end here in `children`
     groups: Vec<u32>,
     children: Vec<u32>,
-    /// Each node's chance that the next public card is none of its entries
-    rest: Vec<f64>,
 }
 
 impl Graph {
@@ -285,6 +348,10 @@ impl Graph {
             graph: Self {
                 threshold: rules.threshold,
                 others: (rules.players - 1) as f64,
+                unseen: live.distinct().fold([0.0; 7], |mut unseen, (card, n)| {
+                    unseen[card.rank as usize] += f64::from(n);
+                    unseen
+                }),
                 roots: Vec::new(),
                 hands: vec![Hand::EMPTY],
                 bases: vec![0],
@@ -294,7 +361,6 @@ impl Graph {
                 entries: Vec::new(),
                 groups: Vec::new(),
                 children: Vec::new(),
-                rest: Vec::new(),
             },
         };
         build.graph.roots = roots
@@ -302,7 +368,6 @@ impl Graph {
             .map(|&(hand, base)| build.node(hand, base) as usize)
             .collect();
         build.graph.ends.push(0);
-        build.graph.rest.push(1.0);
         let mut node = 1;
         // Breadth first, so a node's depth is its fewest claims from a root
         while node < build.graph.hands.len() {
@@ -312,7 +377,6 @@ impl Graph {
             {
                 build.graph.leaves.push(node);
                 build.graph.ends.push(build.graph.entries.len() as u32);
-                build.graph.rest.push(1.0);
             } else {
                 build.depth = build.graph.depths[node] + 1;
                 build.expand(node);
@@ -434,7 +498,25 @@ impl Graph {
         };
         let mut before = vec![0.0; self.len()];
         let mut after = before.clone();
-        for (step, end) in outlook.ends(draws).into_iter().enumerate() {
+        for (step, k) in outlook.segments(draws).into_iter().enumerate() {
+            let end = at(&outlook.end, k);
+            // One card of a segment is its draw, but of the last, which has
+            // none; the rest are discards, the seat's own among them.
+            let draw = if k == 0 {
+                0.0
+            } else {
+                at(&outlook.cards, k).recip().min(1.0)
+            };
+            let discard = (1.0 - draw) * (1.0 - at(&outlook.own, k));
+            let (drawn, discarded) = (at(&outlook.drawn, k), at(&outlook.discarded, k));
+            // `share` of the cards, split among the unseen by `rates`
+            let split = |share: f64, rates: [f64; 7]| {
+                let sum: f64 = self.unseen.iter().zip(rates).map(|(n, r)| n * r).sum();
+                if sum > 0.0 { share / sum } else { 0.0 }
+            };
+            let (d, s) = (split(draw, drawn), split(discard, discarded));
+            let weights: [f64; 7] = std::array::from_fn(|r| d * drawn[r] + s * discarded[r]);
+            let eat = (outlook.eat / (draw + discard)).min(1.0);
             let best = |group: u32| {
                 let first = if group == 0 {
                     0
@@ -459,7 +541,7 @@ impl Graph {
             for (node, value) in after.iter_mut().enumerate() {
                 let stay = before[node];
                 let first = if node == 0 { 0 } else { self.ends[node - 1] };
-                let mut sum = stay * self.rest[node];
+                let (mut sum, mut rest) = (0.0, 1.0);
                 for entry in &self.entries[first as usize..self.ends[node] as usize] {
                     let answer = match entry.kind {
                         Kind::Win(hu) => match payoff {
@@ -477,12 +559,15 @@ impl Graph {
                                 pass = pass.max(best(eats));
                                 eats += 1;
                             }
-                            let eat = (eats..entry.last).map(best).fold(pass, f64::max);
-                            outlook.eat * eat + (1.0 - outlook.eat) * pass
+                            let eaten = (eats..entry.last).map(best).fold(pass, f64::max);
+                            eat * eaten + (1.0 - eat) * pass
                         }
                     };
-                    sum += entry.weight * answer;
+                    let weight = entry.count * weights[entry.rank as usize];
+                    rest -= weight;
+                    sum += weight * answer;
                 }
+                sum += stay * rest;
                 *value = end * loss + (1.0 - end) * sum;
             }
             for (&leaf, curve) in self.leaves.iter().zip(leaves) {
@@ -519,8 +604,9 @@ pub struct ExpectBot {
 }
 
 impl ExpectBot {
-    /// A bot for `rules` gated at 10 cards, with [`Outlook::default`], its h
-    /// scaled by [`END_SCALE`]; two players at ten 胡 play by
+    /// A bot for `rules` gated at 10 cards, with [`Outlook::default`] at
+    /// four players and ten 胡, and elsewhere with its h scaled by
+    /// [`END_SCALE`] and its cards drawn evenly; two players at ten 胡 play by
     /// [`Outlook::new`], its h scaled by 1.3, which [`Eval::of`]'s tables
     /// for them are learnt with
     #[must_use]
@@ -529,10 +615,20 @@ impl ExpectBot {
         // three too.  `Outlook::new`'s measured insufficient data against
         // them at four and, with tables of their own, at three and at two
         // players' 八胡 (`doc/eval.md`, 兩、三人桌的表).
-        let (mut outlook, scale) = if (rules.players, rules.threshold) == (2, 10) {
-            (Outlook::new(rules), 1.3)
-        } else {
-            (Outlook::default(), END_SCALE)
+        let (mut outlook, scale) = match (rules.players, rules.threshold) {
+            (2, 10) => (Outlook::new(rules), 1.3),
+            // The ranks' rates are measured at four players and ten 胡
+            // only, and with them the measured h calibrates unscaled
+            // (`doc/generals.md`, batch 2b).
+            (Seat::COUNT, 10) => (Outlook::default(), 1.0),
+            _ => {
+                let even = Outlook {
+                    drawn: vec![[1.0; 7]],
+                    discarded: vec![[1.0; 7]],
+                    ..Outlook::default()
+                };
+                (even, END_SCALE)
+            }
         };
         outlook.end.iter_mut().for_each(|h| *h *= scale);
         Self {
@@ -590,7 +686,7 @@ impl ExpectBot {
         // with more left, as a table of two had before `Rules::dead`, the
         // leaves lost 5.8 points a split (`research/outlook.md`, 兩、三人桌).
         let draws = Self::draws(view);
-        if draws > crate::eval::DRAWS || self.outlook.ends(draws).len() > crate::eval::CARDS {
+        if draws > crate::eval::DRAWS || self.outlook.segments(draws).len() > crate::eval::CARDS {
             return None;
         }
         Some(Some(if cards <= *deep { 2 } else { 1 }))
@@ -819,10 +915,7 @@ impl Build<'_> {
 
     fn expand(&mut self, node: usize) {
         let (hand, base) = self.graph.state(node);
-        let total = self.live.len() as f64;
-        let mut rest = 1.0;
         for (card, count) in self.live.distinct() {
-            let weight = f64::from(count) / total;
             let first = self.graph.groups.len() as u32;
             let kind = if let Some(hu) = self.wins(hand, base, card) {
                 Some(Kind::Win(hu))
@@ -847,9 +940,9 @@ impl Build<'_> {
                 (self.graph.groups.len() as u32 > first).then_some(Kind::Claim { pong })
             };
             if let Some(kind) = kind {
-                rest -= weight;
                 self.graph.entries.push(Entry {
-                    weight,
+                    count: f64::from(count),
+                    rank: card.rank,
                     kind,
                     first,
                     last: self.graph.groups.len() as u32,
@@ -857,7 +950,6 @@ impl Build<'_> {
             }
         }
         self.graph.ends.push(self.graph.entries.len() as u32);
-        self.graph.rest.push(rest);
     }
 
     /// The discards a node tries after claiming `locked`; see [`Discards`]
@@ -948,6 +1040,7 @@ mod tests {
             loss: 0.0,
             eat: 0.5,
             general: 0.0,
+            ..Outlook::even()
         }
     }
 
@@ -989,10 +1082,12 @@ mod tests {
     }
 
     /// Two players at ten 胡 play by their own table, h × 1.3, and every
-    /// other table by the table of four: the only one whose own won its A/B
+    /// other table by the table of four, its cards drawn evenly: the
+    /// only one whose own won its A/B
     #[test]
     fn only_two_at_ten_plays_by_its_own_outlook() {
         let four = ExpectBot::new(&Rules::new()).outlook;
+        assert_eq!(four, Outlook::default());
         for rules in [Rules::new(), Rules::eight()] {
             for players in 2..=4 {
                 let mut rules = rules;
@@ -1002,8 +1097,16 @@ mod tests {
                     let mut own = Outlook::new(&rules);
                     own.end.iter_mut().for_each(|h| *h *= 1.3);
                     assert_eq!(outlook, own);
-                } else {
+                } else if (players, rules.threshold) == (4, 10) {
                     assert_eq!(outlook, four);
+                } else {
+                    let mut plain = Outlook {
+                        drawn: vec![[1.0; 7]],
+                        discarded: vec![[1.0; 7]],
+                        ..Outlook::default()
+                    };
+                    plain.end.iter_mut().for_each(|h| *h *= END_SCALE);
+                    assert_eq!(outlook, plain);
                 }
             }
         }
@@ -1019,7 +1122,7 @@ mod tests {
                 rules.players = players;
                 let rows = ExpectBot::new(&rules)
                     .outlook
-                    .ends(crate::eval::DRAWS)
+                    .segments(crate::eval::DRAWS)
                     .len();
                 let eval = Eval::of(&rules);
                 let biases = &eval.params()[eval.params().len() - crate::eval::CARDS..];
@@ -1037,8 +1140,8 @@ mod tests {
             ..free()
         };
         // 2 + 1.5 + 1.5 less the card decided on, the last first
-        assert_eq!(outlook.ends(2), [0.1, 0.1, 0.2, 0.2]);
-        assert_eq!(outlook.ends(0), [0.1]);
+        assert_eq!(outlook.segments(2), [0, 0, 1, 2]);
+        assert_eq!(outlook.segments(0), [0]);
     }
 
     #[test]
@@ -1086,7 +1189,18 @@ mod tests {
             }
             let stay = self.value(hand, base, t - 1);
             let foul = -3.0 * f64::from(self.rules.threshold);
-            let total = self.live.len() as f64;
+            // One card a draw, so every card but the last is drawn.
+            let rates = if t == 1 {
+                self.outlook.discarded[0]
+            } else {
+                self.outlook.drawn[0]
+            };
+            let share = if t == 1 {
+                1.0 - self.outlook.own[0]
+            } else {
+                1.0
+            };
+            let total: f64 = self.live.iter().map(|c| rates[c.rank as usize]).sum();
             let mut sum = 0.0;
             for (card, count) in self.live.distinct() {
                 let claim = |this: &mut Self, meld: Meld| {
@@ -1131,11 +1245,11 @@ mod tests {
                     let e = if card.rank == Rank::General {
                         self.outlook.general
                     } else {
-                        self.outlook.eat
+                        (self.outlook.eat / share).min(1.0)
                     };
                     e * best(self, true) + (1.0 - e) * best(self, false)
                 };
-                sum += f64::from(count) / total * answer;
+                sum += share * f64::from(count) * rates[card.rank as usize] / total * answer;
             }
             let end = self.outlook.end[0];
             let v = end * self.outlook.loss + (1.0 - end) * sum;
@@ -1165,6 +1279,9 @@ mod tests {
                 loss: -20.0 * rng.unit(),
                 eat: rng.unit(),
                 general: rng.unit(),
+                drawn: vec![std::array::from_fn(|_| 0.1 + rng.unit())],
+                discarded: vec![std::array::from_fn(|_| 0.1 + rng.unit())],
+                own: vec![0.5 * rng.unit()],
             };
             let t = rng.below(5);
             let graph = Graph::new(&rules, live, &[(hand, base)], unpruned);

@@ -137,8 +137,11 @@ struct Tally {
     /// seat's own discards
     rho: Vec<[Rho; 3]>,
     /// Every rank's rate, gated, by [`phase`] and rank: with the seat's
-    /// own discards and without
-    ranks: [[[Rho; 2]; 7]; 3],
+    /// own discards, without, the draws alone and the other seats'
+    /// discards alone
+    ranks: [[[Rho; 4]; 7]; 3],
+    /// The seat's own among the discards, gated, by [`phase`]
+    own: [Count; 3],
 }
 
 /// The draws left of `doc/generals.md`: 15 or more, 8 to 14, 7 or fewer
@@ -245,6 +248,9 @@ impl Tally {
                         rho.add(by_rank[0], general);
                     }
                 }
+                if gated && !draw {
+                    self.own[phase(left)].add(own);
+                }
                 if gated {
                     let phase = &mut self.ranks[phase(left)];
                     for (rank, (rho, expected)) in phase.iter_mut().zip(by_rank).enumerate() {
@@ -252,6 +258,7 @@ impl Tally {
                         rho[0].add(expected, hit);
                         if !own {
                             rho[1].add(expected, hit);
+                            rho[if draw { 2 } else { 3 }].add(expected, hit);
                         }
                     }
                 }
@@ -305,6 +312,23 @@ impl Tally {
         let near = nearest(all().filter(|&k| self.end[k].gated.n >= least).collect());
         let played = nearest(all().filter(|&k| self.draws[k] >= 100).collect());
         let (sum, n) = self.loss[1];
+        // By draws left, 0 to 15, of the three phases.  士象 share a rate
+        // and so do 車馬炮: `Eval` takes each for alike.
+        let rates = |j: usize| {
+            (0..=15)
+                .map(|k| {
+                    let ranks = &self.ranks[phase(k)];
+                    let pool = |class: std::ops::Range<usize>| {
+                        let sum = ranks[class]
+                            .iter()
+                            .fold(Rho::default(), |a, r| a.merge(r[j]));
+                        sum.rate()
+                    };
+                    let (general, court, field) = (pool(0..1), pool(1..3), pool(3..6));
+                    [general, court, court, field, field, field, pool(6..7)]
+                })
+                .collect()
+        };
         Outlook {
             end: all()
                 .map(|k| near(k).map_or(self.end(), |j| self.end[j].gated.rate()))
@@ -319,6 +343,9 @@ impl Tally {
             loss: -(sum as f64) / n as f64,
             eat: self.eat.gated.rate(),
             general: self.general.gated.rate(),
+            drawn: rates(2),
+            discarded: rates(3),
+            own: (0..=15).map(|k| self.own[phase(k)].rate()).collect(),
         }
     }
 
@@ -393,14 +420,22 @@ impl Tally {
             }
         }
         let names = ["將帥", "士仕", "象相", "車俥", "馬傌", "包炮", "卒兵"];
-        for (j, title) in ["with", "less"].iter().enumerate() {
-            println!("\nevery rank, gated, {title} the seat's own discards: came up over expected");
+        let titles = [
+            "with the seat's own discards",
+            "less the seat's own discards",
+            "draws alone",
+            "the other seats' discards alone",
+        ];
+        for (j, title) in titles.iter().enumerate() {
+            println!("\nevery rank, gated, {title}: came up over expected");
             println!("rank  draws 15+        8–14             0–7");
             for (rank, name) in names.iter().enumerate() {
                 let [a, b, c] = self.ranks.map(|phase| cell(phase[rank][j]));
                 println!("{name}  {a:15}  {b:15}  {c:15}");
             }
         }
+        let [a, b, c] = self.own.map(Count::rate);
+        println!("\nthe seat's own among the discards, gated: {a:.4}  {b:.4}  {c:.4}");
         let sum = self.rho.iter().fold([Rho::default(); 3], |a, r| {
             [0, 1, 2].map(|j| a[j].merge(r[j]))
         });
@@ -412,20 +447,6 @@ impl Tally {
             cell(sum[2]),
             sum[1].n
         );
-    }
-
-    /// ρ gated by draws left; a segment with fewer than `least` gated cards
-    /// takes the nearest that has them
-    fn generals(&self, least: u64) -> Vec<f64> {
-        let full: Vec<_> = (0..=self.span)
-            .filter(|&k| self.rho[k][1].n >= least)
-            .collect();
-        (0..=self.span)
-            .map(|k| {
-                let j = full.iter().min_by_key(|&&j| j.abs_diff(k));
-                self.rho[*j.expect("a segment with enough cards")][1].rate()
-            })
-            .collect()
     }
 }
 
@@ -599,7 +620,6 @@ fn main() {
     // h from segments with fewer gated cards than this is too noisy
     let tables = tally.outlook(500);
     println!("\n{tables:.4?}");
-    println!("generals: {:.4?}", tally.generals(500));
     let flat = Outlook {
         end: vec![tally.end()],
         cards: vec![tally.per_draw()],

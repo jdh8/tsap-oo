@@ -14,7 +14,6 @@ use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use std::cell::RefCell;
 use std::rc::Rc;
-use tsap_oo::expect::END_SCALE;
 use tsap_oo::susik::{Card, Hand, Meld, Rank, Solver, locked_completions};
 use tsap_oo::{
     Claim, ClaimOptions, Eval, ExpectBot, Graph, HeuristicBot, Outlook, Payoff, Prune, Round,
@@ -149,8 +148,8 @@ impl Strategy for Logged {
         let draws = view.pile_len().saturating_sub(rules.dead());
         // The DP's chance to win from here, where the bot plays by it whole
         let chance = if hand.len() <= 14 {
-            let mut outlook = Outlook::default();
-            outlook.end.iter_mut().for_each(|h| *h *= END_SCALE);
+            // `ExpectBot::new`'s at four players and ten 胡
+            let outlook = Outlook::default();
             let graph = Graph::new(rules, live, &[(hand, base)], Prune::default());
             graph.values(&outlook, draws, Payoff::Win)[graph.roots()[0]]
         } else {

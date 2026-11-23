@@ -189,6 +189,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `Graph` weighs each public card to come by its rank's rate
+  (`Outlook::drawn` for a segment's draw, `Outlook::discarded` for the
+  other seats' discards, by phase, 士象 and 車馬炮 pooled) where it took
+  every unseen card as alike, and at four players and ten 胡
+  `ExpectBot::new` plays by the measured h unscaled in place of
+  `END_SCALE`; other tables keep the even draw and `END_SCALE`
+  (`doc/generals.md`, batch 2b).  Calibrated on `examples/overspend`,
+  20,000 rounds, seed base 1795450000: the mean miss over 33 cells of the
+  waiting table falls from 5.9 to 2.4 points.  `ab/run.sh` against
+  `a9e194e`, `RESHUFFLE=8`: the web setting, 60,000 deals, seed base
+  1794000000, 25,242 part, +0.056 ± 0.023 a deal, CI [+0.012, +0.101],
+  **win**; the desktop setting, 20,000 deals, seed base 1794200000, 10,655
+  part, +0.103 ± 0.043, CI [+0.019, +0.187], **win**.
+  `examples/overspend.rs` now uses the bot's own outlook.
+
 - `examples/arena.rs` shuffles every deal first, on one thread, and plays
   four `HeuristicBot`s on every core: the table is the same from each seat,
   so a deal is played from the first seat and turned to its dealer
