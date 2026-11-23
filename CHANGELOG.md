@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `cargo run --release --example away -- CLONE [deals] [seed]` is the
+  return match of `guest`: `ExpectBot` at chunhua1972/four-color-game's
+  table (`ee33cf0`), where `node` runs their own engine from a clone
+  through `examples/away.mjs`: their rules, their scores, their Normal AI
+  as host.  The bot keeps its beliefs from home (a pair of soldiers
+  melds, the claimed card is locked, a win pays its 胡), and wins and
+  kongs are always taken.  10,000 deals, seed base 1795470698, seat 1,
+  dealer rotating: among three hosts, guest − host is +1.551 ± 0.088
+  points a deal, 95% CI [+1.377, +1.724]; among three guests, host −
+  guest is −1.270 ± 0.078, 95% CI [−1.422, −1.117].  No illegal action
+  and no foul by the guest.
+
 - `cargo run --release --example guest -- CLONE [deals] [seed] [expect]`
   plays a match against another program's bot: the Normal AI of
   chunhua1972/four-color-game (`ee33cf0`), which `node` imports from a

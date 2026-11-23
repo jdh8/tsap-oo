@@ -33,6 +33,10 @@ thiserror = "2"
 # Auto-discovery would hide this example from `cargo run --example` listings
 # when the feature is off; the explicit entry documents the requirement.
 [[example]]
+name = "away"
+required-features = ["rand"]
+
+[[example]]
 name = "arena"
 required-features = ["rand"]
 

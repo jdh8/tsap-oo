@@ -547,6 +547,46 @@ impl Round {
         round
     }
 
+    /// What `seat` sees at another engine's table, for the `away` example:
+    /// its hand, the public cards, and a pile of `pile_len`
+    ///
+    /// It is a position to look at through a [`View`](crate::View), not a
+    /// round to play: the other hands are empty, the pile's cards are no
+    /// cards of the deck, and nothing happened ([`Round::events`]).  The
+    /// round waits on `seat`: its claim with an `offer`, its discard
+    /// without.
+    #[expect(clippy::too_many_arguments, reason = "a position has that many parts")]
+    #[doc(hidden)]
+    #[must_use]
+    pub fn seen(
+        rules: Rules,
+        dealer: Seat,
+        seat: Seat,
+        hand: Hand,
+        exposed: [Vec<Meld>; Seat::COUNT],
+        discards: Vec<(Seat, Card)>,
+        pile_len: usize,
+        offer: Option<Offer>,
+    ) -> Self {
+        let mut hands = [Hand::EMPTY; Seat::COUNT];
+        hands[seat.index()] = hand;
+        Self {
+            rules,
+            dealer,
+            hands,
+            exposed,
+            pile: vec![Card::ALL[0]; pile_len],
+            discards,
+            events: Vec::new(),
+            phase: offer.map_or(Phase::Discard(seat), |_| Phase::Claim(seat)),
+            offer,
+            queue: VecDeque::new(),
+            eat: None,
+            locked: None,
+            result: None,
+        }
+    }
+
     /// The cards left in the pile, for [`View::peek`](crate::View::peek)
     #[cfg(feature = "peek")]
     pub(crate) fn pile_mut(&mut self) -> &mut [Card] {
