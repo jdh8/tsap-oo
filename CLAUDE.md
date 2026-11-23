@@ -59,7 +59,12 @@ to what a card-game bot needs.
 - Verdict: `win` when the CI lies above 0, `loss` when it lies below.
   A CI that straddles 0 is insufficient data, never "no loss".
 - Before declaring a loss dead, trace the deals that moved the most.
-- Never rebuild while a run is in flight.
+- Never rebuild while a run is in flight.  Queue a long run instead:
+  `ab/queue.sh SLUG [deals] [control]` freezes the checkout, dirty files
+  included, into a worktree under `~/ab/` and runs `ab/run.sh` there
+  through pueue, one task at a time.  `pueue status` is the index of what
+  is in flight and `pueue log ID --full` the result; never start a run or
+  a release build beside the queue.
 - Write it down in `CHANGELOG.md` and the commit message: the numbers, the
   deal count, the seed base, the control's SHA and the verdict.
 - A change meant to leave play alone (a refactor, a speed-up) owes the same

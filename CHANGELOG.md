@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ab/queue.sh SLUG [deals] [control]` queues an A/B through pueue, one at
+  a time: it freezes the checkout, uncommitted files included, into a
+  worktree under `~/ab/` and runs `ab/run.sh` there at `nice -n19`
+  (`SCHED_IDLE` where `chrt` exists), so the main checkout stays free to
+  edit and build.  Not background QoS: `taskpolicy -b` keeps the run on an
+  M4's six E-cores, 68.6 s against 12.1 s for 1,200 deals; `nice -n19`
+  took 12.6 s.  No bot changes: `ab/queue.sh pueue-harness 20000`
+  against `04d3609`, seed base 1795459850, reads 0 deals that part.
+
 - `examples/outlook.rs` measures the generals' rate ρ (`doc/generals.md`,
   batch 1): the generals among the public cards over the sum of K ÷ N, K
   the generals and N the cards the watching seat has not seen, rebuilt
