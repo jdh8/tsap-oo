@@ -1,66 +1,86 @@
-# 把評分換算成分：常模化做得到多少
+# Converting the grade to points: how far normalisation gets
 
-量測日期：2026-11-16。問題：西洋棋引擎把內部的評估值換算成「兵」，讓
-數字有固定的意義。`HeuristicBot` 的評分能不能照樣換算成得分？換算之後，
-「這個選擇的評分比首選低 x」能不能讀成「少 y 分」？bot 的基準為 `fc6ca57`；
-`fit` example 這次只多印幾張表，打法與原有的表都不變。
+Measured 2026-11-16.  The question: chess engines convert their internal
+evaluation to "pawns", so that the number has a fixed meaning.  Can
+`HeuristicBot`'s grade be converted to score in the same way?  Once
+converted, can "this choice is graded x below the pick" be read as "y points
+less"?  The bot's base is `fc6ca57`; this time the `fit` example only prints
+a few more tables, and play and the earlier tables are unchanged.
 
-評分是 bot 排序用的整數，沒有單位。手上的 1 胡在裡面算 32，其他的項是
-權重，所以下面一律寫評分本身，不除以 32。
+The grade is the whole number the bot sorts by, without a unit.  1 胡 in
+hand counts 32 in it and the other terms are weights, so everything below
+gives the grade itself, not divided by 32.
 
-## 結論
+## Answer
 
-**手牌的評分換得成分，但要看牌局進度；兩個選擇之間的評分差換不成分。**
+**A hand's grade converts to points, but by the stage of the round; the
+difference in grade between two choices does not convert.**
 
-- **手牌的評分對得分是一條單調的曲線。** 評分 −1280 的手牌平均得 −10.9 分，
-  0 是 +4.6 分，320 是 +17.8 分，640 是 +32.9 分。
-- **曲線在 0 附近轉折。** −640 到 0 之間評分每 32 約 0.5 分，0 到 640 之間
-  約 1.4 分。0 以下的評分主要是散牌扣的，而一張散牌扣 128、實際只值 2.2 分。
-- **同樣的評分，越晚越不值錢。** 評分 0 的手牌在牌堆 23 張以上時值 +8.2
-  分，14 到 22 張時 −2.0 分，13 張以下 −4.9 分。換算一定要分段。
-- **曲線說不準選擇的代價。** 拿它去預測「改打另一張會少幾分」，落後 64
-  以內的選擇實際少的是預測的 3.2 到 3.3 倍；落後 64 以上的是 1.2 到 1.3
-  倍。
-- **評分差對得分差連單調都不是。** 落後 8 以內沒有差別（+0.04 ±
-  0.10 分），落後 32 到 64 少 4.1 分，落後 64 到 128 反而只少 1.6 分。
-- **所以網頁提示的數字是名次，不是價錢。** 它不能直接換成分，bot 也沒有
-  改動。
+- **A hand's grade against its score is a monotone curve.**  A hand graded
+  −1280 scores −10.9 points on average, 0 is +4.6 points, 320 is +17.8
+  points and 640 is +32.9 points.
+- **The curve bends near 0.**  From −640 to 0 each 32 of grade is about 0.5
+  points, from 0 to 640 about 1.4 points.  A grade below 0 is mostly what
+  loose cards take off, and a loose card takes off 128 while really worth
+  only 2.2 points.
+- **The same grade is worth less the later it is.**  A hand graded 0 is
+  worth +8.2 points with 23 cards or more in the pile, −2.0 points with 14
+  to 22 and −4.9 points with 13 or fewer.  The conversion has to go by
+  stretches.
+- **The curve does not tell what a choice costs.**  Used to predict "how
+  many points discarding another card instead loses", choices within 64
+  behind really lose 3.2 to 3.3 times the prediction; those 64 or more
+  behind, 1.2 to 1.3 times.
+- **The score difference is not even monotone in the grade difference.**
+  Within 8 behind there is no difference (+0.04 ± 0.10 points), 32 to 64
+  behind loses 4.1 points, and 64 to 128 behind loses only 1.6 points
+  instead.
+- **So the number in the web page's hint is a rank, not a price.**  It does
+  not convert directly to points, and the bot is unchanged.
 
-## 量測方法
+## How it was measured
 
-和 `research/fitted-weights.md` 同一次對局：四家 `HeuristicBot` 以
-`Rules::new()` 對局 60,000 局，seed base 20261119，莊家輪流，分成 16 個
-shard。
+The same run of play as `research/fitted-weights.md`: four `HeuristicBot`s
+play 60,000 rounds under `Rules::new()`, seed base 20261119, the dealer
+rotating, split into 16 shards.
 
-1. **曲線。** 偶數 shard 的每一次棄牌，記下四家各自的評分與該局最後的
-   得分。評分取 bot 比較吃碰時用的那個數：亮出的胡數乘 32 加上手牌的評分。
-   每 32 一格，取各格得分的平均，再用 pool adjacent violators 併成
-   單調。整局一條，依牌堆剩餘張數另分三段。
-2. **檢查。** 奇數 shard 每八次棄牌取一次，把出牌者每一張可以打的牌都
-   打到結束（即 `fitted-weights.md` 的選擇擬合用的那批資料）。曲線的預測
-   是「這個選擇的評分對到的分 − 首選的評分對到的分」，格與格之間取直線。
-   以實際的得分差對預測做過原點的最小平方，斜率 1 表示曲線說得準。
-3. **選擇的代價。** 全部 16 個 shard 的同一批選擇，依評分落後首選多少
-   分組，直接取得分差的平均。
+1. **The curve.**  At every discard of the even shards, record each of the
+   four seats' grade and its final score for the round.  The grade is the
+   number the bot compares claims by: the exposed 胡 times 32 plus the grade
+   of the hand.  In bins of 32, take the mean score of each bin, then pool
+   them monotone with pool adjacent violators.  One curve for the whole
+   round, and three more by the cards left in the pile.
+2. **The check.**  At one discard in eight of the odd shards, every card the
+   discarder may discard is played to the end (the data the choice fit of
+   `fitted-weights.md` uses).  The curve's prediction is "the points this
+   choice's grade maps to − the points the pick's grade maps to", linear
+   between bins.  The actual score difference is fitted to the prediction by
+   least squares through the origin; a slope of 1 means the curve tells it
+   right.
+3. **The cost of a choice.**  The same choices over all 16 shards, grouped
+   by how far the grade falls behind the pick, taking the mean score
+   difference directly.
 
-曲線與檢查用不同的牌局。標準誤取自 shard 之間的離散程度。
+The curve and the check use different rounds.  The standard errors come
+from the spread between shards.
 
-重現（16 核約 17 分鐘）：
+To reproduce (about 17 minutes on 16 cores):
 
 ```sh
 cargo run --release --example fit -- 60000 20261119
 ```
 
-## 數據
+## Data
 
-### 手牌的評分值幾分
+### What a hand's grade is worth in points
 
-各格是「評分從這個數起 32 以內」的手牌，數字是併成單調之後的平均
-得分。完整的表每 32 一列，由上面的指令印出。
+Each bin is the hands "graded from this number up to 32 above it", and the
+number is the mean score after pooling monotone.  The full table, a row for
+every 32, is printed by the command above.
 
-| 評分 | 整局 | 23 張以上 | 14–22 張 | 13 張以下 |
+| Grade | Whole round | 23 cards or more | 14–22 cards | 13 cards or fewer |
 | ---: | ---: | ---: | ---: | ---: |
-| −1280 以下 | −10.87 | −10.87 | −11.23 | −10.88 |
+| −1280 or below | −10.87 | −10.87 | −11.23 | −10.88 |
 | −960 | −7.93 | −7.82 | −10.81 | −8.06 |
 | −640 | −4.68 | −4.33 | −10.08 | −8.06 |
 | −320 | −0.50 | +0.86 | −7.16 | −7.14 |
@@ -71,110 +91,133 @@ cargo run --release --example fit -- 60000 20261119
 | 480 | +23.10 | +27.16 | +21.23 | +11.25 |
 | 640 | +32.91 | +37.70 | +28.62 | +17.25 |
 
-得分為 0 的評分：前段約 −350，中段約 +30，後段約 +100。
+The grade at which the score is 0: about −350 in the early stretch, about
++30 in the middle one and about +100 in the late one.
 
-評分每 32 值幾分（上表兩列相減）：
+Points for each 32 of grade (two rows of the table above subtracted):
 
-| 區間 | 整局 | 23 張以上 | 14–22 張 | 13 張以下 |
+| Interval | Whole round | 23 cards or more | 14–22 cards | 13 cards or fewer |
 | --- | ---: | ---: | ---: | ---: |
-| −640 到 0 | 0.46 | 0.63 | 0.41 | 0.16 |
-| 0 到 640 | 1.42 | 1.48 | 1.53 | 1.11 |
+| −640 to 0 | 0.46 | 0.63 | 0.41 | 0.16 |
+| 0 to 640 | 1.42 | 1.48 | 1.53 | 1.11 |
 
-13 張以下的樣本少（偶數 shard 約三萬筆，−480 以下各格只有幾十到兩百筆），
-那一欄在 −480 以下併成同一個值。
+Samples at 13 cards or fewer are few (about thirty thousand records in the
+even shards, and only a few dozen to two hundred in each bin at −480 or
+below), and that column pools to a single value at −480 or below.
 
-### 曲線預測選擇的代價
+### The curve's prediction of what a choice costs
 
-奇數 shard 的 501,555 個選擇。「預測」是分段曲線給的得分差，「斜率」是
-實際對預測的斜率；最右兩欄改用整局那一條曲線。
+The 501,555 choices of the odd shards.  "Predicted" is the score difference
+the curves by stretch give, and "slope" is the slope of actual against
+predicted; the two rightmost columns use the whole-round curve instead.
 
-| 評分落後 | 選擇數 | 平均落後 | 實際（分） | ± | 預測 | 斜率 | ± | 整局曲線預測 | 斜率 | ± |
+| Grade behind | Choices | Mean behind | Actual (points) | ± | Predicted | Slope | ± | Predicted by the whole-round curve | Slope | ± |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 0 | 12,207 | 0 | +0.365 | 0.149 | 0 | | | 0 | | |
-| 0 到 16 | 92,586 | 8 | −0.487 | 0.140 | −0.160 | 3.18 | 0.29 | −0.132 | 3.27 | 0.35 |
-| 16 到 64 | 41,248 | 29 | −2.586 | 0.214 | −0.564 | 3.29 | 0.22 | −0.476 | 3.42 | 0.27 |
-| 64 到 256 | 168,970 | 165 | −3.104 | 0.072 | −2.527 | 1.31 | 0.04 | −2.179 | 1.52 | 0.04 |
-| 256 以上 | 186,544 | 371 | −8.704 | 0.138 | −7.313 | 1.18 | 0.02 | −6.368 | 1.35 | 0.02 |
-| 全部 | 501,555 | 197 | −4.612 | 0.129 | −3.647 | 1.20 | 0.02 | −3.166 | 1.37 | 0.03 |
+| 0 to 16 | 92,586 | 8 | −0.487 | 0.140 | −0.160 | 3.18 | 0.29 | −0.132 | 3.27 | 0.35 |
+| 16 to 64 | 41,248 | 29 | −2.586 | 0.214 | −0.564 | 3.29 | 0.22 | −0.476 | 3.42 | 0.27 |
+| 64 to 256 | 168,970 | 165 | −3.104 | 0.072 | −2.527 | 1.31 | 0.04 | −2.179 | 1.52 | 0.04 |
+| 256 or more | 186,544 | 371 | −8.704 | 0.138 | −7.313 | 1.18 | 0.02 | −6.368 | 1.35 | 0.02 |
+| All | 501,555 | 197 | −4.612 | 0.129 | −3.647 | 1.20 | 0.02 | −3.166 | 1.37 | 0.03 |
 
-### 選擇落後首選多少，實際少幾分
+### How far a choice is behind the pick, and what it really loses
 
-全部 16 個 shard 的 949,096 個選擇。
+The 949,096 choices of all 16 shards.
 
-| 評分落後 | 選擇數 | 平均落後 | 得分差（分） | ± | 每落後 32 少幾分 |
+| Grade behind | Choices | Mean behind | Score difference (points) | ± | Points lost for each 32 behind |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | 0 | 23,906 | 0 | +0.086 | 0.116 | |
-| 0 到 8 | 106,420 | 5 | +0.036 | 0.099 | |
-| 8 到 16 | 68,186 | 13 | −1.239 | 0.128 | 3.0 |
-| 16 到 32 | 51,238 | 22 | −1.855 | 0.200 | 2.7 |
-| 32 到 64 | 23,552 | 45 | −4.060 | 0.199 | 2.9 |
-| 64 到 128 | 72,299 | 87 | −1.643 | 0.077 | 0.6 |
-| 128 到 256 | 245,697 | 188 | −3.552 | 0.063 | 0.6 |
-| 256 到 512 | 335,709 | 357 | −8.306 | 0.075 | 0.7 |
-| 512 以上 | 22,089 | 581 | −14.759 | 0.262 | 0.8 |
+| 0 to 8 | 106,420 | 5 | +0.036 | 0.099 | |
+| 8 to 16 | 68,186 | 13 | −1.239 | 0.128 | 3.0 |
+| 16 to 32 | 51,238 | 22 | −1.855 | 0.200 | 2.7 |
+| 32 to 64 | 23,552 | 45 | −4.060 | 0.199 | 2.9 |
+| 64 to 128 | 72,299 | 87 | −1.643 | 0.077 | 0.6 |
+| 128 to 256 | 245,697 | 188 | −3.552 | 0.063 | 0.6 |
+| 256 to 512 | 335,709 | 357 | −8.306 | 0.075 | 0.7 |
+| 512 or more | 22,089 | 581 | −14.759 | 0.262 | 0.8 |
 
-依牌堆分段（得分差，分）：
+By stretch of the pile (score difference, points):
 
-| 評分落後 | 23 張以上 | ± | 14–22 張 | ± | 13 張以下 | ± |
+| Grade behind | 23 cards or more | ± | 14–22 cards | ± | 13 cards or fewer | ± |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | 0 | +0.023 | 0.141 | +0.277 | 0.368 | +2.144 | 0.807 |
-| 0 到 8 | +0.044 | 0.099 | +0.027 | 0.175 | −1.425 | 0.582 |
-| 8 到 16 | −1.193 | 0.130 | −1.635 | 0.255 | −2.526 | 0.900 |
-| 16 到 32 | −1.691 | 0.213 | −3.174 | 0.460 | −2.815 | 1.245 |
-| 32 到 64 | −3.814 | 0.227 | −5.341 | 0.751 | −4.915 | 1.901 |
-| 64 到 128 | −1.623 | 0.081 | −1.963 | 0.313 | −1.004 | 0.495 |
-| 128 到 256 | −3.601 | 0.070 | −3.198 | 0.134 | −2.413 | 0.467 |
-| 256 到 512 | −8.203 | 0.087 | −8.933 | 0.158 | −6.990 | 0.441 |
-| 512 以上 | −14.005 | 0.253 | −16.805 | 0.586 | −12.487 | 1.246 |
+| 0 to 8 | +0.044 | 0.099 | +0.027 | 0.175 | −1.425 | 0.582 |
+| 8 to 16 | −1.193 | 0.130 | −1.635 | 0.255 | −2.526 | 0.900 |
+| 16 to 32 | −1.691 | 0.213 | −3.174 | 0.460 | −2.815 | 1.245 |
+| 32 to 64 | −3.814 | 0.227 | −5.341 | 0.751 | −4.915 | 1.901 |
+| 64 to 128 | −1.623 | 0.081 | −1.963 | 0.313 | −1.004 | 0.495 |
+| 128 to 256 | −3.601 | 0.070 | −3.198 | 0.134 | −2.413 | 0.467 |
+| 256 to 512 | −8.203 | 0.087 | −8.933 | 0.158 | −6.990 | 0.441 |
+| 512 or more | −14.005 | 0.253 | −16.805 | 0.586 | −12.487 | 1.246 |
 
-「落後 32 到 64 比落後 64 到 128 貴」在三段都出現。
+"32 to 64 behind costs more than 64 to 128 behind" shows in all three
+stretches.
 
-## 怎麼讀
+## How to read it
 
-- **有兩種匯率，不是一種。** 比較不同的手牌，評分的 32 值 0.2 到 1.5 分；
-  比較同一手牌的兩種打法，落後 8 到 64 時每 32 值 3 分左右，落後
-  64 以上只值 0.6 到 0.8 分。`fitted-weights.md` 的「1 胡約 1.4 分」是
-  `hu` 那一項的價錢，接近曲線在 0 以上的斜率。
-- **轉折來自散牌的定價。** 一張散牌在評分裡扣 128，擬合出來只值 2.2 分，
-  也就是每 32 值 0.55 分。落後 64 到 256 的選擇多半是多留了一兩張散牌，
-  所以每 32 只少 0.6 分。
-- **小差距貴，是因為它們來自便宜的項。** 落後 8 到 64 的選擇，差的
-  是搭子和聽牌張數。一張能胡的活牌在評分裡是 8，擬合出來值 1.1
-  分，每 32 值 4.4 分。
-- **單調的換算修不了排序。** 把評分換成分不改變哪一個選擇排第一。評分的
-  項與項之間比價不對時（例如聽牌的手為了少一張散牌去碰，聽的張數從 8 張
-  掉到 3 張），換算之後還是選同一個。
-- **8 以內可以當成平手。** 這一格有十萬個選擇，得分差 +0.04 ± 0.10。
-- **`HeuristicBot::draw` 的平均是在評分上取的。** 曲線彎曲，所以先換
-  成分再平均會得到不同的吃碰決定。這是唯一會因為常模化而改變打法的地方，
-  還沒有試；曲線在選擇上不準，沒有理由預期它會贏。
+- **There are two exchange rates, not one.**  Between different hands, 32 of
+  grade is worth 0.2 to 1.5 points; between two plays of the same hand,
+  each 32 is worth about 3 points at 8 to 64 behind and only 0.6 to 0.8
+  points at 64 or more behind.  The "1 胡 is about 1.4 points" of
+  `fitted-weights.md` is the price of the term `hu`, close to the slope of
+  the curve above 0.
+- **The bend comes from the pricing of loose cards.**  A loose card takes
+  128 off the grade and is fitted at only 2.2 points, that is 0.55 points
+  for each 32.  Choices 64 to 256 behind have mostly kept one or two loose
+  cards more, so each 32 loses only 0.6 points.
+- **Small gaps are dear because they come from cheap terms.**  Choices 8 to
+  64 behind differ in 搭子 and in the cards waited on.  A live card the
+  hand wins on is 8 in the grade and is fitted at 1.1 points, 4.4 points for
+  each 32.
+- **A monotone conversion cannot fix the ordering.**  Converting the grade
+  to points does not change which choice comes first.  When the terms of
+  the grade are priced wrongly against each other (for example a waiting
+  hand that pongs for one loose card fewer, its wait falling from 8 cards to
+  3), the same one is still picked after the conversion.
+- **Within 8 can be taken as a tie.**  This bin has a hundred thousand
+  choices, with a score difference of +0.04 ± 0.10.
+- **The mean in `HeuristicBot::draw` is taken over grades.**  The curve
+  bends, so converting to points first and averaging after would give
+  different claim decisions.  This is the only place where normalisation
+  would change play, and it has not been tried; the curve is inaccurate on
+  choices, so there is no reason to expect it to win.
 
-## 一個吃碰的例子
+## An example of a claim
 
-八胡，桌上 3 胡，手上五張將帥、紅炮紅炮、黃兵、綠卒，已滿 8 胡，聽 紅兵
-白卒 最多 8 張。下家摸出 紅炮。網頁提示：碰是首選，過落後約 77。
+八胡, 3 胡 on the table, and in hand five generals (將帥), red 炮 red 炮,
+yellow 兵 and green 卒; the 8 胡 are already there, and it waits on red 兵
+and white 卒, 8 cards at most.  The next seat draws a red 炮.  The web
+page's hint: pong is the pick, and pass is about 77 behind.
 
-| | 過 | 碰 |
+| | Pass | Pong |
 | --- | --- | --- |
-| 散牌 | 黃兵 綠卒 | 其中一張 |
-| 聽 | 最多 8 張 | 最多 3 張 |
-| 胡的時候 | 11 胡 | 9 胡 |
+| Loose cards | yellow 兵, green 卒 | one of the two |
+| Waits on | 8 cards at most | 3 cards at most |
+| On winning | 11 胡 | 9 胡 |
 
-評分選碰，是因為少一張散牌省 128、碰多的 1 胡加 32，而多聽 5 張只值 40。
-這正是上面那張表的情形：差在聽牌張數的 32 到 64，比差在散牌的 64 到 128
-貴。換算成分不會改變這個選擇。
+The grade picks the pong because one loose card fewer saves 128 and the 1 胡
+more of the pong adds 32, while waiting on 5 more cards is worth only 40.
+This is exactly the case of the table above: the 32 to 64 that lies in the
+cards waited on is dearer than the 64 to 128 that lies in loose cards.
+Converting to points does not change this choice.
 
-把「聽牌的手不吃碰成更少的聽牌張數」做成規則試了一次：以 `fc6ca57` 為
-對照，`ab/run.sh 200000`，seed base 1794828275，3,607 局不同，+0.007 ±
-0.011 分／局，95% CI [−0.014, +0.029]，勝率 24.23% 對 24.19%。結論不明，
-bot 沒有改動。
+Making "a waiting hand does not claim into a wait on fewer cards" a rule was
+tried once: `fc6ca57` as the control, `ab/run.sh 200000`, seed base
+1794828275, 3,607 deals differ, +0.007 ± 0.011 points a deal, 95% CI
+[−0.014, +0.029], win rate 24.23% against 24.19%.  Insufficient data; the
+bot is unchanged.
 
-## 限制
+## Caveats
 
-- **對手是同一個 bot。** 曲線與代價都是對 `HeuristicBot` 量的。
-- **選擇只看棄牌。** 吃碰與過之間的取捨沒有打到結束比較過，上面的表對
-  那種決定不成立。
-- **每個選擇只打一次。** 量得到一組選擇的平均，量不到單一決策裡誰好。
-- **曲線只用評分與牌堆兩個變數。** 對手的進度（暗牌張數、亮出的胡數）
-  沒有放進去；同一個決策的各個選擇共用這些，所以不影響檢查。
-- **後段的樣本少。** 牌堆 13 張以下只占約 2% 的手牌。
+- **The opponents are the same bot.**  Both the curve and the costs were
+  measured against `HeuristicBot`.
+- **The choices are discards only.**  The choice between claiming and
+  passing was never compared by playing to the end, and the tables above do
+  not hold for that kind of decision.
+- **Each choice is played out once.**  That measures the mean of a group of
+  choices, not which is better in a single decision.
+- **The curve uses two variables only, the grade and the pile.**  The
+  opponents' progress (their concealed cards, their exposed 胡) is not in
+  it; the choices of one decision share these, so the check is not affected.
+- **The late stretch has few samples.**  A pile of 13 cards or fewer
+  accounts for only about 2% of the hands.

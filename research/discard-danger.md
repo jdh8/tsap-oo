@@ -1,123 +1,158 @@
-# 棄牌的危險度：兵卒、士象、車馬炮誰該先打
+# The danger of a discard: which of soldiers, 士象 and 車馬炮 should go first
 
-量測日期：2026-11-16。問題：「好牌先打」是為了不要把別家想要的牌留到後面
-才放銃。車馬炮顯然是最差的牌，但兵卒與士象誰的牌值高、誰容易被聽，因而
-該先打？本文用 `HeuristicBot` 自對局量測，基準為 `3526146`。
+Measured 2026-11-16.  The question: 「好牌先打」 (good cards first) is there
+so that a card the other seats want is not kept until later, only to deal
+in.  車馬炮 are plainly the worst cards, but of soldiers and 士象, which is
+worth more and more readily waited on, and so should go first?  This is
+measured from `HeuristicBot` self-play, base `3526146`.
 
-## 結論
+## Answer
 
-**牌值順序是兵卒 ≫ 士象 ≳ 車馬炮，孤張就照這個順序打。**
+**The order of card value is soldiers ≫ 士象 ≳ 車馬炮, and lone cards go in
+that order.**
 
-- **兵卒遠比另外兩類危險。** 中段以後，一張兵卒落地被胡的機率約是士象或
-  車馬炮的兩倍，而且幾乎全部來自成順（三色、四色兵卒）。
-- **士象與車馬炮的總銃率相當，車馬炮還略高，但那不是牌值。** 把胡牌依銃張
-  完成的牌組拆開後，車馬炮多出來的部分全在單吊與對倒；成順的部分是士象
-  略高。
-- **士象的成順優勢很小。** 中段約高 5%，後段約高 11%，遠不到兩倍，統計上
-  也不算確定。
-- **放銃的代價與牌種無關。** 被胡時贏家的胡數三類都在 12.1 到 12.3 之間，
-  所以比較機率就夠了。
+- **Soldiers are far more dangerous than the other two kinds.**  From the
+  middle stage on, a soldier that comes down is won on about twice as often
+  as a 士象 or a 車馬炮, and nearly all of it comes from runs (soldiers of
+  three and of four colours).
+- **士象 and 車馬炮 deal in at about the same total rate, 車馬炮 even a
+  little higher, but that is not card value.**  With the wins split by the
+  meld the winning card completes, all of the excess of 車馬炮 is in the
+  pair waits (單吊) and triplet waits (對倒); in runs 士象 are slightly
+  higher.
+- **The edge of 士象 in runs is small.**  About 5% higher in the middle
+  stage and about 11% in the late stage, far from double, and not
+  statistically certain either.
+- **The cost of dealing in does not depend on the kind.**  The winner's 胡
+  when the card is won on are between 12.1 and 12.3 for all three kinds, so
+  comparing the rates is enough.
 
-`HeuristicBot` 的孤張順序（[`prospects`](../src/heuristic.rs)，依被吃進去
-的牌組胡數：兵卒 3、將士象 2、車馬炮 1）與此一致，這次量測沒有改動 bot。
+`HeuristicBot`'s order of lone cards ([`prospects`](../src/heuristic.rs), by
+the 胡 of the meld the card would be eaten into: soldiers 3, 將士象 2,
+車馬炮 1) agrees with this, and this measurement changed nothing in the bot.
 
-## 為什麼會這樣
+## Why it is so
 
-一張牌的危險度有兩個來源，要分開看。
+A card's danger has two sources, to be looked at apart.
 
-**牌值**是這張牌能完成多少種順子，由規則決定：
+**Card value** is how many runs the card can complete, and the rules decide
+it:
 
-- 兵卒不分顏色互搭。手上有兩色兵卒就聽另外兩色，共 8 張；有三色還能再聽
-  第四色。
-- 士象與車馬炮只跟同色的牌搭。將士聽象、將象聽士、車馬聽炮，各只聽一種牌
-  的 4 張。
-- 將帥沒有人會打，也不能打。所以士象搭子（缺將）吃不到任何棄牌，只能等
-  自己摸進將帥；反過來，手上有將帥的人，士與象兩張都用得上。這是士象牌值
-  略高於車馬炮的理由。
+- Soldiers go together whatever their colours.  A hand with soldiers of two
+  colours waits on the other two, 8 cards in all; with three colours it can
+  still wait on the fourth.
+- 士象 and 車馬炮 go only with cards of their own colour.  將士 waits on 象,
+  將象 on 士 and 車馬 on 炮, each on the 4 copies of one card only.
+- Nobody would discard a general (將帥), and nobody may.  So a 士象 搭子
+  (lacking the general) can eat no discard and can only wait to draw the
+  general itself; conversely, whoever holds a general has a use for both
+  the 士 and the 象.  This is why 士象 are worth slightly more than 車馬炮.
 
-**單吊與對倒**則是任何牌都有的聽法，機率取決於別家手上留著什麼單張與對子，
-也就是取決於對手怎麼打，而不是牌本身。`HeuristicBot` 先丟孤張士象、後丟
-孤張車馬炮，於是留在手上當單吊的多半是車馬炮，這一欄便偏高。換一批對手，
-這個數字會跟著變。
+**Pair waits and triplet waits** are waits any card has; their rate depends
+on which singles and pairs the other seats keep in hand, that is, on how the
+opponents play and not on the card itself.  `HeuristicBot` throws lone 士象
+first and lone 車馬炮 later, so what stays in hand as a pair wait is mostly
+車馬炮, and that column runs high.  With another set of opponents the number
+would change with them.
 
-所以要比牌值，看「成順」一欄；總銃率混進了對手的習慣。
+So to compare card value, read the "Run" column; the total deal-in rate has
+the opponents' habits mixed in.
 
-## 量測方法
+## Method
 
-四家 `HeuristicBot` 以 `Rules::new()` 對局 20,000 局，seed base 20261116，
-莊家輪流。每到一次棄牌：
+Four `HeuristicBot`s play 20,000 rounds under `Rules::new()`, seed base
+20261116, the dealer rotating.  At every discard:
 
-1. 對每一種非將帥的牌（另外三家沒有握滿四張的），檢查它此刻落地時是否有
-   別家能胡，記下銃張完成的是對子、刻子（或槓）還是順子。一張牌能以多種
-   方式被胡時，各欄都計。這是「任何可能落地的牌」，不受出牌者實際選擇影響。
-2. 對出牌者實際打出的那張牌做同樣的檢查，這是「實際棄牌」。
+1. For each card that is not a general (and of which the other three seats
+   do not hold all four copies), check whether another seat could win if it
+   came down now, and record whether the winning card completes a pair, a
+   triplet (or a kong) or a run.  A card that can be won on in several ways
+   counts in each column.  This is "any card that could come down",
+   independent of what the discarding seat actually chose.
+2. The same check for the card the discarding seat actually put down: this
+   is "actual discards".
 
-胡牌的判定與 `Round` 相同：銃張所成的牌組以明牌計分，其餘暗手以暗牌計分，
-加上已亮出的牌組須達十胡。「下家可吃」只看下家能否把這張牌吃成順子，不問
-它是否願意吃。
+A win is decided as `Round` decides it: the meld the winning card makes
+scores as exposed and the rest of the concealed hand as concealed, and with
+the melds already exposed they must reach ten 胡.  "Next seat can eat" asks
+only whether the next seat could eat the card into a run, not whether it
+would want to.
 
-階段以牌堆剩餘張數劃分：前段 23 張以上、中段 14 至 22 張、後段 13 張以下
-（含六張廢牌）。
+Stages are set by the cards left in the pile: early with 23 or more, middle
+with 14 to 22, late with 13 or fewer (the six dead cards included).
 
-重現：
+To reproduce:
 
 ```sh
 cargo run --release --example danger -- 20000 20261116
 ```
 
-## 數據
+## Data
 
-### 任何可能落地的牌
+### Any card that could come down
 
-| 階段 | 牌種 | 樣本 | 被胡 | 單吊 | 對倒 | 成順 | 胡數 | 下家可吃 |
+| Stage | Kind | Sample | Won on | Pair wait | Triplet wait | Run | 胡 | Next seat can eat |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| 前段 | 士象 | 1,763,715 | 0.908% | 0.310% | 0.256% | 0.364% | 12.11 | 24.80% |
-| 前段 | 車馬炮 | 2,624,786 | 0.957% | 0.291% | 0.310% | 0.370% | 12.10 | 24.13% |
-| 前段 | 兵卒 | 891,898 | 1.574% | 0.246% | 0.174% | 1.241% | 12.33 | 47.37% |
-| 中段 | 士象 | 389,190 | 3.155% | 1.125% | 0.899% | 1.236% | 12.17 | 19.07% |
-| 中段 | 車馬炮 | 580,358 | 3.387% | 1.198% | 1.094% | 1.177% | 12.22 | 16.87% |
-| 中段 | 兵卒 | 195,455 | 6.708% | 1.079% | 0.777% | 5.194% | 12.31 | 35.86% |
-| 後段 | 士象 | 41,537 | 3.751% | 1.488% | 1.009% | 1.449% | 12.34 | 16.10% |
-| 後段 | 車馬炮 | 61,976 | 4.428% | 1.898% | 1.399% | 1.304% | 12.32 | 13.47% |
-| 後段 | 兵卒 | 20,785 | 9.156% | 1.674% | 1.313% | 6.630% | 12.28 | 27.39% |
+| early | 士象 | 1,763,715 | 0.908% | 0.310% | 0.256% | 0.364% | 12.11 | 24.80% |
+| early | 車馬炮 | 2,624,786 | 0.957% | 0.291% | 0.310% | 0.370% | 12.10 | 24.13% |
+| early | soldiers | 891,898 | 1.574% | 0.246% | 0.174% | 1.241% | 12.33 | 47.37% |
+| middle | 士象 | 389,190 | 3.155% | 1.125% | 0.899% | 1.236% | 12.17 | 19.07% |
+| middle | 車馬炮 | 580,358 | 3.387% | 1.198% | 1.094% | 1.177% | 12.22 | 16.87% |
+| middle | soldiers | 195,455 | 6.708% | 1.079% | 0.777% | 5.194% | 12.31 | 35.86% |
+| late | 士象 | 41,537 | 3.751% | 1.488% | 1.009% | 1.449% | 12.34 | 16.10% |
+| late | 車馬炮 | 61,976 | 4.428% | 1.898% | 1.399% | 1.304% | 12.32 | 13.47% |
+| late | soldiers | 20,785 | 9.156% | 1.674% | 1.313% | 6.630% | 12.28 | 27.39% |
 
-### 實際棄牌
+### Actual discards
 
-| 階段 | 牌種 | 樣本 | 被胡 | 單吊 | 對倒 | 成順 | 胡數 | 下家可吃 |
+| Stage | Kind | Sample | Won on | Pair wait | Triplet wait | Run | 胡 | Next seat can eat |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| 前段 | 士象 | 92,608 | 0.933% | 0.350% | 0.252% | 0.355% | 11.98 | 26.64% |
-| 前段 | 車馬炮 | 110,811 | 1.414% | 0.508% | 0.421% | 0.511% | 12.04 | 23.55% |
-| 前段 | 兵卒 | 30,567 | 0.730% | 0.134% | 0.079% | 0.556% | 12.10 | 56.03% |
-| 中段 | 士象 | 16,113 | 4.723% | 1.682% | 1.452% | 1.756% | 12.07 | 20.88% |
-| 中段 | 車馬炮 | 31,342 | 5.242% | 2.007% | 1.697% | 1.678% | 12.16 | 17.86% |
-| 中段 | 兵卒 | 2,905 | 9.811% | 1.411% | 1.170% | 7.573% | 12.07 | 43.06% |
-| 後段 | 士象 | 1,652 | 8.777% | 3.390% | 2.785% | 3.208% | 12.48 | 20.04% |
-| 後段 | 車馬炮 | 3,279 | 8.814% | 3.843% | 3.263% | 2.318% | 12.35 | 15.58% |
-| 後段 | 兵卒 | 396 | 14.394% | 3.283% | 1.515% | 10.606% | 12.26 | 31.31% |
+| early | 士象 | 92,608 | 0.933% | 0.350% | 0.252% | 0.355% | 11.98 | 26.64% |
+| early | 車馬炮 | 110,811 | 1.414% | 0.508% | 0.421% | 0.511% | 12.04 | 23.55% |
+| early | soldiers | 30,567 | 0.730% | 0.134% | 0.079% | 0.556% | 12.10 | 56.03% |
+| middle | 士象 | 16,113 | 4.723% | 1.682% | 1.452% | 1.756% | 12.07 | 20.88% |
+| middle | 車馬炮 | 31,342 | 5.242% | 2.007% | 1.697% | 1.678% | 12.16 | 17.86% |
+| middle | soldiers | 2,905 | 9.811% | 1.411% | 1.170% | 7.573% | 12.07 | 43.06% |
+| late | 士象 | 1,652 | 8.777% | 3.390% | 2.785% | 3.208% | 12.48 | 20.04% |
+| late | 車馬炮 | 3,279 | 8.814% | 3.843% | 3.263% | 2.318% | 12.35 | 15.58% |
+| late | soldiers | 396 | 14.394% | 3.283% | 1.515% | 10.606% | 12.26 | 31.31% |
 
-「胡數」是被胡時贏家的平均胡數（多家能胡時取最高）。
+"胡" is the winner's mean 胡 when the card is won on (the highest when
+several seats can win).
 
-## 怎麼讀
+## How to read it
 
-- **好牌先打是對的。** 兵卒前段落地被胡的機率是 1.6%，後段是 9.2%；每一類
-  牌都是越晚越危險，而兵卒漲得最多。實際棄牌裡，前段打掉的兵卒只有 0.73%
-  放銃，是三類中最低的。
-- **實際棄牌的銃率比「任何可能落地的牌」高**，中後段尤其明顯。出牌者打的
-  是自己用不上的牌，而自己用不上的牌，別家手上通常較少被佔住。
-- **前段三類的成順機率幾乎相同**（士象 0.36%、車馬炮 0.37%），士象與
-  車馬炮的差距要到中段才出現。
-- **被下家吃**也是兵卒最高，約為另外兩類的兩倍。吃牌不是放銃，但會幫下家
-  推進手牌。
+- **Good cards first is right.**  A soldier that comes down in the early
+  stage is won on 1.6% of the time, and in the late stage 9.2%; every kind
+  is more dangerous the later it goes, and soldiers rise the most.  Among
+  actual discards, the soldiers discarded in the early stage dealt in only
+  0.73% of the time, the lowest of the three kinds.
+- **Actual discards deal in more often than "any card that could come
+  down"**, most clearly in the middle and late stages.  A seat discards the
+  cards it has no use for, and of the cards it has no use for, fewer are
+  usually tied up in the other seats' hands.
+- **In the early stage the run rates of the three kinds are nearly the
+  same** (士象 0.36%, 車馬炮 0.37%); the gap between 士象 and 車馬炮 only
+  appears in the middle stage.
+- **Being eaten by the next seat** is highest for soldiers too, about twice
+  the other two kinds.  An eat is not a deal-in, but it helps the next seat
+  advance its hand.
 
-## 限制
+## Caveats
 
-- **對手是同一個 bot。** 單吊與對倒兩欄反映的是 `HeuristicBot` 的留牌習慣；
-  成順一欄也受它影響（早丟孤張士象會讓場上的將士、將象搭子變少），只是
-  較輕。真人或別的 bot 會給出不同的數字。
-- **沒有信賴區間。** 同一局的各次棄牌檢查的是幾乎相同的手牌，樣本彼此
-  相關。把它們當獨立樣本算，後段士象與車馬炮的成順差距（1.449% 對 1.304%）
-  約 1.9 個標準誤，實際更弱。兵卒與另外兩類的差距則大到不受此影響。
-- **士象成順優勢偏小的原因沒有驗證。** 上面的解釋（缺將的搭子吃不到棄牌、
-  孤張士象早丟）只是推測。
-- **這是危險度，不是該怎麼打的證明。** 一張牌留在手上也有自己的用處；
-  要改 bot 的棄牌順序，仍須照 `CLAUDE.md` 跑 `ab/run.sh`。
+- **The opponents are the same bot.**  The pair-wait and triplet-wait
+  columns reflect what `HeuristicBot` keeps in hand; the run column is
+  affected too (throwing lone 士象 early leaves fewer 將士 and 將象 搭子 at
+  the table), only less.  People or another bot would give different
+  numbers.
+- **No confidence intervals.**  The discards of one round test nearly the
+  same hands, so the samples are correlated.  Treated as independent
+  samples, the late-stage gap in runs between 士象 and 車馬炮 (1.449%
+  against 1.304%) is about 1.9 standard errors, and in truth weaker.  The
+  gap between soldiers and the other two kinds is too large to be affected.
+- **Why the edge of 士象 in runs is so small has not been verified.**  The
+  explanation above (a 搭子 lacking its general can eat no discard, and lone
+  士象 are thrown early) is only a conjecture.
+- **This is danger, not proof of how to play.**  A card kept in hand has
+  uses of its own; changing the bot's order of discards still takes
+  `ab/run.sh`, as `CLAUDE.md` requires.

@@ -1,123 +1,155 @@
-# 起手的規劃：對子的額度
+# Planning a hand from the deal: the allowance of pairs
 
-寫於 2026-11-19。給人打牌用的心算，不是 bot 的設計。帳來自
-[`research/seven-slots.md`](../research/seven-slots.md) 與
-[`research/room-for-melds.md`](../research/room-for-melds.md)，規則是
-`Rules::new` 的十胡。
+Written 2026-11-19.  Mental arithmetic for a person at the table, not a
+design for the bot.  The arithmetic comes from
+[`research/seven-slots.md`](../research/seven-slots.md) and
+[`research/room-for-melds.md`](../research/room-for-melds.md), and the rules
+are the 十胡 of `Rules::new`.
 
-## 口訣
+## Rules of thumb
 
-1. **車馬炮、碰是基準。** 21 張全是基準就是 7 胡，還差 3 胡。
-2. **一張單張將帥抵一個對子。** 將帥加對子是 3 張 1 胡，等於一組車馬炮。
-3. **加胡先到 3，對子才能和單張將帥一樣多。** 將士象加 1，三色兵卒、暗刻
-   加 2。只有 1 或 2，單張將帥要比對子多 3 張；沒有加胡要多 6 張。
-4. **必要的對子數是「單張 % 3」。** 再多只能一次多三個，每三個少 2 胡。
-5. **車馬炮、碰的胡不換額度。** 手上胡數多不代表能多吃對子。
+1. **車馬炮 and a pong are the baseline.**  All 21 cards at the baseline
+   make 7 胡, 3 胡 short.
+2. **One lone general (將帥) pays for one pair.**  A general plus a pair is
+   3 cards for 1 胡, the same as one 車馬炮.
+3. **Pairs may match the lone generals only once the extra 胡 reach 3.**
+   將士象 adds 1; soldiers of three colours and a concealed triplet add 2.
+   With only 1 or 2, the lone generals must outnumber the pairs by 3; with
+   no extra 胡, by 6.
+4. **The pairs a hand must hold are "singles % 3".**  Any more come only
+   three at a time, and every three cost 2 胡.
+5. **The 胡 of 車馬炮 and pongs buy no allowance.**  Many 胡 in hand do not
+   mean more pairs may be eaten.
 
-## 帳
+## The arithmetic
 
-胡牌的手一定是 21 張。把每個牌組記成三種數字：
+A winning hand is always 21 cards.  Write each meld down as three kinds of
+number:
 
-| 牌組 | 張數 | 胡 | 記成 |
+| Meld | Cards | 胡 | Counts as |
 | --- | ---: | ---: | --- |
-| 車馬炮、碰 | 3 | 1 | 基準 |
-| 將帥 | 1 | 1 | 單張 +1 |
-| 對子 | 2 | 0 | 對子 +1 |
-| 將士象 | 3 | 2 | 加胡 +1 |
-| 三色兵卒、暗刻 | 3 | 3 | 加胡 +2 |
-| 四色兵卒 | 4 | 5 | 加胡 +3，單張 +1 |
-| 明槓 | 4 | 6 | 加胡 +4，單張 +1 |
-| 暗槓 | 4 | 8 | 加胡 +6，單張 +1 |
+| 車馬炮, pong | 3 | 1 | baseline |
+| general | 1 | 1 | single +1 |
+| pair | 2 | 0 | pair +1 |
+| 將士象 | 3 | 2 | extra 胡 +1 |
+| soldiers of three colours, concealed triplet | 3 | 3 | extra 胡 +2 |
+| soldiers of four colours | 4 | 5 | extra 胡 +3, single +1 |
+| exposed kong | 4 | 6 | extra 胡 +4, single +1 |
+| concealed quad | 4 | 8 | extra 胡 +6, single +1 |
 
-**胡 = 7 + ⅔ ×（單張 − 對子）+ 加胡**
+**胡 = 7 + ⅔ × (singles − pairs) + extra 胡**
 
-- 將士象裡的將帥不算單張，它已經算進加胡。
-- 四張組是一組三張組加一張單張，所以各算一張單張。
-- 21 是 3 的倍數，三張組不影響餘數，所以「單張 − 對子」一定是 3 的倍數。
+- The general in a 將士象 is not a single; it is already counted in the
+  extra 胡.
+- A four-card meld is a three-card meld plus one single, so each counts as
+  one single.
+- 21 is a multiple of 3 and three-card melds do not change the remainder, so
+  "singles − pairs" is always a multiple of 3.
 
-## 對子的額度
+## The allowance of pairs
 
-十胡要「⅔ ×（單張 − 對子）+ 加胡」至少 3：
+十胡 needs "⅔ × (singles − pairs) + extra 胡" to be at least 3:
 
-| 單張 − 對子 | 加胡至少 | 配方 |
+| Singles − pairs | Extra 胡 at least | Recipe |
 | ---: | ---: | --- |
-| +6 | 0 | 全是車馬炮、碰也夠 |
-| +3 | 1 | 一組將士象 |
-| 0 | 3 | 將士象 + 三色兵卒（或暗刻），三組將士象，或一組四色兵卒 |
-| −3 | 5 | 將士象 + 兩組三色兵卒／暗刻，明槓 + 將士象，或一組暗槓 |
+| +6 | 0 | all 車馬炮 and pongs is enough too |
+| +3 | 1 | one 將士象 |
+| 0 | 3 | 將士象 + soldiers of three colours (or a concealed triplet), three 將士象, or one soldiers of four colours |
+| −3 | 5 | 將士象 + two soldiers of three colours / concealed triplets, an exposed kong + 將士象, or one concealed quad |
 
-- **加胡是偶數時浪費 1 胡。** 加胡 2 和 1 的要求一樣，4 和 3 一樣。
-- **只有將士象可做的手幾乎沒有額度。** 一或兩組將士象，單張將帥要比對子
-  多 3；三組才能一樣多。
-- **八胡只差 1 胡。** 同一張表，加胡的門檻各減 2，最少是 0。
+- **An even number of extra 胡 wastes 1 胡.**  Extra 胡 of 2 meet the same
+  requirement as 1, and 4 the same as 3.
+- **A hand that can only make 將士象 has almost no allowance.**  With one or
+  two 將士象 the lone generals must outnumber the pairs by 3; only with
+  three may they be as many.
+- **八胡 is only 1 胡 short.**  The same table, with each threshold of extra
+  胡 2 lower, and 0 at the least.
 
-## 必要的對子
+## The pairs a hand must hold
 
-21 張扣掉單張，剩下的分成三張組和對子：
+Take the singles from the 21 cards, and the rest divide into three-card
+melds and pairs:
 
-| 單張 | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+| Singles | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 必要的對子 | 0 | 1 | 2 | 0 | 1 | 2 | 0 |
+| Pairs it must hold | 0 | 1 | 2 | 0 | 1 | 2 | 0 |
 
-這些對子不算浪費，它們是除不盡的餘數。超過的對子一次要多三個：三個對子
-（6 張）換掉兩組三張組，少 2 胡。
+These pairs are no waste; they are the remainder that does not divide.
+Pairs beyond them come three at a time: three pairs (6 cards) replace two
+three-card melds, for 2 胡 less.
 
-## 例子
+## Examples
 
-每一列都是 21 張、過了門檻的手：
+Every row is a hand of 21 cards past the threshold:
 
-| 單張將帥 | 加胡的牌組 | 對子 | 車馬炮、碰 | 胡 |
+| Lone generals | Melds with extra 胡 | Pairs | 車馬炮, pongs | 胡 |
 | ---: | --- | ---: | ---: | ---: |
-| 2 | 將士象 + 三色兵卒 | 2 | 3 | 10 |
+| 2 | 將士象 + soldiers of three colours | 2 | 3 | 10 |
 | 3 | 將士象 | 0 | 5 | 10 |
 | 4 | 將士象 | 1 | 4 | 10 |
-| 2 | 四色兵卒 | 3 | 3 | 10 |
-| 1 | 明槓 | 2 | 4 | 11 |
-| 6 | 無 | 0 | 5 | 11 |
+| 2 | soldiers of four colours | 3 | 3 | 10 |
+| 1 | exposed kong | 2 | 4 | 11 |
+| 6 | none | 0 | 5 | 11 |
 
-將士象 + 三色兵卒是自對局裡最常見的加胡配方，占胡牌的 13%。第二列一個
-對子都不能有。
+將士象 + soldiers of three colours is the commonest recipe for extra 胡 in
+self-play, 13% of the wins.  The second row cannot hold a single pair.
 
-## 牌桌上怎麼用
+## Using it at the table
 
-1. **數單張將帥。** 打算做成將士象的那張不算。
-2. **估加胡到不到 3。** 看有沒有暗刻、兵卒的搭子、靠著將帥的士象。
-3. **算額度。** 加胡到 3，額度是單張將帥數；只到 1 或 2，額度少 3 個。
-4. **對子追上額度就不再吃。** 加胡還沒著落時也先不吃。
+1. **Count the lone generals.**  One you mean to make into 將士象 does not
+   count.
+2. **Estimate whether the extra 胡 reach 3.**  Look for a concealed triplet,
+   a 搭子 of soldiers, 士象 beside a general.
+3. **Work out the allowance.**  If the extra 胡 reach 3, the allowance is
+   the number of lone generals; if they reach only 1 or 2, it is 3 fewer.
+4. **Stop eating once the pairs catch up with the allowance.**  Do not eat
+   yet either while the extra 胡 are still not in sight.
 
-## 提醒
+## Reminders
 
-- **吃對子是消化孤張的唯一辦法。** 每吃成或碰成一組只打掉一張，胡的那一次
-  不打。多的孤張只能兩張兩張靠吃對子出去：一張配成對，一張打掉。
-- **吃下的對子退不回去。** 手上的暗對子還能碰成一組基準；亮出的對子就是
-  0 胡到底。
-- **摸到將帥會改餘數。** 將帥強制收下。2 張將帥、已吃兩個對子，再摸一張
-  之後必要的對子是 0 或 3 個，只能補第三個對子；那張將帥的 1 胡剛好被少掉
-  的一組抵銷。
-- **暗刻只能是發到的。** 摸到的牌翻開而不進手，暗牌只減不增。
+- **Eating a pair is the only way to digest lone cards.**  Each meld eaten
+  or ponged discards only one card, and the one that wins discards none.
+  Lone cards beyond that can only leave two by two through eaten pairs: one
+  makes the pair, one is discarded.
+- **A pair eaten cannot be taken back.**  A concealed pair in hand can still
+  be ponged into a baseline meld; an exposed pair is 0 胡 to the end.
+- **Drawing a general changes the remainder.**  A general must be taken.
+  With 2 generals and two pairs already eaten, after one more is drawn the
+  pairs the hand must hold are 0 or 3, so it can only add a third pair; that
+  general's 1 胡 is exactly cancelled by the meld lost.
+- **A concealed triplet can only be dealt.**  A drawn card is turned up and
+  does not enter the hand; concealed cards only decrease, never increase.
 
-## 證據與限制
+## Evidence and caveats
 
-- **恆等式不依賴打法。** `HeuristicBot` 四家自對局 20,000 局的 19,404 手
-  胡牌逐手成立（`examples/census.rs`）。
-- **其餘數字帶著 bot 的習慣。** 胡牌的手平均 2.76 張單張將帥、2.12 個
-  對子，56% 剛好一樣多，35% 單張多三個。
-- **「胡不夠就不吃對子」是大輸。** −1.50 分／局，胡牌率從 24.20% 掉到
-  20.33%（`research/room-for-melds.md`）。口訣是「算好額度再吃」，不是
-  「少吃」。
-- **超出額度的對子不吃，在 bot 上是贏的。** `HeuristicBot` 不吃「吃完之後
-  不再摸到將帥就到不了門檻」的對子：+0.053 ± 0.002 分／局，95% CI [+0.049,
-  +0.056]，800,000 局（`doc/hu-ceiling.md` 批次 3）。批次 2 連「吃完上限
-  變低、但仍到得了門檻」的對子也不吃，那一組是 −2.2 分／局。
-- **起手的將帥與加胡都看得出胡牌率。** 非莊家發到的 20 張：
+- **The identity does not depend on play.**  It holds hand by hand for the
+  19,404 winning hands of 20,000 rounds of `HeuristicBot` self-play at four
+  seats (`examples/census.rs`).
+- **The other numbers carry the bot's habits.**  A winning hand averages
+  2.76 lone generals and 2.12 pairs; 56% have exactly as many of each, and
+  35% three more singles.
+- **"No pairs eaten while the 胡 fall short" is a big loss.**  −1.50 points
+  a deal, with the win rate falling from 24.20% to 20.33%
+  (`research/room-for-melds.md`).  The rule of thumb is "work out the
+  allowance, then eat", not "eat less".
+- **Not eating pairs beyond the allowance is a win in the bot.**
+  `HeuristicBot` does not eat a pair "after which the threshold is out of
+  reach unless another general is drawn": +0.053 ± 0.002 points a deal, 95%
+  CI [+0.049, +0.056], 800,000 deals (`doc/hu-ceiling.md`, batch 3).  Batch
+  2 also refused the pairs "after which the ceiling is lower but the
+  threshold still within reach", and that group is −2.2 points a deal.
+- **The generals and the extra 胡 of the dealt hand both show in the win
+  rate.**  The 20 cards dealt to a seat other than the dealer:
 
-  | 將帥 | 0 | 1 | 2 | 3 | 4 | 5 |
+  | Generals | 0 | 1 | 2 | 3 | 4 | 5 |
   | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-  | 胡牌率 | 11.0% | 15.4% | 19.5% | 22.9% | 26.6% | 29.7% |
+  | Win rate | 11.0% | 15.4% | 19.5% | 22.9% | 26.6% | 29.7% |
 
-  | 發到的三張組的加胡 | 0 | 1 | 2 | 3 | 4 | 5 |
+  | Extra 胡 of the three-card melds dealt | 0 | 1 | 2 | 3 | 4 | 5 |
   | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-  | 胡牌率 | 9.2% | 13.8% | 21.0% | 27.0% | 29.3% | 34.3% |
+  | Win rate | 9.2% | 13.8% | 21.0% | 27.0% | 29.3% | 34.3% |
 
-- **這些口訣沒有對人量過。** 帳是精確的，bot 的天花板也比心算的額度準：
-  它試過每一種排法。人照著口訣打會不會贏更多，沒有量過。
+- **These rules of thumb have not been measured on people.**  The arithmetic
+  is exact, and the bot's ceiling is more accurate than the allowance worked
+  out in the head: it tries every layout.  Whether people win more by
+  playing to the rules of thumb has not been measured.

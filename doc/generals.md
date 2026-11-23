@@ -1,165 +1,206 @@
-# 牌張出現的頻率：設計
+# How often cards appear: the design
 
-寫於 2026-11-23，基準 `803d18e`。起因是書上「對子的上限」：`ExpectBot` 有時
-刻意多吃一個對子，靠之後的將帥補回來。那一章後來拿掉了（`../tsap-oo-book`
-`86caae2`）：上限只是三七二十一換個寫法，人照七組三張去排就不會吃進太多
-對子。這裡剩下的是電腦的問題。量了它什麼時候這樣做
-（`examples/overspend.rs`），發現它把只能靠將帥胡的手估得太高。這份文件把
-後面的工作拆成幾批，每一批都有閘門，過了才做下一批。程式還沒寫。
+Written 2026-11-23, base `803d18e`.  It started from the book's 「對子的上限」
+(The limit on pairs): `ExpectBot` sometimes eats one pair more on purpose and
+counts on later generals (將帥) to make it up.  That chapter has since been
+removed (`../tsap-oo-book` `86caae2`): the limit is only "three sevens are
+twenty-one" written another way, and a person who lays the hand out as seven
+groups of three will not eat too many pairs.  What is left here is the
+computer's problem.  Measuring when it does this (`examples/overspend.rs`)
+showed that it values hands that can only win on a general too high.  This
+document splits the work that follows into batches, each with a gate to pass
+before the next.  No code is written yet.
 
-**主線是出現率，不是對子的公式。** 多吃的對子是症狀：`Graph` 假設中後期
-每一張公開的牌都是從沒出現的牌裡均勻抽的，這個假設錯了，將帥錯得最多
-（批次 1：只有假設的四成），其他牌種也偏（車馬炮多三成，卒兵前期少三成）。
-要修的是這個假設。對子能有幾個的公式可能不存在，有也可能太複雜，這裡
-不找；超支該不該擋，是修完之後拿來檢查的。
+**The main line is the appearance rates, not a formula for pairs.**  The
+extra pair is a symptom: `Graph` assumes that from the middle of the round on
+every public card is drawn evenly from the unseen cards.  That assumption is
+wrong, most of all for generals (batch 1: only four tenths of what it
+assumes), and off for the other ranks too (車馬炮 three tenths more, soldiers
+three tenths fewer early on).  It is this assumption that needs fixing.  A
+formula for how many pairs a hand can have may not exist, and may be too
+complicated if it does; it is not sought here.  Whether an overspend should
+be blocked is a check for after the fix.
 
-## 要回答的問題
+## Questions to answer
 
-1. 中後期公開的牌是各個牌種的頻率，和 `Graph` 假設的「沒出現的張數 ÷
-   沒出現的牌」差多少？隨還能摸幾張怎麼變？（批次 1 量了。）
-2. 把量到的率放進 `Outlook`，`ExpectBot` 會不會變強？先放將帥（批次 2），
-   再放每個牌種（批次 2b）。
-3. 修掉之後，還沒聽牌就超支的吃對子還剩多少？這是檢查出現率修得夠不夠，
-   不是要找一條擋對子的規則。
-4. 書上談對子的地方（`material.md`「吃對子是在湊張數」）要改哪幾句？
+1. How far is the frequency with which a public card of the middle and late
+   round is of each rank from the "unseen copies ÷ unseen cards" `Graph`
+   assumes?  How does it change with the draws left?  (Batch 1 measured it.)
+2. With the measured rates in `Outlook`, does `ExpectBot` get stronger?
+   Generals first (batch 2), then every rank (batch 2b).
+3. Once that is fixed, how many pair eats that overspend before the hand is
+   waiting remain?  This checks whether the appearance rates are fixed well
+   enough; it is not a search for a rule that blocks pairs.
+4. Which sentences of the book on pairs (`material.md`, 「吃對子是在湊張數」
+   (Eating a pair is making up the card count)) need changing?
 
-## 進度
+## Progress
 
-每一批大約是一個 session。做完一批就更新這張表。
+Each batch is about one session.  Update this table when a batch is done.
 
-| 批次 | 產出 | 改變打法 | 閘門 | 狀態 |
+| Batch | Output | Changes play | Gate | Status |
 | --- | --- | --- | --- | --- |
-| 0 | `examples/overspend.rs`、`research/overspend.py`、這份文件 | 否 | 無 | 完成（`803d18e`） |
-| 1 | 將帥的折扣 ρ，依還能摸幾張 | 否，要量到零分歧 | 閘門內的 ρ 在 0.85 以下 | 完成，ρ = 0.406，過了 |
-| 2 | `Outlook` 的折扣進 `Graph`，校準，A/B | 是 | 校準過了才跑 A/B；win 才 commit | 校準沒過：延伸 0 張修好了，搭子變差；沒跑 A/B |
-| 2b | 每個牌種的出現率進 `Graph`，校準，A/B | 是 | 批次 2 的校準過了；自己的校準過了才跑 A/B；win 才 commit | 完成，網頁與桌面都 win |
-| 3 | 用新的 `Outlook` 重學 `Eval` 的表，A/B | 是 | 批次 2 或 2b 有贏，2b 有結論；win 才 commit | 放棄：網頁與桌面的 CI 都跨過 0，表沒換 |
-| 4 | 還沒聽牌的超支：重跑統計，檢查出現率修得夠不夠 | 候選 | 見批次 4 | 未開始 |
-| 5 | 書的修訂 | 否 | 批次 2、2b 與 4 有結論 | 未開始 |
+| 0 | `examples/overspend.rs`, `research/overspend.py`, this document | No | None | Done (`803d18e`) |
+| 1 | The generals' discount ρ, by draws left | No; must measure zero deals that part | ρ within the gate below 0.85 | Done, ρ = 0.406, passed |
+| 2 | `Outlook`'s discount into `Graph`, calibration, A/B | Yes | The A/B runs only once the calibration passes; commit only on a win | Calibration failed: the hands that extend 0 are fixed, the 搭子 got worse; no A/B run |
+| 2b | Every rank's appearance rate into `Graph`, calibration, A/B | Yes | Batch 2's calibration passed; the A/B runs only once its own calibration passes; commit only on a win | Done, win on both the web and the desktop |
+| 3 | Relearn the `Eval` table under the new `Outlook`, A/B | Yes | Batch 2 or 2b has won and 2b has its verdict; commit only on a win | Dropped: the CIs of the web and the desktop both straddle 0; the table is not replaced |
+| 4 | Overspending before the hand is waiting: rerun the statistics, check whether the appearance rates are fixed well enough | Candidate | See batch 4 | Not started |
+| 5 | Revision of the book | No | Batches 2, 2b and 4 have their verdicts | Not started |
 
-## 用語
+## Terms
 
-- **完成形**：聽所有還沒出現的將帥的手。將帥自己是一組，所以這等於其餘
-  20 張全部成組（牌組、對子、單張將帥），而且只差 1 胡以內。
-- **延伸**：完成形另外聽的牌，都是替手上的牌組多接一張：對子碰成刻、暗刻
-  槓、三色兵卒吃成四色。亮在桌上的牌組接不了牌。將帥能胡的時候延伸的牌
-  一定也能胡，因為延伸至少也多 1 胡。延伸 0 張是完成形的一種，不另外分類。
-- **超支**：吃了對子之後，`ceiling(generals = 0)` 到不了門檻而
-  `ceiling(generals = 1)` 到得了。延伸算在 `generals = 0` 裡，所以超支的手
-  只有將帥補得回來。依吃之前的天花板再分：
-  - **乙1**：吃之前 `generals = 0` 到得了門檻，吃了才欠一張將帥。
-  - **乙2**：吃之前就欠一張。
-  - **甲**是 `generals = 1` 也到不了，**丙**是 `generals = 0` 仍到得了，同
-    `doc/hu-ceiling.md` 的分組。
+- **完成形**: a hand that waits on every general not yet seen.  A general is
+  a meld by itself, so this is the same as the other 20 cards all being in
+  groups (melds, pairs, lone generals) with the hand no more than 1 胡 short.
+- **Extension**: the other cards a 完成形 waits on, each adding one card to a
+  meld in hand: a pair ponged into a triplet, a concealed triplet konged,
+  soldiers of three colours eaten into four.  A meld exposed on the table
+  takes no card.  Whenever a general wins, an extension card wins as well,
+  since an extension too brings at least 1 胡 more.  A hand that extends 0
+  is one kind of 完成形, not a class apart.
+- **Overspend**: after a pair is eaten, `ceiling(generals = 0)` falls short
+  of the threshold while `ceiling(generals = 1)` reaches it.  Extensions
+  count within `generals = 0`, so only a general makes an overspent hand
+  good.  Split further by the ceiling before the eat:
+  - **B1**: before the eat `generals = 0` reaches the threshold; only the
+    eat leaves the hand one general short.
+  - **B2**: one short already before the eat.
+  - **A** is where `generals = 1` falls short as well, and **C** where
+    `generals = 0` still reaches, the same groups as in `doc/hu-ceiling.md`.
 
-## 批次 0 量到的事
+## What batch 0 measured
 
-座位 1 是桌面版的 `ExpectBot`（閘門 14，深 17），對三家 `HeuristicBot`。
-20,000 局，seed base 1797200000，基準 `b95dde4`：
+Seat 1 is the desktop's `ExpectBot` (gate 14, depth 17) against three
+`HeuristicBot`s.  20,000 rounds, seed base 1797200000, base `b95dde4`:
 
 ```sh
 cargo run --release --example overspend -- 20000 1797200000 > pairs.csv 2> waiting.csv
 python3 research/overspend.py pairs.csv waiting.csv
 ```
 
-### 完成形有多好聽
+### How good a wait 完成形 is
 
-打完牌之後聽牌的手，14 張以下（`Graph` 整個展開的範圍）。每格是實際的
-胡牌率與標準誤，括號裡是 `Graph` 估的胡牌率與手數：
+Hands waiting after their discard, 14 cards or fewer (the range `Graph`
+expands whole).  Each cell is the actual win rate and its standard error,
+with `Graph`'s estimate of the win rate and the number of hands in
+parentheses:
 
-| | 摸 15 以上 | 摸 8–14 | 摸 0–7 |
+| | 15 draws or more | 8–14 draws | 0–7 draws |
 | --- | ---: | ---: | ---: |
-| 完成形，延伸 0 張 | 50% ± 4（65%，168） | 39% ± 3（58%，236） | 23% ± 4（43%，129） |
-| 完成形，延伸 1 張 | 67% ± 4（67%，159） | 47% ± 4（61%，189） | 45% ± 8（49%，40） |
-| 完成形，延伸 2 張 | 62% ± 3（70%，363） | 61% ± 3（63%，329） | 32% ± 5（48%，101） |
-| 完成形，延伸 3 張 | 74% ± 3（72%，293） | 61% ± 4（64%，146） | 48% ± 7（53%，50） |
-| 完成形，延伸 4 張以上 | 80% ± 1（77%，1,079） | 70% ± 2（68%，409） | 44% ± 7（58%，50） |
-| 搭子，聽 1 張 | 38% ± 3（30%，285） | 26% ± 3（22%，174） | 17% ± 5（13%，65） |
-| 搭子，聽 2 張 | 44% ± 3（39%，339） | 40% ± 3（30%，212） | 24% ± 5（16%，62） |
-| 搭子，聽 3 張 | 55% ± 1（46%，1,346） | 36% ± 2（35%，558） | 17% ± 3（24%，123） |
-| 搭子，聽 4 張 | 54% ± 1（46%，1,334） | 41% ± 3（37%，367） | 27% ± 5（27%，70） |
-| 搭子，聽 5 張以上 | 60% ± 1（55%，1,300） | 47% ± 3（44%，382） | 33% ± 6（32%，64） |
-| 士象等自己的將帥 | 33% ± 2（40%，523） | 24% ± 3（30%，217） | 11% ± 4（20%，56） |
+| 完成形, extends 0 | 50% ± 4 (65%, 168) | 39% ± 3 (58%, 236) | 23% ± 4 (43%, 129) |
+| 完成形, extends 1 | 67% ± 4 (67%, 159) | 47% ± 4 (61%, 189) | 45% ± 8 (49%, 40) |
+| 完成形, extends 2 | 62% ± 3 (70%, 363) | 61% ± 3 (63%, 329) | 32% ± 5 (48%, 101) |
+| 完成形, extends 3 | 74% ± 3 (72%, 293) | 61% ± 4 (64%, 146) | 48% ± 7 (53%, 50) |
+| 完成形, extends 4 or more | 80% ± 1 (77%, 1,079) | 70% ± 2 (68%, 409) | 44% ± 7 (58%, 50) |
+| 搭子, waits on 1 | 38% ± 3 (30%, 285) | 26% ± 3 (22%, 174) | 17% ± 5 (13%, 65) |
+| 搭子, waits on 2 | 44% ± 3 (39%, 339) | 40% ± 3 (30%, 212) | 24% ± 5 (16%, 62) |
+| 搭子, waits on 3 | 55% ± 1 (46%, 1,346) | 36% ± 2 (35%, 558) | 17% ± 3 (24%, 123) |
+| 搭子, waits on 4 | 54% ± 1 (46%, 1,334) | 41% ± 3 (37%, 367) | 27% ± 5 (27%, 70) |
+| 搭子, waits on 5 or more | 60% ± 1 (55%, 1,300) | 47% ± 3 (44%, 382) | 33% ± 6 (32%, 64) |
+| 士象 waiting for its own general | 33% ± 2 (40%, 523) | 24% ± 3 (30%, 217) | 11% ± 4 (20%, 56) |
 
-- **延伸 0 張的完成形被高估 15 到 20 個百分點。** 實際上它和聽 2 到 4 張
-  的搭子差不多；`Graph` 以為它比聽 4 張的搭子好 20 個百分點。
-- **搭子在摸 15 以上被低估 5 到 9 個百分點。**
-- **士象等自己的將帥也被高估**，6 到 9 個百分點。
-- **延伸越多估得越準。** 延伸 3 張以上、摸 8 以上，相差 4 個百分點以內；
-  延伸 1 到 2 張還會高估到 14 個百分點。完成形整體是估 67% 對實際 64%。
+- **A 完成形 that extends 0 is overestimated by 15 to 20 percentage
+  points.**  In fact it does about as well as a 搭子 that waits on 2 to 4
+  cards; `Graph` takes it for 20 percentage points better than a 搭子 that
+  waits on 4.
+- **A 搭子 is underestimated by 5 to 9 percentage points with 15 draws or
+  more left.**
+- **士象 waiting for its own general is overestimated too**, by 6 to 9
+  percentage points.
+- **The more extensions, the closer the estimate.**  With 3 or more and 8
+  draws or more left it is within 4 percentage points; with 1 or 2 it still
+  runs up to 14 percentage points high.  Over all 完成形 the estimate is 67%
+  against an actual 64%.
 
-### 引擎什麼時候超支
+### When the engine overspends
 
-可以吃對子的 51,317 個決定：
+The 51,317 decisions where a pair could be eaten:
 
-| | 決定 | 吃了 | 自估 吃 − 不吃（分） |
+| | Decisions | Eaten | Own estimate, eat − pass (points) |
 | --- | ---: | ---: | ---: |
-| 丙：上限以內 | 39,686 | 19,830 | +0.11 |
-| 乙1：吃了才欠一張 | 4,176 | 1,039 | −2.23 |
-| 乙2：吃之前就欠一張 | 1,629 | 616 | −0.66 |
-| 甲：再摸一張也不到 | 5,826 | 243 | −2.31 |
+| C: within the limit | 39,686 | 19,830 | +0.11 |
+| B1: one short only after eating | 4,176 | 1,039 | −2.23 |
+| B2: one short already before eating | 1,629 | 616 | −0.66 |
+| A: short even with one more drawn | 5,826 | 243 | −2.31 |
 
-吃完是完成形的 1,135 個決定裡，984 個有延伸可聽，全部在丙：延伸是對子的
-退路，不必靠將帥。延伸 0 張而超支的是乙1 39 個（吃了 35 個）與乙2 42 個
-（吃了 32 個），自估都比不吃好 10.7 分。依不吃時聽什麼（含丙的 70 個）：
+Of the 1,135 decisions that are 完成形 after eating, 984 have extensions to
+wait on, all of them in C: the extension is the pair's way out, with no need
+of a general.  Those that extend 0 and overspend are 39 in B1 (35 eaten) and
+42 in B2 (32 eaten), both by its own estimate 10.7 points better than
+passing.  By what passing waits on (the 70 of C included):
 
-| 不吃的話 | 決定 | 吃了 | 自估 吃 − 不吃（分） |
+| If it passes | Decisions | Eaten | Own estimate, eat − pass (points) |
 | --- | ---: | ---: | ---: |
-| 沒聽 | 46 | 43 | +18.4 |
-| 士象等自己的將帥 | 23 | 23 | +11.4 |
-| 搭子聽 1 到 2 張 | 10 | 10 | +15.2 |
-| 搭子聽 3 張以上 | 47 | 45 | +10.4 |
-| 已經是完成形 | 25 | 0 | −1.8 |
+| Not waiting | 46 | 43 | +18.4 |
+| 士象 waiting for its own general | 23 | 23 | +11.4 |
+| 搭子 waits on 1 to 2 | 10 | 10 | +15.2 |
+| 搭子 waits on 3 or more | 47 | 45 | +10.4 |
+| Already 完成形 | 25 | 0 | −1.8 |
 
-- **從沒聽、士象、聽 1 到 2 張的搭子換成完成形站得住**：上一張表裡實際的
-  胡牌率也是完成形比較高或相當。
-- **從聽 3 張以上的搭子換過去，自估的 10 分是高估出來的**：實際的胡牌率
-  是打平到略差。
-- **乙1 絕大多數還沒聽牌**（4,176 個裡吃完是完成形的只有 39 個）。吃下去
-  的 1,039 個多半是邊緣的決定，自估只多 0 到 2 分。將帥被高估的話，這些
-  很可能是虧的，但這份統計分不出來。
+- **Moving to 完成形 from not waiting, from 士象, or from a 搭子 that waits
+  on 1 to 2 cards holds up**: in the table before, the actual win rate of
+  完成形 is higher or level as well.
+- **Moving from a 搭子 that waits on 3 cards or more, the 10 points of its
+  own estimate come from the overestimate**: the actual win rates are level
+  to slightly worse.
+- **B1 is almost all not yet waiting** (only 39 of the 4,176 are 完成形
+  after eating).  The 1,039 eaten are mostly marginal decisions, only 0 to 2
+  points better by its own estimate.  If generals are overestimated these
+  most likely lose, but these statistics cannot tell.
 
-限制：這是觀察。走到各種聽牌的手本來就不同（胡數、別家的進度），「打平」
-只有 5 個百分點左右的精度。
+Caveat: this is observation.  The hands that reach each kind of wait differ
+to begin with (their 胡, the other seats' progress), and "level" is only
+good to 5 percentage points or so.
 
-## 為什麼會高估（推測，批次 1 要驗證）
+## Why the overestimate (a conjecture, for batch 1 to test)
 
-`Graph` 把每一張公開的牌當成從沒出現的牌裡均勻抽的，所以一張公開的牌是
-將帥的機率是 K ÷ N（K 是沒出現的將帥，N 是沒出現的牌）。實際上：
+`Graph` takes every public card as drawn evenly from the unseen cards, so the
+chance that a public card is a general is K ÷ N (K the unseen generals, N
+the unseen cards).  In fact:
 
-- **將帥只從牌堆摸出來。** 公開的牌還包括別家打的，那裡面沒有將帥。
-- **別家手上的將帥永遠不出來。** 別家打掉的都不是將帥，所以越到後面，
-  沒出現的將帥留在別家手上的比例越高。
+- **Generals only come out of the pile.**  The public cards include the
+  other seats' discards, and there is no general among those.
+- **A general in another seat's hand never comes out.**  What the other
+  seats discard is never a general, so the later it is, the larger the share
+  of the unseen generals that sits in their hands.
 
-從胡牌率反推，將帥出現的頻率大約是假設的一半到六成。這個數字沒有直接
-量過。
+Worked back from the win rates, generals appear about half to six tenths as
+often as assumed.  This number has not been measured directly.
 
-## 批次 1：量折扣
+## Batch 1: measure the discount
 
-`examples/outlook.rs` 加一項。每一張公開的牌，對每一家各算一次：
+`examples/outlook.rs` gains one item.  For every public card, once for each
+seat:
 
-- 預期：那一家當時的 K ÷ N。要從 `Round::events` 重建那一家沒看過的牌，
-  不只是暗牌的張數。
-- 實際：這張牌是不是將帥。
+- Expected: that seat's K ÷ N at the time.  The cards that seat has not seen
+  must be rebuilt from `Round::events`, not just the count of concealed
+  cards.
+- Actual: whether the card is a general.
 
-**ρ = 實際的和 ÷ 預期的和**，依還能摸幾張分，全部與閘門內各一份，和
-`end`、`cards` 兩張表同一個格式。少於 500 張牌的段取最近一段的值，同
-h 的做法。
+**ρ = the sum of the actual ÷ the sum of the expected**, by draws left, once
+over everything and once within the gate, in the same format as the `end`
+and `cards` tables.  A segment with fewer than 500 cards takes the value of
+the nearest segment, as h does.
 
-- 常數與校準的 seed、局數在跑之前定下；四人十胡先量，兩人、三人與八胡的
-  桌子用同一個指令加 `PLAYERS`、`THRESHOLD`。
-- 不動 `src/`，`ab/run.sh 20000` 要讀到 0 局分歧。
+- The constants and the calibration's seed and round count are fixed before
+  the run; four players at ten 胡 is measured first, and the tables of two
+  and three players and of 八胡 by the same command with `PLAYERS` and
+  `THRESHOLD`.
+- `src/` is not touched; `ab/run.sh 20000` must read 0 deals that part.
 
-閘門：
+The gate:
 
-- **閘門內整體的 ρ 在 0.85 以下**：做批次 2。
-- **否則**：高估另有原因。先看完成形延伸 0 張的手輸在哪裡（別家先胡得
-  比 h 多？將帥集中在別家手上？），這條線停在這裡，寫進 `research/`。
+- **Overall ρ within the gate is below 0.85**: do batch 2.
+- **Otherwise**: the overestimate has another cause.  First see where the
+  完成形 hands that extend 0 lose (the other seats winning first more often
+  than h says?  the generals gathered in the other seats' hands?); this line
+  stops here and is written up in `research/`.
 
-### 批次 1 量到的事
+### What batch 1 measured
 
-`HeuristicBot` 自己打，每張桌子 20,000 局，seed base 1795364857，基準
-`74e99e2`，跑之前定下：
+`HeuristicBot` self-play, 20,000 rounds a table, seed base 1795364857, base
+`74e99e2`, fixed before the run:
 
 ```sh
 cargo run --release --example outlook -- 20000 1795364857 0
@@ -168,25 +209,31 @@ PLAYERS=2 cargo run --release --example outlook -- 20000 1795364857 0
 THRESHOLD=8 cargo run --release --example outlook -- 20000 1795364857 0
 ```
 
-ρ，± 一個標準誤：
+ρ, ± one standard error:
 
-| 桌子 | 全部 | 閘門內 | 閘門內，不含自己打的牌 |
+| Table | All | Within the gate | Within the gate, without the seat's own discards |
 | --- | ---: | ---: | ---: |
-| 四人十胡 | 0.383 ± 0.001 | 0.406 ± 0.002 | 0.480 ± 0.003 |
-| 三人十胡 | 0.458 ± 0.001 | 0.515 ± 0.003 | 0.619 ± 0.004 |
-| 兩人十胡 | 0.549 ± 0.002 | 0.647 ± 0.005 | 0.792 ± 0.006 |
-| 四人八胡 | 0.358 ± 0.001 | 0.383 ± 0.003 | 0.463 ± 0.003 |
+| Four players, ten 胡 | 0.383 ± 0.001 | 0.406 ± 0.002 | 0.480 ± 0.003 |
+| Three players, ten 胡 | 0.458 ± 0.001 | 0.515 ± 0.003 | 0.619 ± 0.004 |
+| Two players, ten 胡 | 0.549 ± 0.002 | 0.647 ± 0.005 | 0.792 ± 0.006 |
+| Four players, 八胡 | 0.358 ± 0.001 | 0.383 ± 0.003 | 0.463 ± 0.003 |
 
-- **閘門過了，四張桌子都在 0.85 以下。** 比從胡牌率反推的一半到六成還低。
-- **ρ 大約是一段裡摸牌的比例。** 四人十胡閘門內的表，還能摸 1 到 12 張是
-  0.40 到 0.46，摸 20 以上掉到 0.28 到 0.36：前期一段的公開牌有 2 到 3
-  張，大多是別家打的。最後一段（摸 0）只有打出來的牌，ρ 是 0。
-- **人越少 ρ 越高**：別家少，打出來的牌在公開牌裡的比例低，留在別家手上的
-  將帥也少。
-- **自己打的牌占了 0.07 到 0.15。** `Graph` 把自己要打的牌也算成公開牌，
-  所以批次 2 用含自己打的那一欄。
+- **The gate is passed: all four tables are below 0.85.**  Lower still than
+  the half to six tenths worked back from the win rates.
+- **ρ is roughly the share of a segment's cards that are drawn.**  In the
+  table for four players at ten 胡 within the gate it is 0.40 to 0.46 with 1
+  to 12 draws left and falls to 0.28 to 0.36 with 20 or more: early on a
+  segment has 2 to 3 public cards, most of them other seats' discards.  The
+  last segment (0 draws left) has only discards, and ρ is 0.
+- **The fewer the players, the higher ρ**: with fewer other seats, discards
+  are a smaller share of the public cards, and fewer generals stay in other
+  seats' hands.
+- **The seat's own discards account for 0.07 to 0.15.**  `Graph` counts the
+  card the seat is about to discard as a public card too, so batch 2 uses
+  the column that includes its own discards.
 
-四人十胡閘門內依還能摸幾張的表（從 0 開始，少於 500 張牌的段取最近一段）：
+The table for four players at ten 胡 within the gate, by draws left (from 0;
+a segment with fewer than 500 cards takes the nearest):
 
 ```text
 [0.0000, 0.4362, 0.4448, 0.4424, 0.4470, 0.4505, 0.4537, 0.4091, 0.4535,
@@ -194,376 +241,484 @@ THRESHOLD=8 cargo run --release --example outlook -- 20000 1795364857 0
  0.3767, 0.3671, 0.3609, 0.3437, 0.3386, 0.2828, 0.2926, 0.2926]
 ```
 
-`src/` 沒動。`ab/run.sh 20000`（對照 `74e99e2`，seed base 1795365381）：
-0 局分歧。
+`src/` is untouched.  `ab/run.sh 20000` (control `74e99e2`, seed base
+1795365381): 0 deals part.
 
-## 批次 2：折扣進 `Graph`
+## Batch 2: the discount into `Graph`
 
-`Outlook` 加一張表 `generals`（ρ 依還能摸幾張）。`Graph` 裡將帥的權重乘上
-ρ，等於把沒出現的將帥當成 ρK 張：
+`Outlook` gains a table `generals` (ρ by draws left).  In `Graph` the weight
+of a general is multiplied by ρ, which is to take the unseen generals for ρK
+cards:
 
-- **胡將帥**（`Kind::Win`，牌是將帥）：權重 × ρ。
-- **吃進將帥**（`Kind::General`）：權重 × ρ，再乘原本的 `general`。
-- **其他的牌**：N 換成 N − (1 − ρ)K，權重跟著變大。少算的將帥不是空的
-  公開牌，是別的牌；搭子被低估的那幾個百分點有一部分從這裡來。
+- **Winning on a general** (`Kind::Win`, the card a general): weight × ρ.
+- **Eating a general** (`Kind::General`): weight × ρ, times the `general` it
+  had before.
+- **Other cards**: N becomes N − (1 − ρ)K, and the weights grow with it.
+  The generals no longer counted are not empty public cards but other cards;
+  part of the few percentage points by which a 搭子 is underestimated comes
+  from here.
 
-`rest` 照舊是 1 減各項權重的和。ρ 隨時間變，所以權重要在 `sweep` 裡依
-那一步的段來乘，不能在 `expand` 裡寫死；建圖不變。
+`rest` is 1 less the sum of the weights, as before.  ρ changes with time, so
+the weights are multiplied in `sweep` by that step's segment and cannot be
+fixed in `expand`; building the graph does not change.
 
-先校準，再 A/B：
+Calibrate first, then A/B:
 
-1. **校準。** 新的 seed 重跑 `examples/overspend`，看上面那張聽牌的表。
-   閘門：完成形延伸 0 張的三格，估的胡牌率都落在實際的 ± 2 個標準誤裡，
-   而且搭子各列沒有變差。沒過就回頭看 ρ 的形狀（要不要分閘門內外、要不要
-   分是誰摸的），不跑 A/B。
-2. **A/B。** 候選是 `ExpectBot`，對照 `main` HEAD 自己的 `ExpectBot`
-   （`BASELINE_EXPECT=1`），網頁與桌面的設定各一次，`RESHUFFLE=8`，新的
-   seed base。局數在看到得分之前定下：先用另一個 seed 跑 5,000 局計時，
-   結果丟掉；`doc/eval.md` 批次 4 在 30,000 局與 20,000 局的標準誤是 0.046
-   與 0.052 分，這裡的效果估在 0.1 分以下，所以預期要更多局。推估超過
-   一小時就 detach，把狀態寫進 memory。
+1. **Calibration.**  Rerun `examples/overspend` on a fresh seed and read the
+   table of waiting hands above.  The gate: in the three cells of 完成形
+   that extends 0, the estimated win rate falls within ± 2 standard errors
+   of the actual, and no 搭子 row gets worse.  If it fails, go back to the
+   shape of ρ (split within and past the gate?  split by who drew?) and run
+   no A/B.
+2. **A/B.**  The candidate is `ExpectBot`, the control `main` HEAD's own
+   `ExpectBot` (`BASELINE_EXPECT=1`), once each on the web's and the
+   desktop's settings, `RESHUFFLE=8`, a fresh seed base.  The deal count is
+   fixed before any score is seen: first time 5,000 deals on another seed
+   and throw the result away; batch 4 of `doc/eval.md` had standard errors
+   of 0.046 and 0.052 points at 30,000 and 20,000 deals, and the effect here
+   is put below 0.1 points, so expect to need more deals.  If the estimate
+   is over an hour, detach and write the state to memory.
 
-`Eval` 的表是照舊的 `Outlook` 學的，這一批不重學：閘門外的葉節點還帶著
-舊的高估，只有圖的頭一兩層與閘門內換成新的。這個不一致是刻意的，批次 3
-處理。
+The `Eval` tables were learnt under the old `Outlook` and are not relearnt in
+this batch: the leaves past the gate still carry the old overestimate, and
+only the first layer or two of the graph and the play within the gate move
+to the new one.  The inconsistency is deliberate; batch 3 deals with it.
 
-結論照 `CLAUDE.md`：CI 在 0 之上才是 win；跨 0 是資料不足；loss 要先追
-變動最大的那幾局才算結束。
+The verdict follows `CLAUDE.md`: a win only when the CI lies above 0; a CI
+that straddles 0 is insufficient data; a loss is not final until the deals
+that moved the most have been traced.
 
-### 批次 2 量到的事
+### What batch 2 measured
 
-`Outlook::generals` 是批次 1 四人十胡閘門內的表，只有四人十胡用；其他桌子
-是 `[1.0]`，打法不變。`examples/overspend` 20,000 局，seed base
-1795366613，基準 `a9e194e` 加上這個改動，跑之前定下（34 分鐘）。
+`Outlook::generals` is batch 1's table for four players at ten 胡 within the
+gate, used only at four players and ten 胡; other tables have `[1.0]` and no
+change to play.  `examples/overspend`, 20,000 rounds, seed base 1795366613,
+base `a9e194e` plus this change, fixed before the run (34 minutes).
 
-估的 − 實際（百分點），批次 0 → 批次 2：
+Estimate − actual (percentage points), batch 0 → batch 2:
 
-| | 摸 15 以上 | 摸 8–14 | 摸 0–7 |
+| | 15 draws or more | 8–14 draws | 0–7 draws |
 | --- | ---: | ---: | ---: |
-| 完成形，延伸 0 張 | +15 → −3 | +19 → −5 | +20 → −2 |
-| 完成形，延伸 4 張以上 | −3 → −14 | −2 → −9 | +14 → −2 |
-| 搭子，聽 1 張 | −8 → −16 | −4 → −6 | −4 → −2 |
-| 搭子，聽 2 張 | −5 → −13 | −10 → −13 | −8 → −11 |
-| 搭子，聽 3 張 | −9 → −13 | −1 → −6 | +7 → +5 |
-| 搭子，聽 4 張 | −8 → −13 | −4 → −3 | 0 → −3 |
-| 搭子，聽 5 張以上 | −5 → −3 | −3 → −2 | −1 → +8 |
+| 完成形, extends 0 | +15 → −3 | +19 → −5 | +20 → −2 |
+| 完成形, extends 4 or more | −3 → −14 | −2 → −9 | +14 → −2 |
+| 搭子, waits on 1 | −8 → −16 | −4 → −6 | −4 → −2 |
+| 搭子, waits on 2 | −5 → −13 | −10 → −13 | −8 → −11 |
+| 搭子, waits on 3 | −9 → −13 | −1 → −6 | +7 → +5 |
+| 搭子, waits on 4 | −8 → −13 | −4 → −3 | 0 → −3 |
+| 搭子, waits on 5 or more | −5 → −3 | −3 → −2 | −1 → +8 |
 
-- **延伸 0 張的三格過了**：47% ± 5 估 44%，45% ± 4 估 40%，27% ± 5 估 25%。
-- **搭子沒過**：摸 15 以上，聽 1 到 4 張低估了 13 到 16 個百分點，批次 0 是
-  5 到 9。延伸 4 張以上也從準的變成低估 14 個百分點。閘門沒過，不跑 A/B。
+- **The three cells that extend 0 pass**: 47% ± 5 estimated at 44%, 45% ± 4
+  at 40%, 27% ± 5 at 25%.
+- **The 搭子 rows fail**: with 15 draws or more left, those that wait on 1
+  to 4 cards are underestimated by 13 to 16 percentage points, where batch 0
+  had 5 to 9.  Those that extend 4 or more also went from accurate to 14
+  percentage points under.  The gate is not passed; no A/B is run.
 
-兩批的 seed 與打法都不同，所以再用同一個 seed base 重跑前 5,000 局，每手
-同時算 ρ 與 ρ = 1 的估計（暫時的追蹤，沒留）。同一批手，摸 15 以上：
+The two batches differ in both seed and play, so the first 5,000 rounds were
+rerun on the same seed base, each hand estimated both with ρ and with ρ = 1
+(a temporary trace, not kept).  The same hands, 15 draws or more left:
 
-| | 實際 | ρ | ρ = 1 | 手數 |
+| | Actual | ρ | ρ = 1 | Hands |
 | --- | ---: | ---: | ---: | ---: |
-| 完成形，延伸 0 張 | 53% ± 8 | 43% | 64% | 38 |
-| 完成形，延伸 2 張 | 72% ± 5 | 54% | 70% | 71 |
-| 完成形，延伸 4 張以上 | 79% ± 2 | 67% | 77% | 296 |
-| 搭子，聽 1 張 | 41% ± 5 | 27% | 32% | 103 |
-| 搭子，聽 3 張 | 55% ± 3 | 42% | 47% | 321 |
-| 搭子，聽 4 張 | 53% ± 3 | 45% | 46% | 333 |
-| 士象等自己的將帥 | 39% ± 5 | 27% | 41% | 98 |
+| 完成形, extends 0 | 53% ± 8 | 43% | 64% | 38 |
+| 完成形, extends 2 | 72% ± 5 | 54% | 70% | 71 |
+| 完成形, extends 4 or more | 79% ± 2 | 67% | 77% | 296 |
+| 搭子, waits on 1 | 41% ± 5 | 27% | 32% | 103 |
+| 搭子, waits on 3 | 55% ± 3 | 42% | 47% | 321 |
+| 搭子, waits on 4 | 53% ± 3 | 45% | 46% | 333 |
+| 士象 waiting for its own general | 39% ± 5 | 27% | 41% | 98 |
 
-- **搭子變差是 ρ 本身造成的，不是手換了。** N − (1 − ρ)K 讓其他牌的權重
-  大約多 8%，但搭子之後吃將帥再胡的路也少了，淨的是低 1 到 5 個百分點。
-- **ρ 對將帥是對的，錯的是少掉的那些分給誰。** 延伸靠的是碰與暗刻，搭子
-  聽的多半是車馬炮士象：批次 2b 的表裡，這些都比平均多出 15 到 33%。
-  N − (1 − ρ)K 平均分給所有的牌，給得不夠。
-- **ρ 的形狀不用改**：延伸 0 張只聽將帥，三格都準了。
+- **The 搭子 got worse because of ρ itself, not because the hands changed.**
+  N − (1 − ρ)K gives the other cards about 8% more weight, but a 搭子 also
+  has fewer routes that eat a general and then win; the net is 1 to 5
+  percentage points lower.
+- **ρ is right for the generals; what is wrong is who gets the share they
+  lose.**  Extensions rest on pongs and concealed triplets, and a 搭子
+  mostly waits on 車馬炮 and 士象: in batch 2b's table these all run 15 to
+  33% above the average.  N − (1 − ρ)K spreads the share evenly over all
+  cards, which gives them too little.
+- **The shape of ρ needs no change**: a hand that extends 0 waits on
+  generals alone, and all three cells came out right.
 
-## 批次 2b：每個牌種的出現率
+## Batch 2b: the appearance rate of every rank
 
-批次 2 只修將帥那一列；這一批把整個假設換掉，是主線的後半。`Graph` 假設沒出現的牌平均分配：一張公開的牌是某一張牌的機率是它沒出現的
-張數 ÷ N。批次 1 重建每一家沒看過的牌，順手把 ρ 推到每個牌種：公開的牌是
-這個牌種的次數 ÷ 照平均分配算的期望。和批次 1 同一批牌：四人十胡，
-`HeuristicBot` 自己打 20,000 局，seed base 1795364857，基準 `74e99e2`，
-閘門內，含那一家自己打的牌，± 一個標準誤：
+Batch 2 fixes only the generals' row; this batch replaces the whole
+assumption and is the second half of the main line.  `Graph` assumes the
+unseen cards are spread evenly: the chance that a public card is a given
+card is its unseen copies ÷ N.  Batch 1 rebuilds the cards each seat has not
+seen, and while at it extends ρ to every rank: the times a public card is of
+the rank ÷ the expectation under an even spread.  The same cards as batch 1:
+four players at ten 胡, `HeuristicBot` self-play of 20,000 rounds, seed base
+1795364857, base `74e99e2`, within the gate, the seat's own discards
+included, ± one standard error:
 
-| 牌種 | 摸 15 以上 | 摸 8–14 | 摸 0–7 |
+| Rank | 15 draws or more | 8–14 draws | 0–7 draws |
 | --- | ---: | ---: | ---: |
-| 將帥 | 0.376 ± 0.004 | 0.422 ± 0.004 | 0.431 ± 0.006 |
+| Generals | 0.376 ± 0.004 | 0.422 ± 0.004 | 0.431 ± 0.006 |
 | 士仕 | 1.161 ± 0.008 | 1.184 ± 0.008 | 1.257 ± 0.014 |
 | 象相 | 1.186 ± 0.008 | 1.213 ± 0.008 | 1.251 ± 0.014 |
 | 車俥 | 1.271 ± 0.008 | 1.252 ± 0.008 | 1.246 ± 0.014 |
 | 馬傌 | 1.290 ± 0.008 | 1.263 ± 0.008 | 1.249 ± 0.014 |
 | 包炮 | 1.333 ± 0.008 | 1.303 ± 0.008 | 1.298 ± 0.014 |
-| 卒兵 | 0.684 ± 0.006 | 0.787 ± 0.006 | 0.882 ± 0.011 |
+| Soldiers | 0.684 ± 0.006 | 0.787 ± 0.006 | 0.882 ± 0.011 |
 
-不含自己打的牌，將帥是 0.47 到 0.49，卒兵 0.76、0.84、0.92，其他牌種
-1.16 到 1.26。
+Without the seat's own discards, generals are 0.47 to 0.49, soldiers 0.76,
+0.84 and 0.92, and the other ranks 1.16 to 1.26.
 
-- **將帥少掉的不是平均分給別的牌。** 每張公開的牌各牌種的機率加起來是 1；
-  車馬炮與士象多出 15 到 33%，是別家打掉的牌，卒兵前期少 30% 左右，到後面
-  才接近平均，是留著做三色、四色兵卒的。批次 2 的 N − (1 − ρ)K 把將帥少掉
-  的平均分給其他牌，這張表說不是。
-- **搭子在摸 15 以上被低估 5 到 9 個百分點**（批次 0 的聽牌表）可能有一部分
-  從這裡來：聽車馬炮的搭子等的正是出現得多的牌，聽卒兵的反過來。
+- **What the generals lose is not spread evenly over the other cards.**  For
+  each public card the ranks' chances sum to 1; 車馬炮 and 士象 run 15 to
+  33% over, being the cards the other seats discard, and soldiers some 30%
+  under early on, nearing the average only later, being kept for soldiers of
+  three and four colours.  Batch 2's N − (1 − ρ)K spreads what the generals
+  lose evenly over the other cards; this table says otherwise.
+- **A 搭子 being underestimated by 5 to 9 percentage points with 15 draws or
+  more left** (batch 0's table of waiting hands) may come partly from here:
+  a 搭子 that waits on 車馬炮 waits on just the cards that appear more, and
+  one that waits on soldiers the reverse.
 
-### 摸的與打的分開
+### Draws and discards apart
 
-公開的牌有兩個來源：牌堆摸出來的與別家打的。`examples/outlook` 把兩者
-分開，四人十胡，`HeuristicBot` 自己打 20,000 局，seed base 1795370029，
-基準 `a9e194e`，閘門內，不含自己打的牌：
+Public cards have two sources: draws from the pile and the other seats'
+discards.  `examples/outlook` tells the two apart; four players at ten 胡,
+`HeuristicBot` self-play of 20,000 rounds, seed base 1795370029, base
+`a9e194e`, within the gate, without the seat's own discards:
 
-| 牌種 | 摸的，15 以上 | 8–14 | 0–7 | 別家打的，15 以上 | 8–14 | 0–7 |
+| Rank | Drawn, 15 or more | 8–14 | 0–7 | Discarded by other seats, 15 or more | 8–14 | 0–7 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 將帥 | 0.759 | 0.684 | 0.636 | 0 | 0 | 0 |
+| Generals | 0.759 | 0.684 | 0.636 | 0 | 0 | 0 |
 | 士仕 | 1.096 | 1.122 | 1.134 | 1.247 | 1.206 | 1.293 |
 | 象相 | 1.135 | 1.115 | 1.130 | 1.252 | 1.288 | 1.456 |
 | 車俥 | 1.023 | 1.036 | 1.109 | 1.490 | 1.519 | 1.483 |
 | 馬傌 | 1.046 | 1.101 | 1.111 | 1.534 | 1.600 | 1.641 |
 | 包炮 | 1.050 | 1.122 | 1.142 | 1.557 | 1.630 | 1.674 |
-| 卒兵 | 1.009 | 1.046 | 1.125 | 0.381 | 0.456 | 0.500 |
+| Soldiers | 1.009 | 1.046 | 1.125 | 0.381 | 0.456 | 0.500 |
 
-標準誤是摸的 0.006 到 0.017，打的 0.008 到 0.033。
+The standard errors are 0.006 to 0.017 for draws and 0.008 to 0.033 for
+discards.
 
-- **偏得最多的是打出來的牌**：沒有將帥，卒兵只有平均的四到五成，車馬炮多
-  五到七成。
-- **摸的牌也不是照沒看過的牌平均分。** 牌堆是真的洗亂的，但沒看過的牌是
-  牌堆加上別家的暗牌，而別家的暗牌不是隨機的：發到的將帥永遠留著。所以
-  摸到將帥的率是 0.76，越到後面越低（0.64）：牌堆越來越小，別家的暗牌在
-  沒看過的牌裡占得越來越多。別的牌種摸的率在 1.0 到 1.14，接近把將帥少掉
-  的平均分掉。
-- **批次 1 的「ρ 大約是一段裡摸牌的比例」就是這兩欄的混合**：一段裡摸的
-  牌一張，打的牌其餘，將帥 0.7 × 摸牌的比例。
-- **對批次 2 校準的意思**：N − (1 − ρ)K 對摸的牌差不多對，對打的牌錯得
-  多：打出來的車馬炮士象比它算的多出 20 到 60%，搭子聽的與延伸要碰的正是
-  這些。批次 2b 的表可以照這兩欄分開學，用 `Outlook::cards` 的摸牌比例
-  混合，比直接學混合的率平滑。
+- **Discards are skewed the most**: no generals, soldiers at only four to
+  five tenths of the average, 車馬炮 five to seven tenths over.
+- **Draws are not spread evenly over the unseen cards either.**  The pile
+  really is shuffled, but the unseen cards are the pile plus the other
+  seats' concealed cards, and those are not random: a dealt general always
+  stays.  So the rate of drawing a general is 0.76, and lower the later it
+  is (0.64): the pile keeps shrinking, and the other seats' concealed cards
+  make up more and more of the unseen cards.  The other ranks' draw rates
+  are 1.0 to 1.14, close to an even spread of what the generals lose.
+- **Batch 1's "ρ is roughly the share of a segment's cards that are drawn"
+  is the mix of these two columns**: one drawn card to a segment, the rest
+  discards, generals at 0.7 × the share drawn.
+- **What it means for batch 2's calibration**: N − (1 − ρ)K is about right
+  for draws and far off for discards: discarded 車馬炮 and 士象 come 20 to
+  60% more often than it reckons, and these are just what a 搭子 waits on
+  and what an extension needs to pong.  Batch 2b's tables can be learnt by
+  these two columns apart and mixed by the draw share of `Outlook::cards`,
+  which is smoother than learning the mixed rate directly.
 
-做法：`Outlook` 的 `generals` 換成兩張依牌種與三段還能摸幾張的表，`drawn`
-與 `discarded`。一段裡一張是摸的（比例是 1 ÷ `cards`，最後一段沒有），其餘
-是打的。`Graph::sweep` 每一步各自正規化再混合：摸的那一份照「沒出現的張數
-× 摸的率」分給每張牌，打的那一份照「沒出現的張數 × 打的率」分。建圖不變，
-`Entry` 只多記牌種。
+How: `Outlook`'s `generals` gives way to two tables by rank and by three
+bands of draws left, `drawn` and `discarded`.  One card of a segment is
+drawn (a share of 1 ÷ `cards`; the last segment has none) and the rest are
+discards.  At each step `Graph::sweep` normalises each of the two and then
+mixes them: the drawn share goes to each card by "unseen copies × draw
+rate", the discarded share by "unseen copies × discard rate".  Building the
+graph does not change; `Entry` only records the rank as well.
 
-- **士象共用一個率，車馬炮共用一個率。** `Eval` 的特徵把這幾個牌種當成
-  可以互換的（`symmetric_hands_share_patterns_and_values`），各用各的率會
-  破壞這個對稱。同一類裡的差距在 4% 以內，只有摸 0–7 打出來的象相
-  （1.46 對士仕 1.29）例外。
-- **自己打的牌不另外扣。** 閘門內的那一家看到的棄牌有 30 到 40% 是自己
-  打的（摸 15 以上 0.402，8–14 0.335，0–7 0.302），這些牌它胡不了也碰
-  不了。`Outlook::own` 可以把打的那一份扣掉這個比例（`eat` 已經把自己打的
-  牌算在分母裡，所以同時把 `eat` 除回來），但校準說扣了更差（下面的表），
-  所以留在 0，和原本一樣由 h 吸收。
+- **士象 share one rate, and 車馬炮 share one.**  `Eval`'s features take
+  these ranks for interchangeable
+  (`symmetric_hands_share_patterns_and_values`), and a rate for each would
+  break that symmetry.  Within a class the gap is within 4%, the one
+  exception being discarded 象相 with 0–7 draws left (1.46 against 1.29 for
+  士仕).
+- **The seat's own discards are not taken off separately.**  Of the discards
+  a seat within the gate sees, 30 to 40% are its own (0.402 with 15 draws or
+  more left, 0.335 with 8–14, 0.302 with 0–7), cards it can neither win on
+  nor pong.  `Outlook::own` can take this share off the discarded part
+  (`eat` already counts the seat's own discards in its denominator, so `eat`
+  is divided back at the same time), but the calibration says that is worse
+  (the table below), so it stays at 0 and h absorbs it as before.
 
-閘門與量法照批次 2：
+The gates and the method are batch 2's:
 
-1. **批次 2 的校準過了就做**，不等它的 A/B 贏：將帥那一列跨 0 的話，整張
-   表仍然是比較完整的修正。對照是當時的 `main` HEAD，批次 2 沒進去就連
-   將帥那一列一起量。
-2. **校準。** 新的 seed 重跑 `examples/overspend`，閘門是聽牌表的搭子各列
-   改善、完成形各列不變差。沒過不跑 A/B。
-3. **A/B。** 候選與對照都是 `ExpectBot`，`BASELINE_EXPECT=1`，局數在看到
-   得分之前定下。
+1. **Do it once batch 2's calibration passes**, without waiting for its A/B
+   to win: if the generals' row straddles 0, the whole table is still the
+   more complete fix.  The control is the `main` HEAD of the time; if batch
+   2 did not go in, the generals' row is measured along with the rest.
+2. **Calibration.**  Rerun `examples/overspend` on a fresh seed; the gate is
+   that the 搭子 rows of the waiting table improve and no 完成形 row gets
+   worse.  If it fails, no A/B is run.
+3. **A/B.**  Candidate and control are both `ExpectBot`,
+   `BASELINE_EXPECT=1`, the deal count fixed before any score is seen.
 
-### 批次 2b 量到的事
+### What batch 2b measured
 
-率是上面「摸的與打的分開」那一批牌（seed base 1795370029），士象與車馬炮
-合併之後：
+The rates are those of the cards under "Draws and discards apart" above
+(seed base 1795370029), with 士象 and 車馬炮 pooled:
 
-| | 將帥 | 士象 | 車馬炮 | 卒兵 |
+| | Generals | 士象 | 車馬炮 | Soldiers |
 | --- | ---: | ---: | ---: | ---: |
-| 摸的，15 以上 | 0.759 | 1.116 | 1.040 | 1.009 |
-| 摸的，8–14 | 0.684 | 1.118 | 1.086 | 1.046 |
-| 摸的，0–7 | 0.636 | 1.132 | 1.121 | 1.125 |
-| 打的，15 以上 | 0 | 1.250 | 1.527 | 0.381 |
-| 打的，8–14 | 0 | 1.247 | 1.583 | 0.456 |
-| 打的，0–7 | 0 | 1.373 | 1.597 | 0.500 |
+| Drawn, 15 or more | 0.759 | 1.116 | 1.040 | 1.009 |
+| Drawn, 8–14 | 0.684 | 1.118 | 1.086 | 1.046 |
+| Drawn, 0–7 | 0.636 | 1.132 | 1.121 | 1.125 |
+| Discarded, 15 or more | 0 | 1.250 | 1.527 | 0.381 |
+| Discarded, 8–14 | 0 | 1.247 | 1.583 | 0.456 |
+| Discarded, 0–7 | 0 | 1.373 | 1.597 | 0.500 |
 
-校準：`examples/overspend` 20,000 局，seed base 1795450000，基準 `a9e194e`
-加上這個改動，跑之前定下。座位 1 用候選打（新的率，h × 1.5），每一手同時
-記下幾個模型的估計（暫時的追蹤，沒留）。估的 − 實際（百分點）：
+Calibration: `examples/overspend`, 20,000 rounds, seed base 1795450000, base
+`a9e194e` plus this change, fixed before the run.  Seat 1 plays the
+candidate (the new rates, h × 1.5), and each hand records the estimates of
+several models at once (a temporary trace, not kept).  Estimate − actual
+(percentage points):
 
-| | 實際 | 平均分、h × 1.5（現在的） | 率、h × 1.5（候選） | 率、h × 1 | 率、扣自己打的、h × 1 | 手數 |
+| | Actual | Even draw, h × 1.5 (current) | Rates, h × 1.5 (candidate) | Rates, h × 1 | Rates, own discards taken off, h × 1 | Hands |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 摸 15 以上：完成形，延伸 0 張 | 49% ± 4 | +17 | −7 | +3 | +3 | 126 |
-| 完成形，延伸 2 張 | 65% ± 3 | +5 | −12 | −3 | −4 | 354 |
-| 完成形，延伸 4 張以上 | 78% ± 1 | −1 | −13 | −5 | −7 | 1,108 |
-| 搭子，聽 1 張 | 36% ± 2 | −6 | −10 | −1 | −5 | 371 |
-| 搭子，聽 3 張 | 55% ± 1 | −9 | −13 | −3 | −8 | 1,400 |
-| 搭子，聽 4 張 | 55% ± 1 | −9 | −9 | 0 | −5 | 1,490 |
-| 搭子，聽 5 張以上 | 58% ± 1 | −4 | −9 | 0 | −4 | 1,269 |
-| 士象等自己的將帥 | 35% ± 2 | +5 | −11 | −3 | −4 | 367 |
-| 摸 8–14：完成形，延伸 0 張 | 42% ± 4 | +15 | −6 | +3 | +3 | 159 |
-| 完成形，延伸 4 張以上 | 67% ± 2 | +1 | −11 | −1 | −2 | 409 |
-| 搭子，聽 3 張 | 38% ± 2 | −3 | −5 | +4 | +1 | 568 |
-| 搭子，聽 4 張 | 40% ± 2 | −3 | −3 | +6 | +3 | 404 |
-| 摸 0–7：完成形，延伸 0 張 | 22% ± 4 | +20 | +3 | +7 | +7 | 87 |
-| 搭子，聽 3 張 | 25% ± 4 | −2 | −2 | +3 | +1 | 117 |
-| 全部 33 格，偏差絕對值依手數平均 | | 5.9 | 9.4 | 2.4 | 4.5 | 12,419 |
-| 全部，胡牌率 | 52.3% | 50.1% | 43.0% | 51.9% | 48.9% | |
+| 15 draws or more: 完成形, extends 0 | 49% ± 4 | +17 | −7 | +3 | +3 | 126 |
+| 完成形, extends 2 | 65% ± 3 | +5 | −12 | −3 | −4 | 354 |
+| 完成形, extends 4 or more | 78% ± 1 | −1 | −13 | −5 | −7 | 1,108 |
+| 搭子, waits on 1 | 36% ± 2 | −6 | −10 | −1 | −5 | 371 |
+| 搭子, waits on 3 | 55% ± 1 | −9 | −13 | −3 | −8 | 1,400 |
+| 搭子, waits on 4 | 55% ± 1 | −9 | −9 | 0 | −5 | 1,490 |
+| 搭子, waits on 5 or more | 58% ± 1 | −4 | −9 | 0 | −4 | 1,269 |
+| 士象 waiting for its own general | 35% ± 2 | +5 | −11 | −3 | −4 | 367 |
+| 8–14 draws: 完成形, extends 0 | 42% ± 4 | +15 | −6 | +3 | +3 | 159 |
+| 完成形, extends 4 or more | 67% ± 2 | +1 | −11 | −1 | −2 | 409 |
+| 搭子, waits on 3 | 38% ± 2 | −3 | −5 | +4 | +1 | 568 |
+| 搭子, waits on 4 | 40% ± 2 | −3 | −3 | +6 | +3 | 404 |
+| 0–7 draws: 完成形, extends 0 | 22% ± 4 | +20 | +3 | +7 | +7 | 87 |
+| 搭子, waits on 3 | 25% ± 4 | −2 | −2 | +3 | +1 | 117 |
+| All 33 cells, mean absolute miss weighted by hands | | 5.9 | 9.4 | 2.4 | 4.5 | 12,419 |
+| All, win rate | 52.3% | 50.1% | 43.0% | 51.9% | 48.9% | |
 
-- **照原本宣告的候選（率、h × 1.5），閘門沒過**：搭子在摸 15 以上從低估
-  4 到 9 變成 9 到 13，和批次 2 一樣。批次 2「少掉的分給誰錯了」的診斷不對：
-  照量到的分給車馬炮士象，搭子還是更低，因為搭子靠將帥與卒兵的路也少了。
-- **h × 1.5 原本是在抵銷將帥的高估。** `research/outlook.md` 的 1.5 是在
-  平均分的模型上校準出來的；那個模型把將帥估成兩倍半，把 h 乘大剛好拉回
-  整體的胡牌率，代價是不靠將帥的手被低估。率修對之後不用再乘：率加上量到
-  的 h，33 格的偏差是 2.4 個百分點，現在的模型 5.9，整體 51.9% 對實際
-  52.3%。
-- **剩下的偏差**：摸 0–7 的完成形與等將帥的手還高估 5 到 9 個百分點，
-  摸 8–14 聽 4 張的搭子高估 6。
-- **自己打的牌扣掉反而更差**（4.5），所以 `own` 是 0。它要配更小的 h 才
-  平，而 h 是量到的，沒有理由再調。
-- **所以 A/B 的候選改成率加上 h × 1**（四人十胡的 `ExpectBot::new`），其他
-  桌子不變。這個候選是看了校準才定的，沒有自己打過一次校準；判決交給 A/B。
-  `Eval` 的表是照平均分、h × 1.5 學的，葉節點還是舊的，批次 3 處理。
+- **The candidate as first declared (rates, h × 1.5) fails the gate**: with
+  15 draws or more left the 搭子 rows go from 4 to 9 under to 9 to 13 under,
+  as in batch 2.  Batch 2's diagnosis, "the lost share goes to the wrong
+  cards", is wrong: given to 車馬炮 and 士象 as measured, a 搭子 still comes
+  out lower, because its routes through generals and soldiers are fewer too.
+- **h × 1.5 was offsetting the generals' overestimate all along.**  The 1.5
+  of `research/outlook.md` was calibrated on the even-draw model; that model
+  takes generals for two and a half times what they are, and scaling h up
+  just pulls the overall win rate back, at the cost of underestimating the
+  hands that do not rely on generals.  With the rates right there is no more
+  need to scale: with the rates and the measured h the miss over the 33
+  cells is 2.4 percentage points against 5.9 for the current model, and
+  51.9% overall against an actual 52.3%.
+- **The misses that remain**: 完成形 and hands waiting for generals with 0–7
+  draws left are still 5 to 9 percentage points high, and a 搭子 that waits
+  on 4 with 8–14 draws left is 6 high.
+- **Taking off the seat's own discards makes it worse instead** (4.5), so
+  `own` is 0.  It would need a smaller h to come level, and h is measured:
+  there is no reason to tune it again.
+- **So the A/B's candidate becomes the rates with h × 1** (`ExpectBot::new`
+  at four players and ten 胡), other tables unchanged.  This candidate was
+  settled after seeing the calibration and has not played a calibration of
+  its own; the verdict is left to the A/B.  The `Eval` tables were learnt
+  under the even draw and h × 1.5, so the leaves are still the old ones;
+  batch 3 deals with that.
 
-A/B，跑之前定下（2026-11-23 發出）。候選是工作目錄的
-`ExpectBot::new`（率、h × 1），對照 `a9e194e` 的 `ExpectBot::new`，
-`RESHUFFLE=8`，指令在 `target/generals-2b/run.sh`：
+The A/B, fixed before the run (launched 2026-11-23).  The candidate is the
+working tree's `ExpectBot::new` (rates, h × 1), the control `a9e194e`'s
+`ExpectBot::new`, `RESHUFFLE=8`, the commands in
+`target/generals-2b/run.sh`:
 
-| 設定 | 環境變數 | 局數 | seed base |
+| Setting | Environment variables | Deals | seed base |
 | --- | --- | ---: | --- |
-| 網頁 | `EXPECT=new GATE_CARDS=10 SHALLOW=0 BASELINE_EXPECT=1 BASELINE_SHALLOW=0` | 60,000 | 1794000000 |
-| 桌面 | `EXPECT=new GATE_CARDS=14 SHALLOW=17 BASELINE_EXPECT=1 BASELINE_GATE=14 BASELINE_SHALLOW=17` | 20,000 | 1794200000 |
+| Web | `EXPECT=new GATE_CARDS=10 SHALLOW=0 BASELINE_EXPECT=1 BASELINE_SHALLOW=0` | 60,000 | 1794000000 |
+| Desktop | `EXPECT=new GATE_CARDS=14 SHALLOW=17 BASELINE_EXPECT=1 BASELINE_GATE=14 BASELINE_SHALLOW=17` | 20,000 | 1794200000 |
 
-網頁的設定用另一個 seed（1795310000）跑 5,000 局計時，9 分鐘，標準誤
-0.075，結果丟掉；60,000 局的標準誤估在 0.022。兩個設定都 win 才換。
+The web setting was timed over 5,000 deals on another seed (1795310000): 9
+minutes, standard error 0.075, the result thrown away; the standard error at
+60,000 deals is put at 0.022.  It is adopted only if both settings win.
 
-結果（2026-11-23）：兩個都 win，換了。
+Result (2026-11-23): both win; adopted.
 
-| 設定 | 分歧的局 | 候選 − 對照（分／局） | 95% CI | 座位 1 胡牌率 | 判決 |
+| Setting | Deals that part | Candidate − control (points a deal) | 95% CI | Seat 1 win rate | Verdict |
 | --- | ---: | ---: | --- | --- | --- |
-| 網頁 | 25,242 / 60,000 | +0.056 ± 0.023 | [+0.012, +0.101] | 25.03% → 25.20% | win |
-| 桌面 | 10,655 / 20,000 | +0.103 ± 0.043 | [+0.019, +0.187] | 25.19% → 25.48% | win |
+| Web | 25,242 / 60,000 | +0.056 ± 0.023 | [+0.012, +0.101] | 25.03% → 25.20% | win |
+| Desktop | 10,655 / 20,000 | +0.103 ± 0.043 | [+0.019, +0.187] | 25.19% → 25.48% | win |
 
-`examples/overspend` 的聽牌表改用 bot 自己的 `Outlook`（率、h × 1），
-批次 4 重跑時量的就是現在的模型。
+The waiting table of `examples/overspend` now uses the bot's own `Outlook`
+(rates, h × 1), so what batch 4's rerun measures is the current model.
 
-另一個便宜的版本：`HeuristicBot` 的 `waits` 依牌種的率加權，`ab/run.sh`
-預設的座位，和批次 4 的將帥 × ρ 一起或分開量。
+A cheaper version besides: `HeuristicBot`'s `waits` weighted by the ranks'
+rates, on the default seat of `ab/run.sh`, measured together with batch 4's
+generals × ρ or apart.
 
-限制：
+Caveats:
 
-- **這是 `HeuristicBot` 自己打的統計。** 哪些牌出現取決於別家打什麼；
-  四家都是 `ExpectBot` 時要重量，換了打法也要重量。
-- **量的是出現率，不是牌在哪裡。** `Graph` 只需要前者。`View::determinize`
-  把沒看過的牌平均發給別家與牌堆，要知道別家手上多半是什麼，是另一個量法，
-  不在這一批裡。
-- **牌種可能不夠細。** 同一個牌種的四色、那張牌已經出現幾張，率都可能
-  不同。先用牌種，校準沒過再分。
+- **These are statistics of `HeuristicBot` self-play.**  Which cards appear
+  depends on what the other seats discard; they must be measured again when
+  all four seats are `ExpectBot`, and again when play changes.
+- **What is measured is the appearance rate, not where the cards are.**
+  `Graph` needs only the former.  `View::determinize` deals the unseen cards
+  evenly to the other seats and the pile; knowing what the other seats
+  mostly hold takes another measurement, which is not in this batch.
+- **Ranks may not be fine enough.**  The four colours of one rank, and how
+  many copies of the card have already appeared, may each have a different
+  rate.  Ranks first; split if the calibration fails.
 
-## 批次 3：重學 `Eval`
+## Batch 3: relearn `Eval`
 
-批次 2 或 2b 有贏、2b 有結論之後才做，表只重學一次。用新的 `Outlook` 重跑 `examples/eval` 的標註與訓練
-（`doc/eval.md` 批次 3 的指令與局數，新的 seed），換掉 `src/eval-16.bin`
-（兩人桌的 `eval-16-2.bin` 等它自己的 ρ 量過再說），A/B 對照當時的
-`main` HEAD。win 才 commit。
+Done only after batch 2 or 2b has won and 2b has its verdict; the table is
+relearnt only once.  Rerun the labelling and training of `examples/eval`
+under the new `Outlook` (the commands and round count of batch 3 of
+`doc/eval.md`, a fresh seed), replace `src/eval-16.bin` (the table of two's
+`eval-16-2.bin` waits until its own ρ is measured), and A/B against the
+`main` HEAD of the time.  Commit only on a win.
 
-宣告（2026-11-23，跑之前寫下，基準與對照都是 `3423521`）：
+Declared (2026-11-23, written before the run; base and control are both
+`3423521`):
 
-- **標註：** `EXPECT=1 eval label 2000 1796250000`，2,000 局。`EXPECT=1`
-  就是 `ExpectBot::new` 在四人十胡的 `Outlook`（率、h × 1）。批次 3 的
-  8,466 秒推估約 2.5 小時，detach。
-- **訓練：** `eval train labels eval 20 1 4 16`，照舊；三個 D 裡驗證 RMSE
-  最小的那一張換進去。
-- **只換四人十胡。** 三人桌與八胡也讀 `Eval::default`，但它們的 `Outlook`
-  還是平均分、h × 1.5，和舊表一致；新表另存，`Eval::of` 只在四人十胡讀它。
-- **離線的損失表不跑。** 批次 3 的閘門已經過了，這裡只是換表，判決交給 A/B。
-- **A/B：** 設定、局數與 seed 等標註完、計時之後寫在這裡，看到得分之前。
+- **Labelling:** `EXPECT=1 eval label 2000 1796250000`, 2,000 rounds.
+  `EXPECT=1` is the `Outlook` of `ExpectBot::new` at four players and ten 胡
+  (rates, h × 1).  From batch 3's 8,466 seconds the estimate is about 2.5
+  hours; detach.
+- **Training:** `eval train labels eval 20 1 4 16`, as before; of the three
+  D, the table with the smallest validation RMSE goes in.
+- **Only four players at ten 胡 changes.**  The table of three and 八胡 read
+  `Eval::default` too, but their `Outlook` is still the even draw with
+  h × 1.5, consistent with the old table; the new table is stored apart, and
+  `Eval::of` reads it only at four players and ten 胡.
+- **The offline loss table is not run.**  Batch 3's gate has already been
+  passed; this is only a change of table, and the verdict is left to the
+  A/B.
+- **A/B:** the settings, deal counts and seeds are written here once the
+  labelling is done and timed, before any score is seen.
 
-標註：14,468 張圖、1,959,151 個節點、66,918,770 個值，8,767 秒。訓練，驗證
-RMSE（依 t 的平均值是 3.55）：D = 1 2.27、D = 4 1.23、**D = 16 0.90**（舊表
-0.78，那時的平均值是 3.37）。換 D = 16。
+Labelling: 14,468 graphs, 1,959,151 nodes, 66,918,770 values, 8,767 seconds.
+Training, validation RMSE (that of the mean by t is 3.55): D = 1 2.27, D = 4
+1.23, **D = 16 0.90** (the old table 0.78, when that of the mean was 3.37).
+D = 16 goes in.
 
-A/B，跑之前定下（2026-11-23）。候選是工作目錄的 `ExpectBot::new`，閘門外讀
-新表（`EVAL=target/generals-3/eval-16.bin`，還沒編進執行檔），對照
-`3423521`，`RESHUFFLE=8`，指令在 `target/generals-3/run.sh`。設定與局數
-同批次 2b，計時也沿用它的（網頁 60,000 局 1.6 小時，桌面 20,000 局
-3.5 小時），不另外試跑：
+The A/B, fixed before the run (2026-11-23).  The candidate is the working
+tree's `ExpectBot::new`, reading the new table past the gate
+(`EVAL=target/generals-3/eval-16.bin`, not yet compiled into the binary),
+the control `3423521`, `RESHUFFLE=8`, the commands in
+`target/generals-3/run.sh`.  The settings and deal counts are batch 2b's,
+and so are the timings (the web, 60,000 deals in 1.6 hours; the desktop,
+20,000 deals in 3.5 hours), with no trial run of its own:
 
-| 設定 | 環境變數 | 局數 | seed base |
+| Setting | Environment variables | Deals | seed base |
 | --- | --- | ---: | --- |
-| 網頁 | `EXPECT=new GATE_CARDS=10 SHALLOW=0 BASELINE_EXPECT=1 BASELINE_SHALLOW=0` | 60,000 | 1795429248 |
-| 桌面 | `EXPECT=new GATE_CARDS=14 SHALLOW=17 BASELINE_EXPECT=1 BASELINE_GATE=14 BASELINE_SHALLOW=17` | 20,000 | 1796429248 |
+| Web | `EXPECT=new GATE_CARDS=10 SHALLOW=0 BASELINE_EXPECT=1 BASELINE_SHALLOW=0` | 60,000 | 1795429248 |
+| Desktop | `EXPECT=new GATE_CARDS=14 SHALLOW=17 BASELINE_EXPECT=1 BASELINE_GATE=14 BASELINE_SHALLOW=17` | 20,000 | 1796429248 |
 
-兩個都 win 才把新表編進去（只在四人十胡）。
+The new table is compiled in only if both win (at four players and ten 胡
+only).
 
-結果（2026-11-24）：兩個都不是 win，表沒換，這一批放棄。
+Result (2026-11-24): neither is a win; the table is not replaced and this
+batch is dropped.
 
-| 設定 | 分歧的局 | 候選 − 對照（分／局） | 95% CI | 座位 1 胡牌率 | 判決 |
+| Setting | Deals that part | Candidate − control (points a deal) | 95% CI | Seat 1 win rate | Verdict |
 | --- | ---: | ---: | --- | --- | --- |
-| 網頁 | 37,228 / 60,000 | +0.019 ± 0.025 | [−0.030, +0.069] | 25.50% → 25.55% | 資料不足 |
-| 桌面 | 9,262 / 20,000 | +0.020 ± 0.036 | [−0.050, +0.091] | 25.94% → 25.94% | 資料不足 |
+| Web | 37,228 / 60,000 | +0.019 ± 0.025 | [−0.030, +0.069] | 25.50% → 25.55% | insufficient data |
+| Desktop | 9,262 / 20,000 | +0.020 ± 0.036 | [−0.050, +0.091] | 25.94% → 25.94% | insufficient data |
 
-- **CI 跨過 0 是資料不足，不是輸，也不是沒差。** 沒有量到新表比較差，所以
-  沒有追蹤變動最大的局。
-- **放棄是因為不值得再量。** 兩個設定的估計都在 +0.02 上下；真的是這麼多
-  的話，網頁要 36 萬局左右（約 14 小時）CI 才會離開 0，換來的是一張只有
-  四人十胡讀的表。
-- **葉節點的不一致留著。** 四人十胡的 `Eval` 還是照平均分、h × 1.5 學的
-  那一張，圖裡用的是率、h × 1。批次 2b 的 win 就是在這個不一致上量到的。
-- 新表留在 `target/generals-3/eval-16.bin`，沒有進 `src/`。之後 `Outlook`
-  再改而要重學時，重新標註，不接著這一張。
+- **A CI that straddles 0 is insufficient data: not a loss, and not "no
+  difference" either.**  The new table was not measured to be worse, so the
+  deals that moved the most were not traced.
+- **It is dropped because it is not worth measuring further.**  Both
+  settings' estimates are around +0.02; if that is the true size, the web
+  needs some 360,000 deals (about 14 hours) before the CI leaves 0, and what
+  that buys is a table only four players at ten 胡 read.
+- **The inconsistency at the leaves stays.**  The `Eval` of four players at
+  ten 胡 is still the table learnt under the even draw and h × 1.5, while
+  the graph uses the rates and h × 1.  Batch 2b's win was measured on just
+  this inconsistency.
+- The new table stays in `target/generals-3/eval-16.bin` and did not go into
+  `src/`.  When `Outlook` changes again and a relearn is due, label afresh
+  rather than carry on from this one.
 
-## 批次 4：還沒聽牌的超支
+## Batch 4: overspending before the hand is waiting
 
-批次 2 與 2b 有結論之後，用新的 seed 重跑 `examples/overspend`：
+Once batches 2 and 2b have their verdicts, rerun `examples/overspend` on a
+fresh seed:
 
-- **乙1 吃下去的比例掉到 10% 以下**：高估修掉之後引擎自己不吃了，這條線
-  結束。
-- **否則先回頭看出現率**：聽牌表哪一格還偏，就是哪個率還沒修對。表都準了
-  引擎還在吃，才做探針。探針先當診斷看：它贏在哪一組，就是 `Graph` 哪裡還估錯。照
-  `doc/hu-ceiling.md` 批次 2 的做法：候選的 `ExpectBot`
-  不吃乙1 的對子，除非吃完是完成形。預先宣告的分組：
+- **The share of B1 that is eaten falls below 10%**: with the overestimate
+  fixed the engine stops eating by itself, and this line ends.
+- **Otherwise go back to the appearance rates first**: whichever cell of the
+  waiting table is still off shows which rate is not yet fixed.  Only when
+  the table is accurate and the engine still eats is the probe made.  Read
+  the probe as a diagnosis first: the group it wins in is where `Graph` is
+  still wrong.  As in batch 2 of `doc/hu-ceiling.md`: the candidate
+  `ExpectBot` does not eat a B1 pair unless the hand is 完成形 after eating.
+  The groups declared beforehand:
 
-  | 組 | 條件 | 預期 |
+  | Group | Condition | Expected |
   | --- | --- | --- |
-  | 子 | 吃完不是完成形，不吃也沒聽 | 不吃比較好 |
-  | 丑 | 吃完是完成形，不吃是聽 3 張以上的搭子 | 不吃略好或打平 |
-  | 寅 | 吃完是完成形，其他 | 吃比較好（探針不擋，只當對照） |
+  | I | Not 完成形 after eating, and not waiting if it passes | Passing is better |
+  | II | 完成形 after eating; passing leaves a 搭子 that waits on 3 or more | Passing is slightly better or level |
+  | III | 完成形 after eating, otherwise | Eating is better (the probe does not block it; a control only) |
 
-  探針與追蹤存成 patch，不進 `main`。整體 win 才 commit；只有分組的 CI
-  在 0 之上就收窄再量一次，判決只看那一次。
+  The probe and the trace are saved as a patch and do not go into `main`.
+  Commit only on an overall win; if only a group's CI lies above 0, narrow
+  to it and measure once more, and the verdict looks at that run alone.
 
-另一個候選放在這一批：`HeuristicBot` 的 `waits` 把將帥和其他聽的牌一樣
-算 `WAIT`。把將帥乘上 ρ 是一個獨立的 A/B，用 `ab/run.sh` 預設的座位，便宜
-得多。
+Another candidate belongs in this batch: `HeuristicBot`'s `waits` counts a
+general as `WAIT` like any other card it waits on.  Multiplying generals by
+ρ is an A/B by itself, on the default seat of `ab/run.sh`, and far cheaper.
 
-## 批次 5：書
+## Batch 5: the book
 
-「對子能有幾個」已經拿掉（`../tsap-oo-book` `86caae2`），留下來的搬到
-`src/material.md`「吃對子是在湊張數」與「把搭子吃成對子」、`src/seven.md`
-（單張和對子差 3 的倍數）、`src/generals.md`（安全線）。書不再教人數上限，
-所以延伸、完成形、超支這些用語不進書。照那邊的 `AGENTS.md`，對局量出來的
-只寫方向，不寫數字。剩下要改的在 `material.md`：
+「對子能有幾個」 (How many pairs there can be) has been removed
+(`../tsap-oo-book` `86caae2`), and what remains moved to `src/material.md`,
+「吃對子是在湊張數」 and 「把搭子吃成對子」 (Eating a 搭子 into a pair),
+`src/seven.md` (lone cards and pairs differ by a multiple of 3) and
+`src/generals.md` (the safety line).  The book no longer teaches people to
+count a limit, so the terms extension, 完成形 and overspend stay out of it.
+By the `AGENTS.md` over there, what play measures is written as a direction
+only, without numbers.  What is left to change is in `material.md`:
 
-- 「對子該不該吃」的三條是 `HeuristicBot` 的結果，`ExpectBot` 現在是提示。
-  第二條（吃了就到不了 10 胡的對子不吃，假設之後不再摸到將帥）等批次 2 與
-  4 的結論改寫。
-- **結論與「照七組去排就夠了」不合才多寫。** 例如批次 4 量出靠將帥補的
-  對子多半是虧的，就在那一段補一句別指望之後的將帥；量出來站得住就不動。
+- The three rules of 「對子該不該吃」 (whether to eat a pair) are
+  `HeuristicBot`'s results; `ExpectBot` is the hint now.  The second (do not
+  eat a pair that leaves the hand unable to reach 10 胡, assuming no general
+  is drawn afterwards) is rewritten once batches 2 and 4 have their
+  verdicts.
+- **Write more only if the verdict disagrees with "laying the hand out as
+  seven groups is enough".**  For instance, if batch 4 measures that pairs
+  made good by generals mostly lose, add a sentence to that passage not to
+  count on later generals; if they are measured to hold up, leave it alone.
 
-## 每一批的收尾
+## Closing each batch
 
-照 `CLAUDE.md`：`cargo fmt`、clippy、三組測試、文件、`CHANGELOG.md`，提議
-commit message，使用者說了才 commit。量測的結果不論輸贏都記下數字、局數、
-seed base、對照的 SHA 與結論，並更新本文件的進度表。
+As `CLAUDE.md` says: `cargo fmt`, clippy, the three test suites, the docs,
+`CHANGELOG.md`, a proposed commit message, and a commit only when the user
+says so.  Win or lose, a measurement's numbers, deal count, seed base,
+control SHA and verdict are written down, and the progress table of this
+document is updated.
 
-## 不做的事
+## Not doing
 
-- **不找對子數量的公式。** 這樣的公式可能不存在，有也可能太複雜：能吃幾個
-  對子要看胡數、延伸、還能摸幾張與每種牌還會不會出現。摸到的將帥一定要
-  吃，每來一張就多要一個對子來配，所以對子最後要幾個，事先定不下來；手上
-  的對子卻因此比搭子好，將帥一來就滿一組。對子吃太多是出現率
-  估錯的結果；率修對了，`Graph` 自己會算。
-- **不改 `ceiling` 與 `Prune::generals`。** 天花板只回答到不到得了；多常
-  到是 `Outlook` 的事。
-- **不猜別家手上有幾張將帥。** ρ 是一張表，不看這一局別家吃碰了什麼。
-- **兩人、三人與八胡的桌子不跟著上。** 各自的 ρ 可以順手量，但要各自的
-  A/B 才換，和 `Outlook::new` 現在的規矩一樣。
+- **No search for a formula for the number of pairs.**  Such a formula may
+  not exist, and may be too complicated if it does: how many pairs can be
+  eaten depends on the 胡, the extensions, the draws left and whether each
+  kind of card will still appear.  A drawn general must be eaten, and each
+  one that comes asks for one more pair to go with it, so how many pairs
+  the hand needs in the end cannot be fixed beforehand; yet for that very
+  reason a pair in hand is better than a 搭子, since a general fills its
+  group the moment it comes.  Eating too many pairs is the result of
+  misjudged appearance rates; with the rates right, `Graph` works it out by
+  itself.
+- **No change to `ceiling` or `Prune::generals`.**  The ceiling only answers
+  whether the threshold can be reached; how often it is reached is
+  `Outlook`'s business.
+- **No guessing how many generals the other seats hold.**  ρ is a table and
+  does not look at what the other seats ate or ponged this round.
+- **The tables of two and three players and of 八胡 do not follow along.**
+  Each one's ρ can be measured in passing, but each changes only on an A/B
+  of its own, as is the rule of `Outlook::new` now.
 
-## 風險與未決問題
+## Risks and open questions
 
-- **ρ 可能不是原因。** 胡牌率的落差也可能來自別家在這種局面胡得比 h 多。
-  批次 1 的閘門就是為了這個。
-- **一張表可能不夠。** 將帥是自己摸的還是別家摸的、閘門內外，ρ 可能都
-  不同。先用一張表，校準沒過再分。
-- **獎金可能量不到。** 完成形延伸 0 張的手每局只有 0.03 手左右；效果主要
-  來自它前面幾步的決定，大小不知道。
-- **統計來自一個座位的 `ExpectBot` 對三家 `HeuristicBot`。** 四家都是
-  `ExpectBot` 時，將帥留在手上的情形可能不同。
-- **批次 0 的表是在一批牌上看的。** 批次 2 的校準與 A/B 都要用新的 seed。
+- **ρ may not be the cause.**  The gap in win rates may also come from the
+  other seats winning more often than h says in such positions.  Batch 1's
+  gate is there for this.
+- **One table may not be enough.**  ρ may differ by whether the seat or
+  another drew the general, and within and past the gate.  One table first;
+  split if the calibration fails.
+- **The payoff may be too small to measure.**  A 完成形 hand that extends 0
+  comes up only about 0.03 times a round; the effect comes mostly from the
+  decisions a few steps before it, and its size is unknown.
+- **The statistics come from one seat of `ExpectBot` against three
+  `HeuristicBot`s.**  With `ExpectBot` in all four seats, generals may stay
+  in hand differently.
+- **Batch 0's table was read on one set of cards.**  Batch 2's calibration
+  and A/B must both use fresh seeds.

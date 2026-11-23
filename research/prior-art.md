@@ -1,619 +1,877 @@
-# 先前研究：麻將與 rummy 類 AI
+# Prior art: mahjong and rummy AI
 
-查核日期：2026-11-16。問題：`doc/stronger-bot.md`（`3aa5b0c` 時的版本）列出
-的四條路線，在麻將、gin rummy 與其他摸打類遊戲的文獻裡有沒有先例？哪些能
-搬到一個手寫評分加 Monte Carlo、沒有深度學習管線的十胡 bot？十胡有沒有兩人、
-三人的成文規則？「先做兩人版再擴到四人」有沒有先例與證據？本文只讀文獻與
-公開原始碼，沒有跑任何對局，也沒有改動 bot。
+Research checked 2026-11-16.  The question: do the four routes listed in
+`doc/stronger-bot.md` (as of `3aa5b0c`) have precedents in the literature on
+mahjong, gin rummy and other draw-and-discard games?  Which of them carry
+over to a 十胡 bot with a hand-written grade and Monte Carlo and no
+deep-learning pipeline?  Does 十胡 have written rules for two or three
+players?  Is there precedent or evidence for "two players first, then
+extend to four"?  This document only reads the literature and public source
+code; it played no rounds and changed no bot.
 
-## 結論
+## Answer
 
-- **最值得先做的是量測，不是打法。** 現在的 A/B 已經是文獻裡的 duplicate
-  （同一副牌、有無候選各打一次），剩下的雜訊全在「兩邊打法分歧之後」。
-  backgammon 的 rollout 與撲克的 DIVAT／MIVAT／AIVAT 處理的正是這一段：
-  從分歧點把剩下的牌堆重洗多次取平均，再扣掉每一張摸牌的「運氣」。
-  [GNU Backgammon 手冊][gnubg-ro]、[DIVAT][divat]、[MIVAT][mivat]、
+- **The first thing worth doing is measurement, not play.**  Today's A/B is
+  already the duplicate of the literature (the same deal played once with
+  the candidate and once without), and all the noise left is "after the two
+  sides' play parts".  Backgammon's rollouts and poker's DIVAT / MIVAT /
+  AIVAT deal with exactly this stretch: from where they part, reshuffle the
+  pile left many times and average, then take off the "luck" of every draw.
+  [GNU Backgammon manual][gnubg-ro], [DIVAT][divat], [MIVAT][mivat],
   [AIVAT][aivat]
-- **做對手推論之前，先量「看得到別家手牌的 Monte Carlo」能贏多少。** Scrabble
-  與 gin rummy 的研究都先量這個上限：上限小，推論就不必做。鬥地主的結論是
-  完美的對手模型只比均勻信念好一點。[Richards & Amir 2007][scrabble]、
-  [Kelidari et al. 2026][gold]、[Cowling et al. 2012][ismcts]
-- **「不餵下家」是 rummy 類裡有比賽結果支持的對手資訊用法。** EAAI 2021
-  gin rummy 比賽的冠軍 MARJJ，棄牌評分就是「自己手牌的價值」加上「這張牌對
-  對手有多大用處」的加減分；把其中一組歸零，對原設定的勝率就掉到 47% 到
-  48%。
-  [Ahmed et al. 2021][gr-marjj]、[比賽結果][gr-results]
-- **麻將 AI 的對手模型幾乎都為了算放銃的期望損失，這一塊搬不過來。** 日麻
-  放銃者付全額；十胡放銃不多賠，`doc/stronger-bot.md` 也已量到防守不值錢。
-  能搬的是另外兩樣：單人期望值的動態規劃，以及把對手換成「每一巡有多少機率
-  結束這一局」的環境。[Mizukami & Tsuruoka 2015][mizukami]、
-  [Kurita & Hoki 2019][kurita]、[tomohxx 和了確率][tomohxx-prob]
-- **兩人版查得到「可以玩」，查不到「怎麼改規則」。** 中文維基寫 2 到 6 人、
-  Board Game Arena 提供 2 到 4 人且排位預設兩人，發牌都是每人 20 張、莊家
-  21 張，沒有任何來源寫出人數少時的規則調整。先例顯示演算法能從兩人搬到
-  多人，打法不保證能搬；兩人麻將的評估仍然用了 20 萬局。
-  [中文維基〈十胡〉][zhwiki-shihu]、[BGA 說明][bga-zh]、[Liu et al. 2023][olss]
-- **沒有找到任何以四色牌或十胡為題的 AI 論文或學位論文。** 公開的實作與 bot
-  見 [`public-opponents.md`](public-opponents.md)。
+- **Before any opponent inference, measure how much a "Monte Carlo that sees
+  the other seats' hands" can win.**  The research on Scrabble and on gin
+  rummy both measured this ceiling first: if the ceiling is low, the
+  inference need not be built.  The conclusion for Dou Dizhu is that a
+  perfect opponent model is only a little better than a uniform belief.
+  [Richards & Amir 2007][scrabble], [Kelidari et al. 2026][gold],
+  [Cowling et al. 2012][ismcts]
+- **"Don't feed the next seat" is the use of opponent information in rummy
+  games that has competition results behind it.**  MARJJ, the winner of the
+  EAAI 2021 gin rummy competition, grades a discard as "the value of its own
+  hand" plus bonuses and penalties for "how useful this card is to the
+  opponent"; with one group of them set to zero, the win rate against the
+  original setting drops to 47% to 48%.
+  [Ahmed et al. 2021][gr-marjj], [competition results][gr-results]
+- **Mahjong AIs model opponents almost entirely to compute the expected loss
+  of dealing in, and that part does not carry over.**  In Japanese mahjong
+  whoever deals in pays in full; in 十胡 dealing in costs nothing extra, and
+  `doc/stronger-bot.md` has already measured that defence does not pay.  Two
+  other things do carry over: dynamic programming for the single-player
+  expected value, and replacing the opponents with an environment of "the
+  chance each turn that the round ends".  [Mizukami & Tsuruoka 2015][mizukami],
+  [Kurita & Hoki 2019][kurita], [tomohxx 和了確率][tomohxx-prob]
+- **For the two-player game the sources say "it can be played" and none says
+  "how the rules change".**  Chinese Wikipedia writes 2 to 6 players, Board
+  Game Arena offers 2 to 4 with ranked play defaulting to two, and the deal
+  is always 20 cards each and 21 to the dealer; no source writes down any
+  adjustment of the rules at fewer players.  The precedents show that
+  algorithms carry from two players to many; play is not guaranteed to.
+  Evaluating two-player mahjong still took 200,000 games.
+  [Chinese Wikipedia, 十胡][zhwiki-shihu], [BGA help][bga-zh],
+  [Liu et al. 2023][olss]
+- **No AI paper or thesis on Four Color Cards or 十胡 was found.**  The
+  public implementations and bots are in
+  [`public-opponents.md`](public-opponents.md).
 
-## A. 麻將 AI
+## A. Mahjong AI
 
-| 系統 | 方法 | 用到手牌以外的什麼 | 怎麼量強度 |
+| System | Method | What it uses beyond its own hand | How strength is measured |
 | --- | --- | --- | --- |
-| [Suphx][suphx] | 五個 CNN（打牌、立直、吃、碰、槓），監督學習後自對局強化學習 | 各家棄牌、累計分數、立直；訓練時還看得到別家手牌與牌山 | 離線 100 萬局對三個固定對手；天鳳 5,000 多局 |
-| [Mizukami & Tsuruoka][mizukami] | 單人麻將的打法 + 三個對手模型 + Monte Carlo | 各家棄牌、副露、巡目，擬合自鳳凰卓牌譜 | 同牌山 duplicate 1,000 局；天鳳 2,634 局 |
-| [Kurita & Hoki][kurita] | 把四人麻將抽象成四個單人 MDP，對手換成機率環境 | 對手和牌、放銃的機率，取自牌譜 | 3,557 局，同一局內與 Bakuuchi 的名次差 |
-| [akochan][akochan] | C++ 明確算每個選擇的期望點數 | 每家的聽牌機率、每張牌的放銃機率與打點 | 同 seed 換起家的自對局 |
-| [Mortal][mortal] | 深度強化學習 | 文件多數頁面空白，未能查證 | 1 對 3 duplicate，同 seed 四個座位各打一次 |
-| [kanachan][kanachan] | 雀魂牌譜的模仿學習加分階段微調，不用人工特徵 | 整局的牌譜序列 | 未能查證 |
-| [ACH／JueJong][ach] | actor-critic 版的加權 CFR，自對局，以 Nash equilibrium 為目標 | 對手的棄牌與副露 | 對規則 bot 各 10,000 局；對人類冠軍 1,000 局 |
-| [Botzone 國標麻將][oim] | 比賽：啟發式、監督學習、強化學習 | 視隊伍而定 | 瑞士制加 duplicate，同牌山 24 種座位排列 |
+| [Suphx][suphx] | Five CNNs (discard, riichi, eat, pong, kong), supervised learning then self-play reinforcement learning | Each seat's discards, running scores, riichi; in training also the other seats' hands and the wall | 1,000,000 games offline against three fixed opponents; over 5,000 games on Tenhou |
+| [Mizukami & Tsuruoka][mizukami] | Single-player mahjong play + three opponent models + Monte Carlo | Each seat's discards, exposed melds and the turn, fitted to Houou-table (鳳凰卓) game records | 1,000 duplicate games on the same walls; 2,634 games on Tenhou |
+| [Kurita & Hoki][kurita] | Abstracts four-player mahjong into four single-player MDPs, the opponents replaced by a stochastic environment | The chances of an opponent winning and of dealing in, taken from game records | 3,557 games, the difference in placing from Bakuuchi within the same game |
+| [akochan][akochan] | C++ that computes the expected points of each choice explicitly | Each seat's chance of waiting, each tile's chance of dealing in and the value of the hand | Self-play on the same seed with the first dealer changed |
+| [Mortal][mortal] | Deep reinforcement learning | Most pages of its documentation are blank; could not be verified | 1-vs-3 duplicate, the same seed played once from each of the four seats |
+| [kanachan][kanachan] | Imitation learning on Mahjong Soul game records plus fine-tuning in stages, no hand-made features | The record sequence of the whole game | Could not be verified |
+| [ACH / JueJong][ach] | An actor-critic form of weighted CFR, self-play, aiming at a Nash equilibrium | The opponent's discards and exposed melds | 10,000 games against each rule bot; 1,000 games against a human champion |
+| [Botzone, Chinese Official mahjong][oim] | A competition: heuristics, supervised learning, reinforcement learning | Depends on the team | Swiss system plus duplicate, 24 seatings on the same wall |
 
 ### Suphx
 
-- **Oracle guiding。** 先訓練一個看得到別家手牌與牌山的 oracle，再把這些
-  「完美特徵」用機率遞減的 dropout 逐步關掉，讓它變成正常 agent。作者說直接
-  蒸餾行不通：資訊少的 agent 模仿不了資訊多的。[§3.3][suphx]
-- **Global reward prediction。** 一個 GRU 從各局的資訊預測整場的最終獎勵，
-  以相鄰兩局預測值的差當作該局的獎勵。這是「場」對「局」的功勞分配，十胡
-  一局就結算，用不上。[§3.2][suphx]
-- **pMCPA。** 每局起手後，固定自己的手牌，隨機發別家與牌山，用離線策略
-  打完若干條軌跡，再用這些軌跡微調策略。離線實驗用 10 萬條軌跡，微調後對
-  未微調的版本勝率 66%，只測了數百局；因為太慢，天鳳上的 Suphx 沒有用它。
-  [§3.4、§4.3、註 8][suphx]
-- **前瞻特徵。** 一百多個特徵來自深度優先搜尋：「打掉某張牌，再換 n 張，
-  能不能和出 S 點的牌」。搜尋時不看對手，只考慮自己的摸與打。這等於把
-  路線三（單人期望值）當成評分的輸入。[§2][suphx]
-- **評估。** 離線隨機產生 100 萬局，每個 agent 都在這同一批牌上對三個固定
-  的弱 agent；指標是天鳳的安定段位，再從 100 萬局抽 80 萬局重複 1,000 次看
-  離散程度。作者寫明這是為了壓掉配牌的變異。天鳳實戰 5,000 多局，安定段位
-  8.74。[§4、§5、附錄 C][suphx]
+- **Oracle guiding.**  First train an oracle that sees the other seats'
+  hands and the wall, then switch these "perfect features" off step by step
+  with a dropout of decaying probability until it is a normal agent.  The
+  authors say plain distillation does not work: an agent with less
+  information cannot imitate one with more.  [§3.3][suphx]
+- **Global reward prediction.**  A GRU predicts the final reward of the whole
+  game from the information of each round, and the difference between the
+  predictions of two consecutive rounds serves as that round's reward.  This
+  is credit assignment from the "game" to the "round"; 十胡 settles every
+  round, so it has no use here.  [§3.2][suphx]
+- **pMCPA.**  After each round's deal, fix its own hand, deal the other
+  seats and the wall at random, play out a number of trajectories with the
+  offline policy, then fine-tune the policy on those trajectories.  The
+  offline experiment used 100,000 trajectories; the fine-tuned version won
+  66% against the one without, measured over only a few hundred games;
+  being too slow, the Suphx on Tenhou did not use it.
+  [§3.4, §4.3, note 8][suphx]
+- **Look-ahead features.**  Over a hundred features come from a depth-first
+  search: "discard a certain tile, then replace n more: can the hand win
+  with S points?"  The search ignores the opponents and considers only its
+  own draws and discards.  This amounts to using route 3 (the single-player
+  expected value) as an input to the grade.  [§2][suphx]
+- **Evaluation.**  1,000,000 games are generated at random offline, and
+  every agent plays this same batch of deals against three fixed weak
+  agents; the metric is Tenhou's stable rank, and 800,000 of the 1,000,000
+  games are drawn 1,000 times over to see the spread.  The authors state
+  that this is to suppress the variance of the deal.  Over 5,000 games of
+  live play on Tenhou, stable rank 8.74.  [§4, §5, appendix C][suphx]
 
-能搬的：前瞻特徵的作法。不能搬的：其餘三項都要深度學習管線。
+Carries over: how the look-ahead features are made.  Does not: the other
+three items all need a deep-learning pipeline.
 
-### Mizukami & Tsuruoka 與 Bakuuchi
+### Mizukami & Tsuruoka and Bakuuchi
 
-- **三個對手模型**，都用鳳凰卓牌譜擬合：對手是否聽牌（logistic regression，
-  6,888 個特徵，AUC 0.777，人類高手 0.778）、每一種牌是不是它的和牌張
-  （34 個 logistic regression）、和牌打點（對數打點的線性迴歸）。特徵是
-  棄牌、副露數、巡目這類公開資訊。[§IV–VI][mizukami]
-- **怎麼接進 Monte Carlo。** 每張候選棄牌的分數是
-  `Sim(牌) × Π(1 − 放銃機率) − Σ 期望放銃損失`。模擬裡自己照「單人麻將」的
-  打法；對手不看手牌，只帶兩個旗標（聽牌、棄和），依機率和牌或立直，摸到
-  的牌直接打掉。每張候選牌用同一組亂數控制對手與牌山。[§VII][mizukami]
-- **結果。** 對公開最強的 Mattari Mahjong，平均名次 2.48 ± 0.07 對 2.51，
-  不顯著（p = 0.29）；對自己的前作顯著（p = 0.01）。天鳳 2,634 局 R1718，
-  前作 1,441 局 R1689，名次差不顯著（p = 0.22）。和牌率 0.245 對前作的
-  0.256，放銃率 0.131 對 0.148：放銃少了，和牌也少了。[§VIII][mizukami]
-- **前作是「單人麻將」。** 先做一個不吃不碰、只求最快和牌的單人玩家，再補上
-  棄和與副露。作者的檢討是：只會單人打法不夠強，因為不會棄和、常放銃。
-  [§III、§IX][mizukami]
+- **Three opponent models**, all fitted to Houou-table game records: whether
+  an opponent is waiting (logistic regression, 6,888 features, AUC 0.777,
+  expert humans 0.778), whether each kind of tile is one it wins on (34
+  logistic regressions), and the value of the winning hand (a linear
+  regression on the log of the value).  The features are public
+  information such as discards, the number of exposed melds and the turn.
+  [§IV–VI][mizukami]
+- **How they go into the Monte Carlo.**  Each candidate discard scores
+  `Sim(tile) × Π(1 − chance of dealing in) − Σ expected loss from dealing in`.
+  In the simulation it plays itself by the "single-player mahjong" play; an
+  opponent looks at no hand and carries only two flags (waiting, folded),
+  wins or declares riichi by probability, and discards whatever it draws.
+  Every candidate tile uses the same random numbers to drive the opponents
+  and the wall.  [§VII][mizukami]
+- **Results.**  Against Mattari Mahjong, the strongest public program, mean
+  placing 2.48 ± 0.07 against 2.51, not significant (p = 0.29); against its
+  own predecessor, significant (p = 0.01).  On Tenhou 2,634 games at R1718,
+  the predecessor 1,441 games at R1689, the difference in placing not
+  significant (p = 0.22).  Win rate 0.245 against the predecessor's 0.256,
+  deal-in rate 0.131 against 0.148: it dealt in less and won less.
+  [§VIII][mizukami]
+- **The predecessor was "single-player mahjong".**  First a single player
+  that never eats or pongs and only seeks the fastest win, then folding and
+  exposed melds added on.  The authors' own review: single-player play
+  alone is not strong enough, because it never folds and often deals in.
+  [§III, §IX][mizukami]
 
-這條線的核心是「速度」對「放銃損失」的取捨。日麻榮和由放銃者付全額，所以
-取捨有分量；十胡放銃不多賠，`doc/stronger-bot.md` 的兩次實驗已量到同樣的
-現象（放銃少了、自己胡的也少了）而且是淨輸。對手模型本身的作法（用公開
-特徵做 logistic regression）可以直接照做，但它在這裡的用途要換。
+The core of this line is the trade of "speed" against "the loss from dealing
+in".  A win on a discard in Japanese mahjong is paid in full by whoever
+dealt in, so the trade has weight; in 十胡 dealing in costs nothing extra,
+and the two experiments in `doc/stronger-bot.md` measured the same thing
+(fewer deal-ins, fewer wins of its own) as a net loss.  The opponent model
+itself (logistic regression on public features) can be copied as it is, but
+its use here has to change.
 
 ### Kurita & Hoki
 
-- 定義四個單人 MDP。主要的一個（Inclusive Policy Solitary Mahjong）把另外
-  三家換成一個機率環境：自己每打一張，有機率放銃而結束；每過一巡，有機率
-  別家和牌而結束；別家打出的牌依機率出現，可以吃碰或榮和。另外三個 MDP
-  各只看和牌、聽牌、棄和，算出來的值當成特徵。[§IV–VI][kurita]
-- 向聽數 0 到 1 時直接用主要 MDP 的值；2 到 3 時用另外三個 MDP 的特徵；
-  更遠時用簡單規則。每個決定幾秒。[§VII][kurita]
-- 3,557 局東風戰，一席對 Bakuuchi 與兩席 manue：平均名次 2.23 ± 0.04 對
-  Bakuuchi 的 2.29 ± 0.04。作者用的統計量是同一局裡兩者的名次差，平均
-  0.0574、標準差 1.822，單尾顯著水準 0.03。[§VII][kurita]
-- 作者指出 CFR 類方法要搬到多人麻將並不容易。[§III][kurita]
+- Defines four single-player MDPs.  The main one (Inclusive Policy Solitary
+  Mahjong) replaces the other three seats with a stochastic environment:
+  each tile it discards has a chance of dealing in and ending the round;
+  each turn that passes has a chance of another seat winning and ending it;
+  the tiles the other seats discard appear by probability and can be eaten,
+  ponged or won on.  The other three MDPs each look only at winning,
+  waiting and folding, and the values they compute serve as features.
+  [§IV–VI][kurita]
+- At a shanten number of 0 to 1 it uses the main MDP's value directly; at 2
+  to 3 the features from the other three MDPs; further away, simple rules.
+  Each decision takes a few seconds.  [§VII][kurita]
+- 3,557 east-only games, one seat against Bakuuchi and two seats of manue:
+  mean placing 2.23 ± 0.04 against Bakuuchi's 2.29 ± 0.04.  The authors'
+  statistic is the difference in placing between the two within the same
+  game, mean 0.0574, standard deviation 1.822, one-sided significance level
+  0.03.  [§VII][kurita]
+- The authors point out that carrying CFR-like methods over to multiplayer
+  mahjong is not easy.  [§III][kurita]
 
-能搬的：這正是路線三需要的形狀。單人動態規劃加上「這一巡有人胡掉」的
-機率，而 `research/safe-cards.md` 已經量過這個機率怎麼隨對手的暗牌張數變。
+Carries over: this is exactly the shape route 3 needs.  Single-player
+dynamic programming plus the chance that "someone wins this turn", and
+`research/safe-cards.md` has already measured how that chance moves with an
+opponent's count of concealed cards.
 
-### 單人期望值的計算
+### Computing the single-player expected value
 
-- **tomohxx《麻雀アルゴリズム》。** 狀態是（手牌，巡目）。摸牌的一步：
-  對每一種有用的牌，以「剩餘張數 ÷ 牌山剩餘張數」加權；打牌的一步：對所有
-  可打的牌取最大值。從最後一巡往回算，就是一張（手牌，巡目）的有向無環圖
-  上的動態規劃。把機率換成點數，並在和牌時取「和牌的點數」與「繼續打的
-  期望值」的較大者，就得到期望點數。模型只有一個玩家，沒有對手與副露；
-  圖裡可以包含手變與退向聽的邊。[和了確率][tomohxx-prob]
-- **nekobean/mahjong-cpp**（題目寫成 tomohxx/mahjong-cpp，實際的 repo 在
-  nekobean 名下，演算法引用 tomohxx）提供向聽數、有效牌、聽牌機率、和牌
-  機率與期望點數，並做成網頁版的何切るシミュレーター。[README][mahjong-cpp]
-- **向聽數。** tomohxx/shanten-number 的查表法；Mortal 的向聽數是 tomohxx
-  演算法的 Rust 移植。[shanten-number][shanten]、[Mortal meta][mortal-meta]
-- **Li & Yan，*Let's Play Mahjong!*。** 定義 deficiency（即向聽數），並給出
-  「在 k 次換牌內完成手牌的機率最大」的棄牌策略。後續的快速演算法把「還
-  拿得到哪些牌」算進去。[arXiv 1903.03294][lets-play]、
-  [arXiv 2108.06832][deficiency]
+- **tomohxx, *麻雀アルゴリズム*.**  The state is (hand, turn).  The draw
+  step: each useful kind of tile is weighted by "copies left ÷ tiles left in
+  the wall"; the discard step: the maximum over every tile that can be
+  discarded.  Computed backwards from the last turn, this is dynamic
+  programming on a directed acyclic graph of (hand, turn).  Replace the
+  probability with points, and at a win take the larger of "the points of
+  the win" and "the expected value of playing on", and the result is
+  expected points.  The model has one player, no opponents and no exposed
+  melds; the graph may include edges that change the hand's shape and edges
+  that go back in shanten.  [和了確率][tomohxx-prob]
+- **nekobean/mahjong-cpp** (the question wrote tomohxx/mahjong-cpp; the
+  actual repo is under nekobean, and its algorithms cite tomohxx) provides
+  the shanten number, useful tiles, the chance of waiting, the chance of
+  winning and expected points, and is made into a web 何切るシミュレーター.
+  [README][mahjong-cpp]
+- **Shanten number.**  The table-lookup method of tomohxx/shanten-number;
+  Mortal's shanten number is a Rust port of tomohxx's algorithm.
+  [shanten-number][shanten], [Mortal meta][mortal-meta]
+- **Li & Yan, *Let's Play Mahjong!*.**  Defines the deficiency (that is, the
+  shanten number) and gives the discard strategy that "maximises the chance
+  of completing the hand within k tile changes".  The fast algorithms that
+  followed take "which tiles can still be had" into account.
+  [arXiv 1903.03294][lets-play], [arXiv 2108.06832][deficiency]
 
-### Mortal、akochan、kanachan
+### Mortal, akochan, kanachan
 
-- **Mortal 的評估。** 1 對 3 duplicate：一組四局用同一個 seed，挑戰者依序坐
-  東南西北，另外三席是對照。模擬器保證同一個（seed，局，本場）下牌山、配牌、
-  寶牌都相同。例：akochan 挑戰 Mortal「3.1」，挑戰者 13,152 局，平均名次
-  2.568 對 2.477。[strength.md][mortal-strength]
-- **akochan 的明確期望值。** 只讀了標頭檔，沒讀實作。`tenpai_est.hpp` 對每個
-  對手估聽牌機率，以及每一種牌、每一種番符被榮和或自摸的機率，並列舉可能的
-  聽牌手牌；`exp_values.hpp` 的 `cal_exp` 把自己的和牌機率（註解寫明來自
-  單人麻將的解）、各家聽牌機率、每張牌的放銃機率與代價、流局聽牌機率合成
-  一個期望點數；`betaori.hpp` 算棄和的期望值。自對局以 seed 與起家的組合
-  重複，README 說這適合「改了策略之後對舊版比較」。
-  [tenpai_est.hpp][akochan-tenpai]、[exp_values.hpp][akochan-exp]、
-  [betaori.hpp][akochan-betaori]、[readme][akochan]
-- **kanachan。** 刻意不用人工特徵，靠雀魂的大量牌譜與大模型。作者自己說這
-  需要大資料與大算力。對本專案沒有可搬的東西。[README][kanachan]
+- **Mortal's evaluation.**  1-vs-3 duplicate: a set of four games shares one
+  seed, the challenger sits East, South, West and North in turn, and the
+  other three seats are the control.  The simulator guarantees the same
+  wall, deal and dora under the same (seed, round, honba).  Example:
+  akochan challenging Mortal "3.1", 13,152 games for the challenger, mean
+  placing 2.568 against 2.477.  [strength.md][mortal-strength]
+- **akochan's explicit expected value.**  Only the headers were read, not
+  the implementation.  `tenpai_est.hpp` estimates for each opponent the
+  chance of waiting and, for each kind of tile and each han and fu, the
+  chance of it being won on a discard or on its own draw, and enumerates
+  the possible waiting hands; `cal_exp` in `exp_values.hpp` combines its own
+  chance of winning (the comment states that it comes from the solution of
+  single-player mahjong), each seat's chance of waiting, each tile's chance
+  and cost of dealing in, and the chance of waiting at an exhausted round
+  into one figure of expected points; `betaori.hpp` computes the expected
+  value of folding.  Self-play repeats over combinations of seed and first
+  dealer, which the README says suits comparing against the old version
+  after a change of strategy.
+  [tenpai_est.hpp][akochan-tenpai], [exp_values.hpp][akochan-exp],
+  [betaori.hpp][akochan-betaori], [readme][akochan]
+- **kanachan.**  Deliberately uses no hand-made features and relies on a
+  large body of Mahjong Soul game records and a large model.  The author
+  says outright that this needs big data and big compute.  Nothing carries
+  over to this project.  [README][kanachan]
 
-能搬的：Mortal 與 akochan 的評估方式，`ab/` 已經在做。akochan 的標頭檔把
-期望值分成「自己照單人解和牌」「別家結束這一局」「放銃」「流局」幾塊，
-各有機率與價值，形狀與 Kurita 和 Hoki 的 MDP 相同。
+Carries over: how Mortal and akochan evaluate, which `ab/` already does.
+akochan's headers split the expected value into "winning by the
+single-player solution", "another seat ending the round", "dealing in" and
+"an exhausted round", each with a chance and a value, the same shape as
+Kurita and Hoki's MDP.
 
-### Tencent：ACH／JueJong、OLSS、LuckyJ
+### Tencent: ACH / JueJong, OLSS, LuckyJ
 
-- **為什麼選兩人。** ACH 的論文寫得很直接：CFR 只在兩人零和遊戲保證收斂到
-  Nash equilibrium，而 policy gradient 的自對局沒有這個保證；Li et al.
-  （Suphx）已經用監督學習與傳統強化學習做了四人麻將，「相對地，我們從賽局
-  理論的角度研究 1-on-1 麻將，也就是以 Nash equilibrium 為目標」。benchmark
-  的說明也寫「為了從賽局理論的角度促進麻將研究」。另一個理由是這個兩人
-  遊戲本身在騰訊的線上遊戲裡有大量玩家。[§1、§7.1、附錄 A][ach]
-- **兩人麻將的規格。** 規則近似國標麻將，只用 72 張牌（萬、風、三元、花、
-  季），每人 13 張。資訊集大小約 10^11，撲克約 10^3。
-  [ACH 附錄 A][ach]、[OLSS 附錄 D][olss]
-- **評估。** 對規則 bot 每 500 訓練步打 10,000 局；另外訓練 best response 量
-  exploitability 的下界。對人類：157 位玩家 7,700 多局平均每局贏 4.56 分；
-  對冠軍程海華 1,000 局，0.82 ± 0.96 分，單尾 p = 0.19。作者的措辭是冠軍
-  「沒能有效地 exploit JueJong」，不是 JueJong 顯著贏。[§7][ach]
-- **OLSS** 是作者有重疊的一組人在同一個兩人麻將上做的即時搜尋。評估段落
-  寫明：兩人麻將變異很大，所以打了 200,000 局，隨機產生 100,000 副牌，
-  同一副牌雙方交換座位各打一次。即使如此，95% 信賴區間仍是 ±0.13 番，
-  而套用搜尋後每局的領先是 0.14 到 0.22 番。搜尋裡的對手模型有兩種：
-  「依剩餘牌的分布隨機打一張」與學來的 ACH 模型；兩者的結果在誤差內相同
-  （對 ACH 是 0.14 對 0.18，對 PPO 是 0.22 對 0.20）。
-  [附錄 D、§7.2、表 3][olss]
-- **有沒有搬到四人。** LuckyJ 沒有找到論文。依媒體轉述的騰訊公告，LuckyJ
-  用的是 ACH 這個策略最佳化演算法（強化學習加 regret minimization 的
-  自對局），以及一個基於「樂觀價值估計」的不完美資訊搜尋；2023 年 7 月在
-  天鳳特上房達到十段，安定段位 10.68，用了 1,321 局。這些都是二手來源，
-  四人版的訓練細節未能查證。[IT之家][luckyj-ithome]、[量子位][luckyj-qbit]、
+- **Why two players.**  The ACH paper is direct about it: CFR is guaranteed
+  to converge to a Nash equilibrium only in two-player zero-sum games, and
+  policy-gradient self-play has no such guarantee; Li et al. (Suphx) had
+  already done four-player mahjong with supervised learning and traditional
+  reinforcement learning, and the authors say that they, by contrast, study
+  1-on-1 mahjong from the game-theoretic side, that is, with a Nash
+  equilibrium as the goal.  The benchmark's description likewise says it is
+  there to advance mahjong research from the game-theoretic side.  The
+  other reason is that this two-player game itself has a large number of
+  players in Tencent's online games.  [§1, §7.1, appendix A][ach]
+- **The two-player mahjong's spec.**  Rules close to Chinese Official
+  mahjong, with only 72 tiles (characters, winds, dragons, flowers,
+  seasons) and 13 each.  The size of an information set is about 10^11,
+  against about 10^3 in poker.
+  [ACH appendix A][ach], [OLSS appendix D][olss]
+- **Evaluation.**  10,000 games against rule bots every 500 training steps;
+  a best response trained separately measures a lower bound on
+  exploitability.  Against humans: over 7,700 games with 157 players it won
+  4.56 points a game on average; against the champion Haihua Cheng (程海華)
+  over 1,000 games, 0.82 ± 0.96 points, one-sided p = 0.19.  The authors'
+  wording is that the champion failed to exploit JueJong effectively, not
+  that JueJong won significantly.  [§7][ach]
+- **OLSS** is real-time search on the same two-player mahjong by a group
+  with overlapping authors.  The evaluation section states: two-player
+  mahjong has high variance, so 200,000 games were played, 100,000 deals
+  generated at random and each played twice with the two sides swapping
+  seats.  Even so the 95% confidence interval is still ±0.13 fan, and the
+  lead a game with search applied is 0.14 to 0.22 fan.  The search has two
+  kinds of opponent model: "discard one tile at random by the distribution
+  of the tiles left" and the learnt ACH model; the two give the same result
+  within error (against ACH, 0.14 against 0.18; against PPO, 0.22 against
+  0.20).  [appendix D, §7.2, table 3][olss]
+- **Was it carried to four players?**  No paper on LuckyJ was found.  By
+  media reports of Tencent's announcement, LuckyJ uses ACH, the
+  policy-optimisation algorithm (self-play with reinforcement learning plus
+  regret minimisation), and an imperfect-information search based on
+  "optimistic value estimation"; in July 2023 it reached 10 dan in Tenhou's
+  特上 room, stable rank 10.68, over 1,321 games.  These are all
+  second-hand sources, and the training details of the four-player version
+  could not be verified.  [IT之家][luckyj-ithome], [量子位][luckyj-qbit],
   [TechNode][luckyj-technode]
-- **作者有重疊的另一篇麻將論文**是 RVR（IEEE CoG 2022）。摘要說麻將的隱藏
-  資訊多、計分複雜，獎勵訊號的隨機性與變異很大；作法是用看得到全域資訊的
-  relative value network 加上 expected reward network 來降低獎勵的變異。
-  全文未取得，摘要沒有寫是哪一種麻將，只說在 Botzone 上勝過 62.5% 的對手。
+- **Another mahjong paper with overlapping authors** is RVR (IEEE CoG
+  2022).  The abstract says that mahjong has much hidden information and
+  complex scoring, and that the reward signal is highly random and has high
+  variance; the method reduces the variance of the reward with a relative
+  value network that sees global information plus an expected reward
+  network.  The full text was not obtained; the abstract does not say which
+  mahjong it is, only that it beat 62.5% of the opponents on Botzone.
   [DOI 10.1109/CoG51982.2022.9893584][rvr]
 
-也就是說，依公告搬過去的是演算法，而多人麻將的那篇論文另外用了一套處理
-獎勵變異的東西。讀到的論文沒有任何地方說兩人麻將學到的「打法」被拿去用在
-四人。
+That is, by the announcement what was carried over is the algorithm, and
+the multiplayer mahjong paper uses a separate device for the variance of
+the reward.  Nowhere in the papers read is the "play" learnt in two-player
+mahjong said to be put to use at four players.
 
-能搬的：對手寫的 bot 來說只有兩個觀察。評估要用同一副牌換座位，而且兩人
-麻將打了 20 萬局也只勉強分得出 0.14 番；搜尋裡把對手當成隨機出牌，與用
-學來的對手模型分不出高下。也就是說，在這個隨機性很高的遊戲裡，把對手
-模型做得更準並沒有讓搜尋變強。
+Carries over: for a hand-written bot, only two observations.  Evaluation
+has to swap seats on the same deal, and even 200,000 games of two-player
+mahjong could only just resolve 0.14 fan; treating the opponent in the
+search as a random discarder cannot be told apart from using a learnt
+opponent model.  That is, in this highly random game a more accurate
+opponent model did not make the search stronger.
 
-### 國標麻將與 Botzone 的比賽
+### Chinese Official mahjong and the Botzone competitions
 
-- 2020 與 2022 兩屆 IJCAI 麻將 AI 比賽。前十六名的作法分三類：依人類知識的
-  啟發式、監督學習、強化學習；作者的結論是後兩者明顯強於啟發式。第一屆
-  多數隊伍用啟發式：用搜尋算向聽數，再依手牌決定要做哪一種牌型，接成一棵
-  行為樹。[§5][oim]
-- **Duplicate 的作法。** 四人麻將裡吃碰會改變摸牌順序，所以把牌山分成四份，
-  每一席只從自己那一份摸，配牌也在裡面；同一副牌山打 24 局，四個 agent
-  坐遍所有排列，分數加總算一場。作者說這不只壓掉牌山的運氣，也減少一家
-  對另一家的影響。外層再用瑞士制，因為四人遊戲排不了循環賽；要數百輪才能
-  得到穩定的排名。花牌因為只影響分數不影響打法，直接拿掉。[§4.2][oim]
-- 人機賽把 duplicate 改成「人類各自坐在不同桌的同一個位子、面對同樣的牌山
-  與同樣的三個基準 AI」，因為人會記牌山。[§4.4][oim]
-- 第三屆的示範論文重述同一套賽制。[IJCAI-24][ijcai24]
+- The two IJCAI Mahjong AI Competitions, of 2020 and 2022.  The top sixteen
+  fall into three kinds: heuristics from human knowledge, supervised
+  learning, reinforcement learning; the authors conclude that the latter
+  two are clearly stronger than heuristics.  In the first competition most
+  teams used heuristics: a search computes the shanten number, the hand
+  then decides which pattern to go for, and it is all wired into a
+  behaviour tree.  [§5][oim]
+- **How the duplicate is done.**  In four-player mahjong eats and pongs
+  change the order of the draws, so the wall is cut into four parts and
+  each seat draws only from its own, the deal included; one wall is played
+  24 times, the four agents taking every seating, and the scores are
+  summed as one match.  The authors say this suppresses not only the luck
+  of the wall but also one seat's influence on another.  Around that is a
+  Swiss system, because a four-player game cannot be scheduled as a round
+  robin; a stable ranking takes hundreds of rounds.  Flower tiles, which
+  affect only the score and not play, are simply removed.  [§4.2][oim]
+- The match of humans against the AI changes the duplicate into "the humans
+  each sit in the same seat at different tables, facing the same wall and
+  the same three baseline AIs", because people remember the wall.
+  [§4.4][oim]
+- The demonstration paper of the third competition restates the same
+  format.  [IJCAI-24][ijcai24]
 
-能搬的：按座位切開牌山的 duplicate（見 D 節）。要記住的：在這個比賽裡，
-手寫的啟發式輸給了學習的方法。
+Carries over: the duplicate with the wall cut by seat (see section D).  To
+remember: in this competition the hand-written heuristics lost to the
+learnt methods.
 
-### 其他
+### Others
 
-- **Meowjong** 做三人麻將。作者把它當成一個獨立的遊戲（牌少、打法更兇），
-  不是四人的前一步。[arXiv 2202.12847][meowjong]
-- **CFR-p** 把 CFR 加上階層式的策略抽象，用在兩人麻將。只讀了摘要。
+- **Meowjong** does three-player mahjong.  The authors treat it as a game of
+  its own (fewer tiles, fiercer play), not a step before four players.
+  [arXiv 2202.12847][meowjong]
+- **CFR-p** adds a hierarchical policy abstraction to CFR and applies it to
+  two-player mahjong.  Only the abstract was read.
   [arXiv 2307.12087][cfrp]
 
-## B. Gin rummy 與 rummy 類 AI
+## B. Gin rummy and rummy AI
 
-### EAAI 2021 Gin Rummy 大學生研究挑戰
+### The EAAI 2021 Gin Rummy Undergraduate Research Challenge
 
-14 隊交了 14 個 AI 與 14 篇論文，13 篇被接受。賽制：14 個 AI 分成兩組各
-7 個，每組前四進八強，八強共打 10,000 局，以 Elo 排名。第一名 MARJJ，
-第二名並列 GettysburgPlayer 與 GinRummyAndTonic。[結果][gr-results]、
-[挑戰首頁][gr-home]
+14 teams submitted 14 AIs and 14 papers, of which 13 were accepted.  The
+format: the 14 AIs are split into two groups of 7, the top four of each
+group go on to the last eight, and the last eight play 10,000 games in all
+and are ranked by Elo.  First MARJJ, joint second GettysburgPlayer and
+GinRummyAndTonic.  [results][gr-results], [challenge home page][gr-home]
 
-| 論文 | 貢獻 | 數字 |
+| Paper | Contribution | Numbers |
 | --- | --- | --- |
-| [A Heuristic Evaluation Function for Hand Strength Estimation][gr-marjj]（MARJJ，第一名） | 棄牌分數 = 現在的 deadwood + 隨回合衰減的未來 deadwood（只看最好的 k 張摸牌）+ 這張牌對對手的用處；knock 用 MCCFR | 把「對手確定能成順」或「確定能成刻」的加減分歸零，對原設定 50,000 局的勝率是 0.469 到 0.480 |
-| [Knocking in the Game of Gin Rummy][gr-knock]（第二名並列） | 以一群打法不同的 AI 做線性迴歸，學何時 knock | 每組對戰 10,000 局，Wilson 區間 |
-| [Extracting Learned Discard and Knocking Strategies][gr-extract]（第二名並列） | 學棄牌的期望效用；knock 用 MCCFR，並比較不同規則下的均衡 | |
-| [Estimating Card Fitness for Discard][gr-fitness] | 以四個特性給棄牌排名，再用簡化的 CFR 選 | |
-| [A Deterministic Neural Network Approach][gr-dnn] | 啟發式與神經網路模型比較摸、棄、knock | |
-| [A Data-Driven Approach for Gin Rummy Hand Evaluation][gr-data] | CNN、Monte Carlo 與 Bayes 推論算攻守兩個分數 | 對 Simple 55.4% ± 0.8% |
-| [Opponent Hand Estimation in the Game of Gin Rummy][gr-ohe] | Bayes 與兩種神經網路估對手手牌，比較各階段的準確度 | 用在棄牌上，勝率多 5% |
-| [Heisenbot][gr-heisen] | 摸、棄、knock 三套規則，用模擬賽挑組合 | |
-| [A Highly-Parameterized Ensemble][gr-ensemble] | 棄牌用多個評分的加權 ensemble，分批調參數 | 對基準 0.701 → 0.739 |
-| [Random Forests for Opponent Hand Estimation][gr-rf] | 自對局資料訓練 random forest，估每張牌在對手手上的機率 | 對不估牌的基準 61% |
-| [Opponent Modeling and Myopic Meld Distance][gr-mmd] | 手牌離成組的距離 + 對手想要的牌 + 保守的 knock，逐項拿掉比較 | 對 Simple 74.6%（500 局） |
-| [Opponent Hand Estimation Using Deep Neural Networks][gr-dnn-ohe] | 用啟發式 agent 產生資料訓練 DNN 估對手手牌，再回頭改進 agent | 855／1,500 = 57% |
-| [Modeling Expert Knowledge in a Heuristic-Based Gin Rummy Agent][gr-tonic]（Tonic） | 把專家口訣寫成帶參數的模型，grid search | 對基準至少 68% |
+| [A Heuristic Evaluation Function for Hand Strength Estimation][gr-marjj] (MARJJ, first) | Discard score = present deadwood + future deadwood decaying by turn (only the best k draws) + the card's use to the opponent; knocks by MCCFR | With the bonus or penalty for "the opponent can certainly make a run" or "can certainly make a set" set to zero, the win rate against the original setting over 50,000 games is 0.469 to 0.480 |
+| [Knocking in the Game of Gin Rummy][gr-knock] (joint second) | Linear regression over a population of AIs that play differently, learning when to knock | 10,000 games for each pairing, Wilson intervals |
+| [Extracting Learned Discard and Knocking Strategies][gr-extract] (joint second) | Learns the expected utility of a discard; knocks by MCCFR, and compares the equilibria under different rules | |
+| [Estimating Card Fitness for Discard][gr-fitness] | Ranks the discards by four properties, then chooses with a simplified CFR | |
+| [A Deterministic Neural Network Approach][gr-dnn] | Compares heuristic and neural-network models for drawing, discarding and knocking | |
+| [A Data-Driven Approach for Gin Rummy Hand Evaluation][gr-data] | CNN, Monte Carlo and Bayesian inference compute two scores, attack and defence | 55.4% ± 0.8% against Simple |
+| [Opponent Hand Estimation in the Game of Gin Rummy][gr-ohe] | Bayes and two kinds of neural network estimate the opponent's hand, comparing the accuracy at each stage | Used for the discard, 5% more wins |
+| [Heisenbot][gr-heisen] | Three sets of rules for drawing, discarding and knocking, the combination chosen by simulated tournaments | |
+| [A Highly-Parameterized Ensemble][gr-ensemble] | Discards by a weighted ensemble of several grades, the parameters tuned in batches | 0.701 → 0.739 against the baseline |
+| [Random Forests for Opponent Hand Estimation][gr-rf] | A random forest trained on self-play data estimates each card's chance of being in the opponent's hand | 61% against the baseline that does not estimate |
+| [Opponent Modeling and Myopic Meld Distance][gr-mmd] | The hand's distance from melds + the cards the opponent wants + a conservative knock, compared by removing one at a time | 74.6% against Simple (500 games) |
+| [Opponent Hand Estimation Using Deep Neural Networks][gr-dnn-ohe] | Trains a DNN on data from a heuristic agent to estimate the opponent's hand, then turns back to improve the agent | 855/1,500 = 57% |
+| [Modeling Expert Knowledge in a Heuristic-Based Gin Rummy Agent][gr-tonic] (Tonic) | Writes expert maxims as a model with parameters, grid search | At least 68% against the baseline |
 
-可以讀出的三件事：
+Three things can be read off:
 
-- **前三名都把 knock 當成獨立的小決策來解。** 兩篇用 MCCFR，一篇用線性
-  迴歸。棄牌則是手寫或學來的評分；MARJJ 的作者說棄牌的資訊集多到沒辦法
-  直接用 CFR。[MARJJ][gr-marjj]、[Maravich et al.][gr-knock]、
-  [Goldstein et al.][gr-extract]
-- **對手資訊有用，而且用法很樸素。** MARJJ 的五組加減分只看「已知在對手
-  手上的牌」與「已經死掉的牌」：對手已有能跟這張牌成順或成刻的牌就加罰，
-  這張牌已經不可能被對手用上就減罰。三篇估對手手牌的論文，對不估牌的版本
-  勝率是 55% 到 61%。[MARJJ][gr-marjj]、[Francis et al.][gr-ohe]、
-  [Hein et al.][gr-rf]、[Mishra & Aggarwal][gr-dnn-ohe]
-- **參數不敏感。** MARJJ 的作者把每個參數掃過一遍，結論是在很寬的範圍裡
-  勝率都在 50% 上下，最好的值也只到 51%。knock 那一篇則發現在一種對手上
-  擬合的迴歸換一種對手就變差。這兩點與 `research/fitted-weights.md` 的
-  結論相同。[MARJJ][gr-marjj]、[Maravich et al.][gr-knock]
+- **The top three all solve the knock as a small decision of its own.**  Two
+  papers use MCCFR and one linear regression.  The discard is a
+  hand-written or learnt grade; MARJJ's authors say the discard has too
+  many information sets for CFR to be used directly.  [MARJJ][gr-marjj],
+  [Maravich et al.][gr-knock], [Goldstein et al.][gr-extract]
+- **Opponent information is useful, and its use is plain.**  MARJJ's five
+  groups of bonuses and penalties look only at "cards known to be in the
+  opponent's hand" and "cards already dead": the penalty rises when the
+  opponent already has cards that make a run or a set with this one, and
+  falls when this card can no longer be of use to the opponent.  The three
+  papers that estimate the opponent's hand win 55% to 61% against the
+  versions that do not.  [MARJJ][gr-marjj], [Francis et al.][gr-ohe],
+  [Hein et al.][gr-rf], [Mishra & Aggarwal][gr-dnn-ohe]
+- **The parameters are not sensitive.**  MARJJ's authors swept every
+  parameter and conclude that the win rate stays around 50% over a wide
+  range, the best value reaching only 51%.  The knock paper found that a
+  regression fitted on one kind of opponent gets worse against another.
+  Both points agree with the conclusion of `research/fitted-weights.md`.
+  [MARJJ][gr-marjj], [Maravich et al.][gr-knock]
 
-### 較早的研究與環境
+### Earlier research and environments
 
-- **Kotnik & Kalita 2003。** 同一個神經網路價值函數，用 TD 自對局與用共同
-  演化各訓練一次。演化的版本比較強，最好的一個在錦標賽贏 87.5%。
+- **Kotnik & Kalita 2003.**  The same neural-network value function trained
+  once by TD self-play and once by co-evolution.  The evolved version is
+  the stronger; the best one won 87.5% in a tournament.
   [ICML 2003][kotnik]
-- **OpenSpiel** 的 gin rummy 只打一手，註解寫資訊狀態超過 10^85，開局時
-  對手的手牌有 41 取 10 種。**RLCard** 的 gin rummy 用 5 個 52 維的平面表示
-  狀態。兩者都是環境，不附強的 bot。[gin_rummy.h][openspiel]、[games.md][rlcard]
-- **Kelidari et al. 2026（arXiv 2607.06854）。** 先做一個固定的規則 bot 當
-  量尺：精確算最小 deadwood、能 knock 就 knock、完全不猜對手。它贏過作者
-  訓練的每一個強化學習 agent 70% 到 99%。兩個與本專案直接相關的數字：
-  均勻發牌的 determinized 搜尋對它最多 26%；同一個搜尋若偷看對手的手牌，
-  每步 10 次 rollout 是 41%，120 次是 85%。另外，把對手的手牌直接餵給
-  學習的 agent 並沒有幫助（24.7% 對 25.5%）。摘要的數字以 v2 為準：整套
-  訓練技巧把自對局冠軍從約 30% 拉到約 34%。[v2][gold]
+- **OpenSpiel**'s gin rummy plays one hand only; a comment says the
+  information states exceed 10^85 and the opponent's hand at the start is
+  one of 41 choose 10.  **RLCard**'s gin rummy represents the state as 5
+  planes of 52 dimensions.  Both are environments and come with no strong
+  bot.  [gin_rummy.h][openspiel], [games.md][rlcard]
+- **Kelidari et al. 2026 (arXiv 2607.06854).**  First builds a fixed rule
+  bot as a yardstick: it computes the minimum deadwood exactly, knocks
+  whenever it can and never guesses the opponent.  It beats every
+  reinforcement-learning agent the authors trained 70% to 99% of the time.
+  Two numbers bear directly on this project: a determinized search with
+  uniform deals wins at most 26% against it; the same search, if it peeks
+  at the opponent's hand, wins 41% at 10 rollouts a move and 85% at 120.
+  Also, feeding the opponent's hand straight to the learning agent did not
+  help (24.7% against 25.5%).  The abstract's numbers are taken from v2:
+  the whole set of training techniques lifts the self-play champion from
+  about 30% to about 34%.  [v2][gold]
 
-### 其他摸打類遊戲
+### Other draw-and-discard games
 
-- **Indian Rummy。** 一篇規則 bot：以 MinDist（手牌到最近的合法牌型的編輯
-  距離）當評分，加上對手手牌的模型，兩人零和的模擬。一篇強化學習：PPO，
-  先用較強的示範資料做一次模仿學習，對最強的搜尋型對手 53.9%。兩篇都只讀了
-  摘要。[arXiv 2601.00024][mindist]、[arXiv 2606.21975][irumai]
-- **Dhumbal**（尼泊爾的多人牌戲）。1,024 局裡規則 bot 勝率 88.3%，ISMCTS
-  9.0%，PPO 1.5%。只讀了摘要。[arXiv 2510.11736][dhumbal]
-- **跑胡子／字牌、Conquian、Khanhoo。** 沒有找到 AI 論文。GitHub 搜尋到的
-  跑胡子專案，從說明看是胡牌判定與遊戲伺服器，沒有逐一打開。
+- **Indian Rummy.**  One paper on a rule bot: MinDist (the edit distance
+  from the hand to the nearest legal layout) as the grade, plus a model of
+  the opponent's hand, in a two-player zero-sum simulation.  One on
+  reinforcement learning: PPO, after one pass of imitation learning on
+  stronger demonstration data, 53.9% against the strongest search-based
+  opponent.  Only the abstracts of the two were read.
+  [arXiv 2601.00024][mindist], [arXiv 2606.21975][irumai]
+- **Dhumbal** (a Nepalese multiplayer card game).  Over 1,024 games the rule
+  bot wins 88.3%, ISMCTS 9.0% and PPO 1.5%.  Only the abstract was read.
+  [arXiv 2510.11736][dhumbal]
+- **跑胡子 / 字牌, Conquian, Khanhoo.**  No AI paper was found.  The 跑胡子
+  projects a GitHub search turned up are, by their descriptions, win
+  checkers and game servers; they were not opened one by one.
 
-### 作者自己的 gin-rummy-engine
+### The author's own gin-rummy-engine
 
-讀的是 `d77f2d7` 的 README、`docs/strong-opponents.md`、
-`docs/marjj-parity-plan.md` 與 `docs/marjj-parity-design.md`。它與 tsap-oo 的
-架構相同（`Strategy`、`View`、貪心的 `HeuristicBot`、determinized 的
-`MonteCarloBot`），所以是最接近的對照。
+What was read is the README at `d77f2d7`, `docs/strong-opponents.md`,
+`docs/marjj-parity-plan.md` and `docs/marjj-parity-design.md`.  It has the
+same architecture as tsap-oo (`Strategy`, `View`, a greedy `HeuristicBot`, a
+determinized `MonteCarloBot`), so it is the closest comparison.
 
-- **兩人 gin rummy 裡，均勻發牌加貪心 playout 的 Monte Carlo 明顯贏過貪心
-  bot。** `mc:64` 對 `greedy` 贏 63.6%（62.8% 到 64.4%）的整場；對基準
-  `EaaiSimpleBot`，樣本從 64 加到 512 一路變強（65.4% → 74.7%）；對 MARJJ
-  到 512 之後才持平（1024 樣本是 55.1%）。同樣的作法在四人十胡是
-  +0.148 ± 0.276 分，看不出差別。
-  [README][gre-readme]、[計畫][gre-plan]
-- **追上最強對手靠的是樣本數，不是對手模型。** 對 MARJJ 的差距是把每個
-  決定算快 3.9 倍（打法逐位元相同）之後，用 512 樣本補上的。照「搞懂對手」
-  提出的三個診斷都被最便宜的 A/B 否定：照對手的 knock 習慣 playout、發出
-  發展過的對手手牌、改價值函數。[計畫 §6、§8][gre-plan]
-- **信念越準不等於越強。** 把發給對手的手牌修到與實測的 deadwood 相符，
-  對兩個弱對手各多 3.2 與 2.0 分，對 MARJJ 少 1.2 分：bot 不再被 undercut，
-  卻也不敢 knock，輸在更長的 gin 競賽。作者的結論是「只有量測說了算」。
-  [設計 D3、M2.5][gre-design]
-- **放寬偏離貪心選擇的門檻通常變弱。** 依雜訊偏離比照著貪心打還差。
-  tsap-oo 的 `CONFIDENCE = 1` 是同一個旋鈕。[計畫 §6][gre-plan]
-- **量測。** 換座位的配對（mirrored pairs）、以配對為單位的信賴區間、
-  不中途停、不換 seed；每次改動都對三個對手量（目標加兩個「不能退步」的
-  守門對手），避免只學會贏一個對手。tsap-oo 目前只有 `HeuristicBot` 一個
-  對手。[README][gre-readme]、[計畫 §5][gre-plan]
-- **程序上的教訓。** 三個機制都是先從對局統計「看起來很有道理」，再被 A/B
-  否定。計畫因此規定：先說出機制，找出能開關它的最小固定版本，先量那個
-  版本，再蓋別的。[計畫 §8][gre-plan]
+- **In two-player gin rummy, a Monte Carlo of uniform deals and greedy
+  playouts clearly beats the greedy bot.**  `mc:64` wins 63.6% (62.8% to
+  64.4%) of whole matches against `greedy`; against the baseline
+  `EaaiSimpleBot` it gets stronger all the way as the samples go from 64 to
+  512 (65.4% → 74.7%); against MARJJ it levels off only after 512 (55.1% at
+  1024 samples).  The same approach in four-player 十胡 is +0.148 ± 0.276
+  points, no visible difference.
+  [README][gre-readme], [plan][gre-plan]
+- **Catching up with the strongest opponent took samples, not an opponent
+  model.**  The gap to MARJJ was closed with 512 samples after each
+  decision was made 3.9 times faster (play the same bit for bit).  The
+  three diagnoses put forward under "understand the opponent" were each
+  refuted by the cheapest A/B: playouts by the opponent's knocking habits,
+  dealing opponent hands that have developed, changing the value function.
+  [plan §6, §8][gre-plan]
+- **A more accurate belief is not a stronger bot.**  Correcting the hands
+  dealt to the opponent to match the measured deadwood gained 3.2 and 2.0
+  points against the two weak opponents and lost 1.2 points against MARJJ:
+  the bot was no longer undercut but no longer dared to knock either, and
+  lost in the longer race to gin.  The author's conclusion is that only
+  measurement has the say.  [design D3, M2.5][gre-design]
+- **Loosening the threshold for leaving the greedy choice usually makes it
+  weaker.**  Leaving it on noise is worse than playing the greedy choice.
+  tsap-oo's `CONFIDENCE = 1` is the same knob.  [plan §6][gre-plan]
+- **Measurement.**  Mirrored pairs with the seats swapped, confidence
+  intervals with the pair as the unit, no stopping midway, no change of
+  seed; every change is measured against three opponents (the target plus
+  two gatekeepers it "must not regress" against), so as not to learn to
+  beat one opponent only.  tsap-oo has only the one opponent,
+  `HeuristicBot`, at present.  [README][gre-readme], [plan §5][gre-plan]
+- **The lesson in procedure.**  All three mechanisms first "looked very
+  plausible" in the game statistics and were then refuted by the A/B.  The
+  plan therefore lays down: name the mechanism, find the smallest fixed
+  version that can switch it on and off, measure that version first, and
+  only then build anything else.  [plan §8][gre-plan]
 
-能搬的：樣本數與 playout 速度比對手模型優先；每個「對手」方向的想法先做
-最小的固定版本去量。要注意的：gin rummy 的 Monte Carlo 有 knock 這個高槓桿
-的決定可以找，十胡的胡是強制的，沒有對應的決定。
+Carries over: sample count and playout speed come before the opponent
+model; every idea in the "opponent" direction has its smallest fixed version
+measured first.  To note: gin rummy's Monte Carlo has the knock, a
+high-leverage decision, to find; in 十胡 the win is compulsory, and there is
+no such decision.
 
-## C. 十胡／四色牌本身
+## C. 十胡 and Four Color Cards themselves
 
-### AI 論文與學位論文
+### AI papers and theses
 
-沒有找到。查過的地方：arXiv 標題與全文、一般網頁搜尋（中文、英文、越南文
-的 Tứ Sắc）、以「四色牌」搭配電腦對局、人工智慧、演算法搜尋臺灣博碩士
-論文知識加值系統的索引頁。搜尋引擎回的都是麻將、橋牌等其他遊戲的論文；
-唯一提到四色牌的是一本樂齡桌遊教具的碩士論文（只看到搜尋摘要，未開啟）。
-臺灣博碩士論文知識加值系統本身的檢索需要 session，沒有直接查。
+None was found.  Places searched: arXiv titles and full text; general web
+search (Chinese, English, and Tứ Sắc in Vietnamese); and the index pages of
+the National Digital Library of Theses and Dissertations in Taiwan
+(臺灣博碩士論文知識加值系統), searched for 四色牌 together with 電腦對局,
+人工智慧 and 演算法 (computer game playing, artificial intelligence,
+algorithm).  The search engines returned only papers on other games such as
+mahjong and bridge; the only one to mention Four Color Cards is a master's
+thesis on a board-game teaching aid for the elderly (only the search
+snippet was seen; it was not opened).  The library's own search needs a
+session and was not queried directly.
 
-公開的實作與 bot 已經在 [`public-opponents.md`](public-opponents.md) 整理，
-這裡不重複。
+The public implementations and bots are already collected in
+[`public-opponents.md`](public-opponents.md) and are not repeated here.
 
-### 兩人與三人的規則
+### Rules for two and three players
 
-| 來源 | 人數 | 發牌 | 人數少時改了什麼 |
-| --- | --- | --- | --- |
-| [中文維基〈十胡〉][zhwiki-shihu] | 「可供2人到6人遊戲」 | 「2~5人遊戲時，莊家摸二十一張，閒家摸二十張。6人遊戲時，莊家摸十六張牌，閒家摸十五張。」 | 沒寫。只寫「五人以上稱為五龍，所有賭注（台與底）變為兩倍」，五龍沒有 6 張廢牌 |
-| [中文維基〈四色牌〉][zhwiki-sisepai] | 沒寫 | 沒寫 | |
-| [國史館臺灣文獻館][thgov] | 「牌搭是二至四人」 | 「依照玩牌人數發牌數量以莊家比其他人多一支為原則」，沒給張數 | 沒寫 |
-| [國瑜企業社][guoyu]（牌具廠商） | 四人玩法、五人玩法 | 「一人發20支牌，頭家發20支」（原文如此） | 五人：8 胡以上可胡，牌不好可以放棄。沒有二、三人 |
-| [遊戲基地〈四色牌十胡篇〉][gamebase]（存檔） | 「四人版」 | 每人 20 張，莊家 21 張 | 只有四人 |
-| Board Game Arena：[中文說明][bga-zh]、[英文說明][bga-en]、[遊戲頁][bga-panel] | 2 至 4 人；遊戲頁的資料是 `player_numbers` [2,3,4]、預設 2 人、排位（arena）2 人 | 每人 7 + 7 + 6 = 20 張，先手 21 張 | 說明頁沒有任何依人數變動的規則 |
-| [pagat.com][pagat] | 沒寫 | 沒寫，轉介下面兩頁 | |
-| [Wei-Hwa Huang][huang]（存檔） | 「anywhere from 2 to 4 people」；人多時（甚至四人）牌不夠，常減少手牌或混入更多副牌 | 每人 20 張 | 沒寫 |
-| [tnt（CMU）][tnt] | 通常四人，有時三人，「只有兩個人玩相當無趣」 | 莊家 21，其餘 20 | 沒寫 |
-| [英文維基][enwiki] | 資訊框：4 人（標準牌組有 2 到 3 人的變體）；內文：標準四人，兩人或三人也能玩；超過四人每多一人加一組 28 張 | 20 張，莊家 21 | 沒寫 |
-| [越南文維基〈Tứ sắc〉][viwiki] | 適合四人，但兩人或三人都能玩 | 每人 20 張，莊家第一輪多拿一張 | 沒寫。另記順化有一種用同一副牌的三人玩法 bài xệp，是另一種遊戲 |
-| [Vinagames Tứ Sắc][vina] | 「for 2-4 people and it is best to play the game with 4 people」 | 每人 20，先手 21 | 沒寫。輸家各自付給贏家 |
+The per-source table (source, player count, deal, what changes at fewer
+players) is in `../tsap-oo-book/research/small-tables.md`, in Chinese.
 
-結論：
+Conclusions:
 
-- **兩人與三人「可以玩」有多個獨立來源**：中文維基、國史館、BGA、Huang、
-  英文與越南文維基、Vinagames。
-- **沒有任何來源寫出兩人或三人的規則調整。** 發牌一律是每人 20 張、莊家
-  21 張。中文維基的「2~5 人各 20 張」在五人時只剩 112 − 101 = 11 張牌堆，
-  與同一段「五龍因剩餘牌堆張數較少」的說法一致，但沒有引註。
-- **BGA 是唯一可操作的兩人規格，而且它的排位賽就是兩人。** 它的規則與人數
-  無關：手裡打出的牌只有下家能吃，摸出的牌是摸牌者與下家都能吃，胡、槓、
-  碰不限座位；達到 10 胡的贏家「跟所有其他玩家收取」。兩個語言版本的收分
-  寫法不同：中文是每家收「胡數減去門檻」，英文是「超過門檻的胡數，加上
-  每家 1 分」。[中文][bga-zh]、[英文][bga-en]
-- **把這套規則套到兩人，遊戲會變。** 以下是從規則推出來的，不是來源說的。
-  兩人時唯一的對手同時是上家與下家，所以每一張棄牌、每一張摸牌雙方都能
-  吃，吃的座位限制實際上消失。牌堆是 112 − 41 = 71 張，不是四人時的 31 張。
-  贏家只向一家收，輸家付全部，放銃與被自摸的代價相同。
-- `chunhua1972/four-color-game` 的 2 到 4 席同樣用 20／21 張，5、6 席改成
-  16／17 與 14／15 張；它的文件明說後者是自訂的擴充，不宣稱是傳統規則。
-  [DEVplan.md §3.2][fcg-plan]
-- **放銃要不要多賠，各地不同。** tnt 記的賭法裡，放銃的人有時要替另外兩家
-  付；Vinagames 的規則是沒有打出「最差的牌」而放銃的人，替其他輸家付。
-  本專案的規則是放銃不多賠，「防守不值錢」的結論只對這套規則成立。
-  [tnt][tnt]、[Vinagames][vina]
+- **That two and three players "can play" has several independent
+  sources**: Chinese Wikipedia, 國史館 (Taiwan Historica), BGA, Huang,
+  English and Vietnamese Wikipedia, Vinagames.
+- **No source writes down any adjustment of the rules for two or three
+  players.**  The deal is always 20 cards each and 21 to the dealer.
+  Chinese Wikipedia's "20 each at 2 to 5 players" leaves a pile of only
+  112 − 101 = 11 cards at five players, which agrees with the statement
+  「五龍因剩餘牌堆張數較少」 in the same passage, but it has no citation.
+- **BGA is the only spec that can be acted on for two players, and its
+  ranked play is two-player.**  Its rules do not depend on the player count:
+  a card discarded from a hand can be eaten only by the next seat, a drawn
+  card by the drawer and the next seat, and a win, kong or pong is not
+  limited by seat; the winner who reaches 10 胡 collects from every other
+  player (「跟所有其他玩家收取」).  The two language versions write the
+  payment differently: the Chinese has each seat pay "the 胡 less the
+  threshold", the English "the 胡 over the threshold, plus 1 point from each
+  seat".  [Chinese][bga-zh], [English][bga-en]
+- **Applying these rules to two players changes the game.**  What follows
+  is derived from the rules, not said by a source.  At two players the only
+  opponent is at once the previous seat and the next seat, so both sides
+  can eat every discard and every draw, and the seat restriction on eating
+  in effect disappears.  The pile is 112 − 41 = 71 cards, not the 31 of four
+  players.  The winner collects from one seat only and the loser pays it
+  all, so dealing in costs the same as the opponent winning on its own
+  draw.
+- `chunhua1972/four-color-game` likewise deals 20 / 21 cards at 2 to 4
+  seats, and changes to 16 / 17 and 14 / 15 cards at 5 and 6 seats; its
+  document says outright that the latter are its own extension and does not
+  claim them as traditional rules.  [DEVplan.md §3.2][fcg-plan]
+- **Whether dealing in costs extra differs from place to place.**  In the
+  stakes tnt records, whoever deals in sometimes has to pay for the other
+  two seats; Vinagames' rule is that a seat that deals in without having
+  discarded "the worst card" pays for the other losers.  This project's
+  rule is that dealing in costs nothing extra, and the conclusion that
+  "defence does not pay" holds only under this rule.
+  [tnt][tnt], [Vinagames][vina]
 
-## D. 先做兩人、再擴到多人
+## D. Two players first, then more
 
-### 先例
+### Precedents
 
-| 先例 | 搬過去的 | 沒搬過去的，或要另外補的 |
+| Precedent | What carried over | What did not, or had to be added |
 | --- | --- | --- |
-| Libratus（兩人）→ Pluribus（六人）[Brown & Sandholm 2019][pluribus] | 自對局算 blueprint、抽象化、即時搜尋這三件事的架構 | Libratus 只在「剩下的遊戲短到能解到底」時搜尋，六人時做不到，改成深度受限、葉節點讓每家在 k 種後續策略裡選；Nash equilibrium 的保證與「不會輸」的性質都沒有了，目標改成「實際上贏過人」 |
-| ACH／JueJong（兩人麻將）→ LuckyJ（四人）[ACH][ach]、[IT之家][luckyj-ithome] | 依公告是 ACH 演算法與搜尋 | 沒有論文，細節未能查證；作者有重疊的多人麻將論文另外加了降低獎勵變異的網路 [RVR][rvr] |
-| Poki（多人）→ PsOpti（兩人）[Billings et al. 2003][psopti] | 方向相反 | 為多人桌寫的 Poki「不是為兩人設計的，相當容易被打敗」；兩人版改用抽象化之後的線性規劃解 |
-| 三人撲克嫁接兩人專家 [Abou Risk & Szafron 2010][risk] | 有人蓋牌後剩兩人的子賽局，換上兩人的 CFR 解 | 結果不一致：一個基礎策略變強，另一個變弱。能嫁接是因為撲克有人會退出；十胡沒有 |
-| 單人麻將 → 四人麻將 [Mizukami & Tsuruoka 2015][mizukami] | 最快和牌的打法，成為模擬裡自己的策略 | 棄和、副露、對手模型都是後來補的；作者說只有單人打法不夠強 |
+| Libratus (two players) → Pluribus (six) [Brown & Sandholm 2019][pluribus] | The architecture of three things: a blueprint computed by self-play, abstraction, and real-time search | Libratus searched only when "the rest of the game is short enough to solve to the end", which cannot be done at six players; it became depth-limited, each player choosing among k continuation strategies at the leaves; the Nash-equilibrium guarantee and the "will not lose" property are both gone, and the goal became "beat humans in practice" |
+| ACH / JueJong (two-player mahjong) → LuckyJ (four) [ACH][ach], [IT之家][luckyj-ithome] | By the announcement, the ACH algorithm and the search | No paper, and the details could not be verified; the multiplayer mahjong paper with overlapping authors adds a network that reduces the variance of the reward [RVR][rvr] |
+| Poki (multiplayer) → PsOpti (two players) [Billings et al. 2003][psopti] | The opposite direction | Poki, written for multiplayer tables, was by the authors' account not designed for two players and is rather easily beaten; the two-player version uses instead the solution of a linear program after abstraction |
+| Grafting two-player experts into three-player poker [Abou Risk & Szafron 2010][risk] | The subgame of the two players left after someone folds gets the two-player CFR solution | The results are inconsistent: one base strategy got stronger, the other weaker.  The graft is possible because in poker someone drops out; in 十胡 nobody does |
+| Single-player mahjong → four-player mahjong [Mizukami & Tsuruoka 2015][mizukami] | The play of the fastest win, which becomes its own policy in the simulation | Folding, exposed melds and the opponent models were all added later; the authors say single-player play alone is not strong enough |
 
-共同點：**搬得動的是方法，不是學到的打法。** 上表沒有任何一例是「在人少的
-版本找出好的打法，然後原封不動用到人多的版本」。Tencent 選兩人的理由寫明
-是理論：兩人零和有 Nash equilibrium 的保證，可以定義並量測 exploitability。
-Alberta 的兩人版同樣從「最佳解保證至少拿到賽局值」出發。
-[ACH §1][ach]、[Billings et al. §1][psopti]
+What they have in common: **what carries is the method, not the play
+learnt.**  No case in the table above is one of "find good play in the
+version with fewer players, then use it unchanged in the version with
+more".  Tencent's stated reason for choosing two players is theory:
+two-player zero-sum has the Nash-equilibrium guarantee, and exploitability
+can be defined and measured.  Alberta's two-player version likewise starts
+from "the optimal solution is guaranteed at least the value of the game".
+[ACH §1][ach], [Billings et al. §1][psopti]
 
-### 兩人零和與多人的理論差異
+### How two-player zero-sum and multiplayer differ in theory
 
-- **均衡的保證。** 兩人零和遊戲裡，Nash equilibrium 策略期望上不輸給任何
-  對手；CFR 的平均策略保證收斂到它。三人以上兩件事都不成立：演算法不保證
-  收斂，而且即使每個人各自算出一個均衡來打，合起來也未必是均衡。Pluribus
-  的作者因此說，在多人遊戲裡連「目標該是什麼」都成問題。
-  [Brown & Sandholm][pluribus]、[Abou Risk & Szafron][risk]
-- **多人的搜尋。** Sturtevant 的分析是 UCT 在多人遊戲算的是混合策略的均衡，
-  max^n 算的是純策略的均衡。只讀了摘要。[Sturtevant 2008][sturtevant]
-- **Determinization 的毛病**是 strategy fusion：搜尋在每一個發牌裡各自做
-  決定，實際上卻分不出自己在哪一個發牌裡。Long 等人用三個性質（葉節點的
-  相關性、偏向、資訊多快揭露）預測 PIMC 什麼時候夠好，並指出它在 Skat 這類
-  牌戲上實際表現不差。[Cowling et al. §III][ismcts]、[Long et al. 2010][pimc]
-- **推論值多少，隨遊戲而定。**
-  - Skat（三人）：用牌譜擬合「看到這個動作時，各種手牌特徵的機率」，據此
-    偏置 PIMC 的發牌，明顯變強；後續改用神經網路預測每張牌的位置，又再
-    變強。[Buro et al. 2009][skat]、[Solinas et al. 2019][solinas]
-  - Scrabble（兩人）：完全知道對手的牌每局多 37 分；用 Bayes 從對手剛打的
-    字推它留下的牌，每局多 5.2 分（630 局）。[Richards & Amir 2007][scrabble]
-  - 鬥地主（三人）：作者自己的前一篇研究用簡化版的鬥地主，完美的對手模型
-    只比均勻信念好一點，所以這篇論文乾脆不做信念分布。他們的解釋是「能從
-    對手的動作推出有用資訊的局面很少」。[Cowling et al. §I][ismcts]
-  - Gin rummy：見上面 Kelidari et al. 的數字。偷看對手的手牌讓搜尋從 26%
-    到 85%，但直接把手牌餵給學習的 agent 沒有用。[Kelidari et al.][gold]
+- **The equilibrium guarantee.**  In a two-player zero-sum game a
+  Nash-equilibrium strategy does not lose in expectation to any opponent,
+  and CFR's average strategy is guaranteed to converge to it.  At three
+  players or more neither holds: the algorithm is not guaranteed to
+  converge, and even if every player computes an equilibrium of its own and
+  plays it, the combination need not be an equilibrium.  Pluribus's authors
+  therefore say that in multiplayer games even "what the goal should be" is
+  a problem.  [Brown & Sandholm][pluribus], [Abou Risk & Szafron][risk]
+- **Multiplayer search.**  Sturtevant's analysis is that in multiplayer
+  games UCT computes a mixed-strategy equilibrium and max^n a
+  pure-strategy one.  Only the abstract was read.
+  [Sturtevant 2008][sturtevant]
+- **The trouble with determinization** is strategy fusion: the search makes
+  its decision separately in each deal, while in fact it cannot tell which
+  deal it is in.  Long et al. predict when PIMC is good enough from three
+  properties (leaf correlation, bias, and how fast information is
+  revealed), and point out that it does not do badly in practice at card
+  games such as Skat.  [Cowling et al. §III][ismcts],
+  [Long et al. 2010][pimc]
+- **What inference is worth depends on the game.**
+  - Skat (three players): fit "the chance of each hand feature on seeing
+    this action" to game records and bias PIMC's deals by it, and it is
+    clearly stronger; a later neural network that predicts where each card
+    is makes it stronger again.  [Buro et al. 2009][skat],
+    [Solinas et al. 2019][solinas]
+  - Scrabble (two players): knowing the opponent's tiles outright is worth
+    37 points a game; a Bayesian inference of the tiles it kept from the
+    word it just played, 5.2 points a game (630 games).
+    [Richards & Amir 2007][scrabble]
+  - Dou Dizhu (three players): in the authors' own earlier study on a
+    simplified Dou Dizhu, a perfect opponent model was only a little
+    better than a uniform belief, so this paper does without a belief
+    distribution altogether.  Their explanation is that positions in which
+    useful information can be inferred from the opponents' actions are few.
+    [Cowling et al. §I][ismcts]
+  - Gin rummy: see the numbers of Kelidari et al. above.  Peeking at the
+    opponent's hand takes the search from 26% to 85%, but feeding the hand
+    straight to the learning agent does nothing.  [Kelidari et al.][gold]
 
-### 作者的理由：兩人零和裡，對錯比較常被獎懲
+### The author's reason: in two-player zero-sum, right and wrong are rewarded and punished more often
 
-作者的說法是：四人時犯錯不一定受罰；兩人零和時，對的決定比較常得到獎勵、
-錯的比較常受罰，所以比較容易學到什麼是好的決定。
+The author's claim: at four players a mistake is not always punished; in
+two-player zero-sum a right decision is rewarded more often and a wrong one
+punished more often, so it is easier to learn what a good decision is.
 
-支持這個說法的來源：
+Sources that support the claim:
 
-- **兩人零和裡，對手的錯在期望上不會變成我的損失。** Pluribus 論文的說明
-  是：打均衡策略的一方期望上不會輸；在比猜拳複雜的遊戲裡，對手只要選了
-  次佳的動作，它期望上就會贏。多人時沒有這個性質。
-  [Brown & Sandholm][pluribus]
-- **兩人零和有一把與對手無關的尺。** ACH 另外訓練 best response 來量各個
-  agent 被 exploit 的程度；OLSS 在撲克上直接報 exploitability。四人遊戲
-  沒有對應的量。[ACH §7][ach]、[OLSS §7.1][olss]
-- **扣掉運氣的估計量在兩人時效果好得多。** DIVAT 在兩人限注撲克把所需手數
-  降到 1／5.7 到 1／7.2；MIVAT 在兩人時與它相當，在六人限注撲克只把變異數
-  降了 20%，作者歸因於特徵太少，也沒抓到還沒蓋牌的人坐在哪裡。
-  [DIVAT][divat]、[MIVAT][mivat]
-- **Duplicate 的成本隨人數的階乘成長。** 兩人是同一副牌換座位打 2 局，三人
-  撲克是 6 種排列，四人麻將是 24 種而且牌山要按座位切開。
-  [OLSS 附錄 D][olss]、[Abou Risk & Szafron §4.4][risk]、[Lu et al. §4.2][oim]
-- **本專案自己的數據。** 對照組放銃而候選沒放的 1,691 局裡，82% 還是別家
-  胡了（`doc/stronger-bot.md`）。這就是「對的決定沒有被獎勵」。
+- **In two-player zero-sum the opponent's mistake does not become my loss in
+  expectation.**  The Pluribus paper's account: the side that plays the
+  equilibrium strategy does not lose in expectation; in games more complex
+  than rock-paper-scissors, whenever the opponent picks a suboptimal action
+  the equilibrium side wins in expectation.  Multiplayer games lack this
+  property.  [Brown & Sandholm][pluribus]
+- **Two-player zero-sum has a yardstick that does not depend on the
+  opponent.**  ACH trains a best response separately to measure how far
+  each agent can be exploited; OLSS reports exploitability directly on
+  poker.  A four-player game has no such quantity.
+  [ACH §7][ach], [OLSS §7.1][olss]
+- **Estimators that take the luck off work far better at two players.**
+  DIVAT cuts the hands needed to 1/5.7 to 1/7.2 in two-player limit poker;
+  MIVAT matches it at two players and cuts the variance by only 20% in
+  six-player limit poker, which the authors put down to too few features
+  and to not capturing where the players yet to fold are seated.
+  [DIVAT][divat], [MIVAT][mivat]
+- **The cost of a duplicate grows with the factorial of the player count.**
+  Two players is 2 games on the same deal with the seats swapped,
+  three-player poker 6 permutations, and four-player mahjong 24 with the
+  wall cut by seat as well.
+  [OLSS appendix D][olss], [Abou Risk & Szafron §4.4][risk],
+  [Lu et al. §4.2][oim]
+- **This project's own data.**  In the 1,691 deals where the control dealt
+  in and the candidate did not, another seat still won 82% of the time
+  (`doc/stronger-bot.md`).  That is "a right decision not rewarded".
 
-不支持，或要打折的來源：
+Sources that do not support it, or that discount it:
 
-- **兩人麻將的評估並沒有變得便宜。** OLSS 用了 200,000 局加換座位，95%
-  信賴區間還有 ±0.13 番，套用搜尋後的領先是 0.14 到 0.22 番；JueJong 對
-  人類冠軍 1,000 局只得到 p = 0.19。
-  [OLSS 附錄 D、表 3][olss]、[ACH §7][ach]
-- **兩人撲克同樣被發牌的運氣淹沒。** 兩人限注撲克每手的標準差約 6 美元，
-  要的精度約 0.05 美元，需要五萬手以上；2015 年的人機賽打了 80,000 手，
-  差距很大卻只在顯著的邊緣。雜訊的主要來源是發牌，不是人數。
-  [MIVAT][mivat]、[AIVAT 緒論][aivat]
-- **均衡的保證幫不到對固定對手的 A/B。** 這是本文的推論，不是來源說的。
-  上面前兩個論點講的都是「對任何對手都不輸」的策略。`ab/run.sh` 量的是
-  對 `HeuristicBot` 的得分，在兩人與四人裡，「對」都只是「對這個對手賺得
-  多」，Nash equilibrium 沒有多給什麼。
-- **人少的版本學到的東西可能不在人多的版本裡。** Poki 的例子是反方向的
-  證據；嫁接兩人專家的結果好壞參半。[Billings et al.][psopti]、
-  [Abou Risk & Szafron §5][risk]
+- **Evaluating two-player mahjong did not get cheap.**  OLSS used 200,000
+  games with the seats swapped and the 95% confidence interval is still
+  ±0.13 fan, the lead with search applied 0.14 to 0.22 fan; JueJong against
+  the human champion got only p = 0.19 from 1,000 games.
+  [OLSS appendix D, table 3][olss], [ACH §7][ach]
+- **Two-player poker is drowned in the luck of the deal just the same.**
+  Two-player limit poker has a standard deviation of about 6 dollars a
+  hand, the precision wanted is about 0.05 dollars, and that takes over
+  fifty thousand hands; the 2015 match of humans against the AI played
+  80,000 hands, and a large margin was only on the edge of significance.
+  The main source of the noise is the deal, not the player count.
+  [MIVAT][mivat], [AIVAT introduction][aivat]
+- **The equilibrium guarantee does not help an A/B against a fixed
+  opponent.**  This is this document's inference, not a source's.  The
+  first two arguments above are both about a strategy that "does not lose
+  to any opponent".  `ab/run.sh` measures the score against `HeuristicBot`;
+  at two players as at four, "right" only means "earns more against this
+  opponent", and the Nash equilibrium adds nothing.
+- **What is learnt in the version with fewer players may not be there in
+  the version with more.**  Poki's case is evidence in the opposite
+  direction; the results of grafting two-player experts are half good and
+  half bad.  [Billings et al.][psopti], [Abou Risk & Szafron §5][risk]
 
-沒有查到的：沒有找到任何研究直接量「同一個錯誤在兩人與多人版本裡被懲罰的
-頻率」，也沒有找到 ACH 或 Pluribus 的作者以「兩人比較容易學到好決定」當作
-選兩人的理由。他們給的理由是理論保證與可計算性。
+Not found: no study was found that directly measures "how often the same
+mistake is punished in the two-player and multiplayer versions", nor were
+the authors of ACH or Pluribus found to give "good decisions are easier to
+learn at two players" as their reason for choosing two.  The reasons they
+give are the theoretical guarantee and computability.
 
-一個粗估（本文的算術，不是來源的數字；假設各家胡牌率相同、胡數都是 h、
-流局約 6%）：四人時贏家收 3h、輸家各付 h，把自己的胡牌率提高 δ 約值 4hδ，
-每局標準差約 1.7h；兩人時約值 2hδ，標準差約 1h。兩者的訊號雜訊比相近
-（2.4δ 對 2.1δ）。兩人版若有優勢，得來自 δ 本身比較大：候選 bot 做了一半
-而不是四分之一的決定，而且它的錯不會被第三家接走。這有可能，但沒有人量過。
+A rough estimate (this document's arithmetic, not a source's numbers;
+assuming every seat has the same win rate, every win is h 胡, and exhausted
+rounds are about 6%): at four players the winner collects 3h and the losers
+pay h each, raising its own win rate by δ is worth about 4hδ, and the
+standard deviation is about 1.7h a round; at two players it is worth about
+2hδ, with a standard deviation of about 1h.  The two signal-to-noise ratios
+are close (2.4δ against 2.1δ).  If the two-player version has an edge, it
+has to come from δ itself being larger: the candidate bot makes half of the
+decisions rather than a quarter, and its mistakes are not picked up by a
+third seat.  That is possible, but nobody has measured it.
 
-### 降低評估變異的技術
+### Techniques that reduce evaluation variance
 
-現況：`ab/` 已經是配對的 duplicate。由 `doc/stronger-bot.md` 各次實驗的
-標準誤反推，打法不同的那些局，得分差的標準差約 27 到 30 分（聽牌規則那一次
-約 37），與單一座位一局的標準差（約 30）幾乎一樣大。標準誤是這個數乘上
-√(不同的局數) 再除以總局數，所以要壓的是「分歧之後」的雜訊。
+As things stand: `ab/` is already a paired duplicate.  Working back from
+the standard errors of the experiments in `doc/stronger-bot.md`, on the
+deals where play differs the score difference has a standard deviation of
+about 27 to 30 points (about 37 for the one on the waiting rule), almost as
+large as the standard deviation of one seat over a round (about 30).  The
+standard error is this number times √(the deals that differ) over the total
+deals, so the noise to suppress is the noise "after they part".
 
-| 技術 | 具體做法 | 來源報告的效果 | 放到 `ab/` 的意思 |
+| Technique | What it does | Effect the sources report | What it means in `ab/` |
 | --- | --- | --- | --- |
-| Duplicate、共同亂數 | 同一副牌、同樣的對手，只換受測者 | Mortal、akochan、Botzone、OLSS、Mizukami 都用 | 已經有了 |
-| Rollout | 從要比較的局面出發，把之後的隨機性重抽很多次取平均；各個候選用同一組亂數 | GNU Backgammon 的 rollout 功能，手冊以 1,296 局為例；Mizukami 的模擬對每張候選牌用同一組亂數 | 從第一個分歧點起，把剩下的牌堆重洗 K 次，兩邊各打 K 次，取平均的差 |
-| 分層的第一步 | 讓前一兩步的隨機結果剛好各出現一次 | GNU Backgammon 的 quasi-random dice | 重洗時讓「下一張摸到的牌」依剩餘張數輪過每一種 |
-| 扣掉運氣（advantage sum、control variate） | 每一個機率事件，把「事件前的期望評分 − 事件後的評分」加到結果上；這一項期望為零，所以不偏 | DIVAT 5.7 到 7.2 倍；AIVAT 在兩人無限注把標準差從 25.96 降到 8.10，手數少十倍以上；MIVAT 在六人限注只降了 20% 的變異數 | 每摸一張牌，對牌堆裡每一種可能的牌算一次評分取平均，把（平均 − 實際那張的評分）加到得分上 |
-| 截斷 | 不打到結束，打幾步後用評分代替結果 | Tesauro 與 Galperin：每次試驗的變異小得多，至少快一個數量級；GNU Backgammon 手冊提醒這會帶進系統誤差 | 評分換算成分只在「手牌」上成立（`research/grade-in-points.md`），在 A/B 裡用會帶進偏差，不建議 |
-| 依座位切開牌堆 | 每一席只從自己那一疊摸，吃碰改變順序時別家摸到的牌不變 | Botzone 的作者說可以減少一家對另一家的影響，沒給數字 | 兩邊分歧之後，各席摸到的牌仍然相同，兩邊的相關性提高 |
-| 序貫檢定 | 邊跑邊算概似比，夠了就停 | fishtest 的 GSPRT；配對的五項式模型比三項式「大幅節省」 | 平均局數變少，但「局數在看資料前定下」這條鐵則要改成「界線在看資料前定下」 |
+| Duplicate, common random numbers | The same deal and the same opponents, only the subject changes | Mortal, akochan, Botzone, OLSS and Mizukami all use it | Already there |
+| Rollout | From the position being compared, redraw the randomness that follows many times and average; every candidate uses the same random numbers | GNU Backgammon's rollout feature, whose manual takes 1,296 games as its example; Mizukami's simulation uses the same random numbers for every candidate tile | From the first point where they part, reshuffle the pile left K times, play each side K times, and take the mean difference |
+| Stratified first step | Make each random outcome of the first step or two come up exactly once | GNU Backgammon's quasi-random dice | In the reshuffles, rotate "the next card drawn" through every kind by the copies left |
+| Taking off the luck (advantage sum, control variate) | For every chance event, add "the expected grade before the event − the grade after the event" to the result; this term has zero expectation, so it is unbiased | DIVAT 5.7 to 7.2 times; AIVAT cuts the standard deviation from 25.96 to 8.10 in two-player no-limit, over ten times fewer hands; MIVAT cut the variance by only 20% in six-player limit | At every draw, grade each kind of card possible in the pile and average, and add (the average − the grade of the card actually drawn) to the score |
+| Truncation | Do not play to the end; after a few moves put the grade in place of the result | Tesauro and Galperin: far less variance in each trial, at least an order of magnitude faster; the GNU Backgammon manual warns that this brings in systematic error | The conversion of the grade into points holds only for "hands" (`research/grade-in-points.md`); used in an A/B it brings in bias, and is not advised |
+| Cutting the pile by seat | Each seat draws only from its own stack, so the cards the other seats draw do not change when an eat or a pong changes the order | Botzone's authors say it reduces one seat's influence on another, and give no number | After the two sides part, each seat still draws the same cards, and the correlation between the two sides rises |
+| Sequential test | Compute the likelihood ratio as the run goes, and stop when it is enough | fishtest's GSPRT; the paired pentanomial model saves substantially over the trinomial | Fewer deals on average, but the iron rule "the deal count is fixed before the data" has to become "the bounds are fixed before the data" |
 
-來源：[GNU Backgammon rollouts][gnubg-ro]、[quasi-random dice][gnubg-qr]、
-[Tesauro & Galperin 1996][tesauro]、[DIVAT][divat]、[MIVAT][mivat]、
-[AIVAT][aivat]、[Pluribus][pluribus]、[Lu et al. §4.2][oim]、
-[Mortal][mortal-strength]、[akochan][akochan]、[fishtest][fishtest]
+Sources: [GNU Backgammon rollouts][gnubg-ro], [quasi-random dice][gnubg-qr],
+[Tesauro & Galperin 1996][tesauro], [DIVAT][divat], [MIVAT][mivat],
+[AIVAT][aivat], [Pluribus][pluribus], [Lu et al. §4.2][oim],
+[Mortal][mortal-strength], [akochan][akochan], [fishtest][fishtest]
 
-補充說明：
+Further notes:
 
-- **Rollout 為什麼不偏。** 這是本文的推論。分歧之前兩邊的每一個決定都只
-  依已經翻開的牌，所以在分歧的那一刻，剩下的牌堆的順序對兩邊來說仍是均勻
-  隨機的。把那一段重洗 K 次取平均，期望值不變，只是把「分歧之後的運氣」
-  平均掉。別家的暗牌不能重發，那是局面的一部分。
-- **能省多少要先量。** 得分差的變異數可以拆成兩塊：不同局面之間真實差異的
-  變異 σ_b²，與同一個局面內牌堆運氣的變異 σ_w²。重洗 K 次只把後者除以 K。
-  若 σ_b 是 5 分，K = 16 時標準差從 28 降到約 8.6，等於局數的十倍；若 σ_b
-  是 10 分，約五倍。σ_b 目前不知道：拿 1,000 個分歧的局面各重洗 32 次就
-  量得出來。成本只加在分歧的局上，所以改動越小的候選越划算。
-- **AIVAT 裡與本專案有關的只有「機率事件」那一半。** 它另一半是利用已知的
-  隨機策略；`HeuristicBot` 是確定性的，那一半是零。也就是說這裡用得上的是
-  MIVAT 的形式。MIVAT 還提供了挑評分函數的方法：直接以「估計量的變異數
-  最小」為目標，擬合一個線性函數，特徵可以用到四家的手牌，因為評估者看得
-  到。`fit` example 的手牌擬合已經有現成的特徵。[MIVAT][mivat]
-- **Pluribus 的人機賽**是多人遊戲裡用 AIVAT 的實例：10,000 手，平均每手贏
-  48 mbb（千分之一個大盲），標準誤 25 mbb。[Brown & Sandholm][pluribus]
-- **麻將專案用的都是 duplicate，沒有人用 advantage sum。** Suphx 是固定
-  100 萬局加重抽樣；Kurita 與 Hoki 用同一局內的名次差；Mizukami 用同牌山的
-  對戰加 bootstrap 與 Welch t 檢定。[Suphx §4][suphx]、[Kurita & Hoki §VII][kurita]、
-  [Mizukami §VIII][mizukami]
+- **Why a rollout is unbiased.**  This is this document's inference.  Before
+  they part, every decision of both sides depends only on cards already
+  turned up, so at the moment they part the order of the pile left is still
+  uniformly random to both sides.  Reshuffling that stretch K times and
+  averaging leaves the expectation unchanged, and only averages out "the
+  luck after they part".  The other seats' concealed cards cannot be
+  redealt; they are part of the position.
+- **How much it saves has to be measured first.**  The variance of the score
+  difference splits into two parts: σ_b², the variance of the real
+  difference between positions, and σ_w², the variance of the pile's luck
+  within one position.  K reshuffles divide only the latter by K.  If σ_b
+  is 5 points, K = 16 takes the standard deviation from 28 to about 8.6,
+  the same as ten times the deals; if σ_b is 10 points, about five times.
+  σ_b is unknown at present: 1,000 positions that part, reshuffled 32 times
+  each, would measure it.  The cost is added only on the deals that part,
+  so the smaller a candidate's change, the better the bargain.
+- **Only the "chance event" half of AIVAT concerns this project.**  Its
+  other half uses a known stochastic policy; `HeuristicBot` is
+  deterministic, so that half is zero.  That is, what can be used here is
+  MIVAT's form.  MIVAT also provides a way to choose the grading function:
+  fit a linear function with "the minimum variance of the estimator" as the
+  direct objective, and the features may use all four seats' hands, because
+  the evaluator sees them.  The hand fit of the `fit` example already has
+  the features ready.  [MIVAT][mivat]
+- **Pluribus's match against humans** is an instance of AIVAT in a
+  multiplayer game: 10,000 hands, winning 48 mbb a hand on average (an mbb
+  is a thousandth of a big blind), standard error 25 mbb.
+  [Brown & Sandholm][pluribus]
+- **The mahjong projects all use the duplicate, and none an advantage sum.**
+  Suphx is a fixed 1,000,000 games plus resampling; Kurita and Hoki use the
+  difference in placing within the same game; Mizukami uses matches on the
+  same walls plus a bootstrap and Welch's t-test.  [Suphx §4][suphx],
+  [Kurita & Hoki §VII][kurita], [Mizukami §VIII][mizukami]
 
-## 可以搬到十胡的想法
+## Ideas that carry over to 十胡
 
-依「預期的資訊量 ÷ 成本」排序。前兩項是量測，不改 bot。
+Ordered by "expected information ÷ cost".  The first two are measurement
+and do not change the bot.
 
-1. **從分歧點 rollout，並扣掉摸牌的運氣。**
-   來源：[GNU Backgammon][gnubg-ro]、[MIVAT][mivat]、[AIVAT][aivat]。
-   意思：`ab/src/main.rs` 在兩邊第一次做出不同決定時記下局面，把剩下的
-   牌堆重洗 K 次各打一遍；再對每一張摸牌扣掉一個期望為零的修正。最簡單的
-   修正是「這張牌讓誰立刻胡了」：評估者知道四家各聽什麼，算得出每一家被
-   這張摸牌胡掉的機率與金額。
-   成本：只在離線。新的估計量要先驗證：候選與對照相同時必須剛好是零，
-   並且重現一個已知的結論（例如 −0.037 的那一次）。
-   支持：計畫裡的七次 A/B（含 `MonteCarloBot` 的重測）有五次結論不明，
-   瓶頸是標準誤。反對：效果取決於 σ_b，還沒量；六人撲克的例子顯示多人時
-   運氣修正的效果有限。
-2. **量「偷看手牌的 Monte Carlo」的上限。**
-   來源：[Richards & Amir][scrabble]、[Kelidari et al.][gold]、
-   [Cowling et al.][ismcts]。
-   意思：讓 `MonteCarloBot` 的發牌直接用真實的別家手牌（牌堆順序仍然隨機，
-   或連牌堆也用真的，各量一次），在同一個 A/B 上對 `HeuristicBot`。這是
-   任何對手推論的天花板。
-   成本：只在離線，改動很小。
-   支持：均勻信念的 Monte Carlo 是 +0.148 ± 0.276；如果偷看也只多零點幾分，
-   第四層的行為推論與「Monte Carlo 的發牌」都可以不做。反對：偷看同時消除
-   了 strategy fusion，所以它高估推論能拿到的部分。
-3. **「不餵下家」寫成 MARJJ 式的加減分。**
-   來源：[Ahmed et al.][gr-marjj]。
-   意思：棄牌評分加一項「這張牌對下家的用處」。下家已經亮出或可推知握有
-   能跟它成組的牌就加罰；能跟它成組的牌已經死光（`doc/stronger-bot.md`
-   第三層的「壁」）就減罰。
-   成本：`HeuristicBot` 的量級，網頁可用。
-   支持：計畫已經把它列為下一步；棄牌有 16% 到 56% 能被下家吃成順。反對：
-   gin rummy 是兩人，對手是唯一的受益者；十胡的下家只是三家之一，防守的
-   兩次實驗都沒贏。預期是小的正值，要靠第 1 項才量得到。
-4. **單人期望值，加上「別家每一巡胡掉的機率」。**
-   來源：[tomohxx][tomohxx-prob]、[Kurita & Hoki][kurita]、
-   [Li & Yan][lets-play]、[Suphx §2][suphx]。
-   意思：路線三，但照 Kurita 與 Hoki 的做法把另外三家換成一個每巡有機率
-   結束這一局的環境，機率取自 `research/safe-cards.md` 那張依暗牌張數的表。
-   這樣對手的進度就進了評分，而不是只用來躲銃。
-   成本：算一次要看狀態數；十胡每張摸牌四家都能要，「能拿到的牌」比麻將
-   難定義。網頁能不能用未知。
-   反對：計畫自己的判斷成立。均勻信念下多看幾步的 Monte Carlo 沒有贏，
-   擬合的權重也沒有贏，這一項是把同一份資訊算得更準。沒有數據支持先做。
-5. **用公開特徵擬合「這一家離胡多遠」。**
-   來源：[Mizukami & Tsuruoka §IV][mizukami]、[akochan][akochan-tenpai]。
-   意思：以暗牌張數、亮出的胡數、吃碰的次數與時機做 logistic regression。
-   成本：離線擬合，線上查表。
-   反對：第二層的機率表已經是這件事的簡化版，用來防守是淨輸。除非第 4 項
-   要用，否則不值得單獨做。
-6. **Oracle guiding、pMCPA、蒸餾。**
-   來源：[Suphx][suphx]。
-   都需要深度學習的訓練管線；pMCPA 連 Suphx 自己上線時都沒用。計畫把蒸餾
-   排在「帶對手模型的 Monte Carlo 明確贏過 `HeuristicBot`」之後，這個順序
-   與文獻一致。
-7. **兩人版當研究載具。**
-   來源：D 節。
-   支持：規格現成（BGA 的 2 人桌，排位預設就是兩人）；duplicate 只要換座位
-   打 2 局；候選做一半的決定。
-   反對：沒有先例是把人少的版本學到的打法搬到人多的版本；兩人麻將的評估
-   仍是 20 萬局；兩人時吃的座位限制消失、輸家付全部、牌堆是 71 張，「防守
-   不值錢」這個四人的結論很可能不成立，反過來在兩人量到的東西也不保證
-   成立於四人。
-   如果要做，建議先花一次小實驗確認兩件事：兩人版每局的標準差與分歧局的
-   比例；以及一個四人已知結論（例如「從評分扣掉 12 胡 × 危險度」的
-   −0.037）在兩人版是否同號。同號才談得上搬。
-   後續：前一件與兩個已知的贏已經量了，見 [`two-seats.md`](two-seats.md)；
-   −0.037 那一次的候選沒有留在版本庫裡，沒辦法重放。
+1. **Roll out from where they part, and take off the luck of the draws.**
+   Sources: [GNU Backgammon][gnubg-ro], [MIVAT][mivat], [AIVAT][aivat].
+   Meaning: `ab/src/main.rs` records the position when the two sides first
+   make different decisions and reshuffles the pile left K times, playing
+   each out; then it takes off, for every draw, a correction with zero
+   expectation.  The simplest correction is "whom this card lets win at
+   once": the evaluator knows what each of the four seats waits on, and can
+   compute the chance that each seat wins on this draw and the amount.
+   Cost: offline only.  The new estimator has to be validated first: it
+   must be exactly zero when the candidate and the control are the same,
+   and reproduce a known conclusion (the −0.037 one, for instance).
+   For: of the plan's seven A/Bs (counting the re-measurement of
+   `MonteCarloBot`), five are insufficient data, and the bottleneck is the
+   standard error.  Against: the effect depends on σ_b, not yet measured;
+   the six-player poker example shows that a luck correction has limited
+   effect with many players.
+2. **Measure the ceiling of a "Monte Carlo that peeks at the hands".**
+   Sources: [Richards & Amir][scrabble], [Kelidari et al.][gold],
+   [Cowling et al.][ismcts].
+   Meaning: have `MonteCarloBot`'s deals use the other seats' real hands
+   (the pile's order still random, or the real pile too, each measured
+   once), against `HeuristicBot` on the same A/B.  This is the ceiling of
+   any opponent inference.
+   Cost: offline only, and a very small change.
+   For: the Monte Carlo of a uniform belief is +0.148 ± 0.276; if peeking
+   too adds only a few tenths of a point, the behavioural inference of
+   layer 4 and "the Monte Carlo's deals" can both be left undone.  Against:
+   peeking also removes strategy fusion, so it overestimates the part that
+   inference can get.
+3. **"Don't feed the next seat" written as MARJJ-style bonuses and
+   penalties.**
+   Source: [Ahmed et al.][gr-marjj].
+   Meaning: add to the discard's grade a term for "this card's use to the
+   next seat".  The penalty rises if the next seat has exposed, or can be
+   inferred to hold, cards that meld with it; it falls if the cards that
+   meld with it are all dead (the "walls" of layer 3 in
+   `doc/stronger-bot.md`).
+   Cost: of the order of `HeuristicBot`, usable on the web page.
+   For: the plan already lists it as the next step; 16% to 56% of discards
+   can be eaten into a run by the next seat.  Against: gin rummy is
+   two-player and the opponent is the only one to benefit; the next seat in
+   十胡 is only one of three, and neither of the two defence experiments
+   won.  The expectation is a small positive value, which only item 1 can
+   make measurable.
+4. **The single-player expected value, plus "the chance each turn that
+   another seat wins".**
+   Sources: [tomohxx][tomohxx-prob], [Kurita & Hoki][kurita],
+   [Li & Yan][lets-play], [Suphx §2][suphx].
+   Meaning: route 3, but as Kurita and Hoki do it, replacing the other
+   three seats with an environment that has a chance each turn of ending
+   the round, the chance taken from the table by count of concealed cards
+   in `research/safe-cards.md`.  The opponents' progress then enters the
+   grade, instead of serving only to avoid dealing in.
+   Cost: one computation depends on the number of states; in 十胡 all four
+   seats may want every draw, so "the cards that can be had" are harder to
+   define than in mahjong.  Whether the web page can use it is unknown.
+   Against: the plan's own judgement stands.  Under a uniform belief a
+   Monte Carlo that looks a few steps further did not win, and neither did
+   the fitted weights; this item computes the same information more
+   accurately.  No data supports doing it first.
+5. **Fit "how far this seat is from winning" on public features.**
+   Sources: [Mizukami & Tsuruoka §IV][mizukami], [akochan][akochan-tenpai].
+   Meaning: logistic regression on the count of concealed cards, the 胡
+   exposed, and the number and timing of eats and pongs.
+   Cost: fitted offline, looked up in a table online.
+   Against: the probability table of layer 2 is already a simplified form
+   of this, and used for defence it is a net loss.  Not worth doing by
+   itself unless item 4 needs it.
+6. **Oracle guiding, pMCPA, distillation.**
+   Source: [Suphx][suphx].
+   All need a deep-learning training pipeline; even Suphx itself did not
+   use pMCPA when it went live.  The plan puts distillation after "a Monte
+   Carlo with an opponent model clearly beats `HeuristicBot`", an order
+   that agrees with the literature.
+7. **The two-player version as a research vehicle.**
+   Source: section D.
+   For: the spec is ready-made (BGA's table of two, and ranked play
+   defaults to two players); the duplicate takes only 2 games with the
+   seats swapped; the candidate makes half of the decisions.
+   Against: there is no precedent for carrying the play learnt in the
+   version with fewer players over to the version with more; evaluating
+   two-player mahjong still took 200,000 games; at two players the seat
+   restriction on eating disappears, the loser pays it all and the pile is
+   71 cards, so "defence does not pay", a conclusion of four players, very
+   likely does not hold, and conversely what is measured at two players is
+   not guaranteed to hold at four.
+   If it is done, the advice is to spend one small experiment first on
+   confirming two things: the two-player version's standard deviation a
+   round and its share of deals that part; and whether a known four-player
+   conclusion (for instance the −0.037 of "take 12 胡 × danger off the
+   grade") has the same sign in the two-player version.  Only with the same
+   sign is there any talk of carrying over.
+   Follow-up: the former and two known wins have since been measured, see
+   [`two-seats.md`](two-seats.md); the candidate of the −0.037 run was not
+   kept in the repository and cannot be replayed.
 
-## 限制
+## Caveats
 
-- **未能取得全文的：** ACH 的 OpenReview 頁擋自動存取，讀的是 Internet
-  Archive 在 2024-09-22 存的 PDF；《Official International Mahjong》讀的
-  是 Internet Archive 存的 MDPI PDF；Pluribus 讀的是作者網站的存檔。RVR
-  （IEEE CoG 2022）只有經 Semantic Scholar 與 OpenAlex 取得的摘要。
-  Sturtevant 2008、CFR-p、兩篇 Indian Rummy、Dhumbal 只讀了摘要。
-- **LuckyJ 沒有論文。** 所有細節來自 IT之家、量子位與 TechNode 對騰訊公告
-  的轉述，騰訊的原始公告沒有找到。「ACH 用在四人版」是公告的說法，沒有
-  技術文件可以對照。
-- **Mortal 的方法沒有文件。** 官方文件自己寫大部分頁面是空的；這裡只引用
-  它的評估方式。
-- **akochan 只讀了標頭檔與 readme**，沒有讀實作，也沒有執行。
-- **臺灣博碩士論文知識加值系統沒有直接檢索。**「沒有找到論文」是搜尋引擎
-  索引範圍內的結論。CNKI、萬方也沒有查。
-- **Bakuuchi 之後的版本沒有公開論文。** Kurita 與 Hoki 提到他們對戰的
-  Bakuuchi 比 2015 年論文的版本強，而且未發表。
-- **fishtest 的官方頁只有概述**，GSPRT 與五項式模型的推導在它連出去的文件
-  裡，沒有讀。
-- **Wolfe 2002 的二十一點基準策略估計量**（把玩家的結果減去基準策略在同一手
-  牌上的結果，標準差降 50 倍）只見於 MIVAT 的轉述，原文沒有讀。它的形式
-  與 `ab/` 的配對設計相同。[MIVAT][mivat]
-- **D 節的三段推論**（rollout 不偏、訊號雜訊比的粗估、均衡保證幫不到固定
-  對手的 A/B）與 C 節「套到兩人會怎樣」是本文從規則與既有數據推出來的，
-  文中都已標明，不是來源的結論。σ_b 沒有量過。兩人版在本文寫完之後量了
-  一次，見 [`two-seats.md`](two-seats.md)：訊號雜訊比相近的粗估與實測相符。
-- **2026 年年中以後的文獻**只查到 arXiv 上的 Kelidari et al.（7 月，8 月
-  改版）與 IRumAI（6 月）。Botzone 第六屆比賽的頁面在搜尋結果裡出現，
-  沒有開啟，結果未查。
-- **gin rummy 各篇的勝率基準不同**（Simple player、各隊自己的基準、彼此），
-  表裡的數字不能互相比較。
+- **Full text not obtained:** ACH's OpenReview page blocks automated
+  access, and what was read is the PDF the Internet Archive saved on
+  2024-09-22; *Official International Mahjong* was read from the MDPI PDF
+  saved by the Internet Archive; Pluribus from the archived copy of the
+  author's site.  RVR (IEEE CoG 2022) only as the abstract obtained through
+  Semantic Scholar and OpenAlex.  Of Sturtevant 2008, CFR-p, the two Indian
+  Rummy papers and Dhumbal only the abstracts were read.
+- **LuckyJ has no paper.**  Every detail comes from IT之家, 量子位 and
+  TechNode relaying Tencent's announcement; Tencent's original announcement
+  was not found.  "ACH is used in the four-player version" is the
+  announcement's claim, with no technical document to check it against.
+- **Mortal's method has no documentation.**  The official documentation
+  itself says most of its pages are empty; only its way of evaluating is
+  cited here.
+- **Only akochan's headers and readme were read**, not the implementation,
+  and nothing was run.
+- **The National Digital Library of Theses and Dissertations in Taiwan was
+  not searched directly.**  "No paper found" is a conclusion within what
+  the search engines index.  CNKI and Wanfang were not searched either.
+- **The versions of Bakuuchi after that have no public paper.**  Kurita and
+  Hoki mention that the Bakuuchi they played against is stronger than the
+  version of the 2015 paper, and unpublished.
+- **fishtest's official page is only an overview**; the derivations of the
+  GSPRT and the pentanomial model are in the documents it links to, which
+  were not read.
+- **Wolfe's 2002 baseline-strategy estimator for blackjack** (subtract from
+  the player's result the baseline strategy's result on the same hand, a
+  50-fold drop in the standard deviation) is seen only in MIVAT's account;
+  the original was not read.  Its form is the same as the paired design of
+  `ab/`.  [MIVAT][mivat]
+- **The three inferences of section D** (the rollout is unbiased, the rough
+  estimate of the signal-to-noise ratio, the equilibrium guarantee does not
+  help an A/B against a fixed opponent) and section C's "what happens when
+  it is applied to two players" are derived by this document from the rules
+  and the existing data; each is marked as such in the text and is not a
+  source's conclusion.  σ_b has not been measured.  The two-player version
+  was measured once after this document was written, see
+  [`two-seats.md`](two-seats.md): the rough estimate that the
+  signal-to-noise ratios are close agrees with the measurement.
+- **Of the literature after mid-2026** only Kelidari et al. on arXiv (July,
+  revised in August) and IRumAI (June) were found.  The page of Botzone's
+  sixth competition came up in the search results; it was not opened and
+  the results were not checked.
+- **The win rates of the gin rummy papers have different baselines** (the
+  Simple player, each team's own baseline, one another), and the numbers in
+  the table cannot be compared with each other.
 
 [gre-readme]: https://github.com/jdh8/gin-rummy-engine/blob/d77f2d78bb0e657d030faa629ae93cc5bc6c1e47/README.md
 [gre-plan]: https://github.com/jdh8/gin-rummy-engine/blob/d77f2d78bb0e657d030faa629ae93cc5bc6c1e47/docs/marjj-parity-plan.md
@@ -667,18 +925,9 @@ Alberta 的兩人版同樣從「最佳解保證至少拿到賽局值」出發。
 [irumai]: https://arxiv.org/abs/2606.21975
 [dhumbal]: https://arxiv.org/abs/2510.11736
 [zhwiki-shihu]: https://zh.wikipedia.org/wiki/%E5%8D%81%E8%83%A1
-[zhwiki-sisepai]: https://zh.wikipedia.org/wiki/%E5%9B%9B%E8%89%B2%E7%89%8C
-[thgov]: https://dict.th.gov.tw/Print.aspx?ID=2186
-[guoyu]: https://www.guoyu.com.tw/zh/qa/1.html
-[gamebase]: https://web.archive.org/web/20131005012051/http://www.gamebase.com.tw/wekey/%E5%A4%A7%E8%95%83%E8%96%AF%E9%81%8A%E6%88%B2%E7%B6%B2%E6%88%B0/%E5%9B%9B%E8%89%B2%E7%89%8C%E5%8D%81%E8%83%A1%E7%AF%87/
 [bga-zh]: https://zh.doc.boardgamearena.com/Gamehelpfourcolorcards
 [bga-en]: https://en.boardgamearena.com/doc/Gamehelpfourcolorcards
-[bga-panel]: https://en.boardgamearena.com/gamepanel?game=fourcolorcards
-[pagat]: https://www.pagat.com/rummy/si_se_pai.html
-[huang]: https://web.archive.org/web/20081210050742/www.ofb.net/~whuang/ugcs/gp/ssp/
 [tnt]: https://www.cs.cmu.edu/~tnt/rules.html
-[enwiki]: https://en.wikipedia.org/wiki/Four_color_cards
-[viwiki]: https://vi.wikipedia.org/wiki/T%E1%BB%A9_s%E1%BA%AFc
 [vina]: https://www.vinagames.com/tusac.html
 [fcg-plan]: https://github.com/chunhua1972/four-color-game/blob/main/DEVplan.md
 [pluribus]: https://web.archive.org/web/2022/https://www.cs.cmu.edu/~noamb/papers/19-Science-Superhuman.pdf

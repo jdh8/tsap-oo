@@ -1,154 +1,184 @@
-# 安全牌：「不能過水」能證明多少
+# Safe cards: how much 「不能過水」 (no passing up a win) proves
 
-量測日期：2026-11-16。問題：胡牌是強制的，所以一張牌落地而沒人胡，就證明
-當時被問到的每一家都胡不到它。這個證明涵蓋多少棄牌選擇？沒被證明安全的牌，
-危險度又由什麼決定？本文用 `HeuristicBot` 自對局量測，bot 的基準為
-`0b5d48f`，`View::safe` 是這次新增的。
+Measured 2026-11-16.  The question: winning is compulsory, so a card that
+comes down and nobody wins on proves that no seat asked could win on it at
+the time.  How many of the discards to choose from does this proof cover?
+And what sets the danger of a card not proven safe?  This is measured from
+`HeuristicBot` self-play; the bot's base is `0b5d48f`, and `View::safe` is
+new with this measurement.
 
-## 結論
+## Answer
 
-**證明是對的，但很稀疏；真正決定危險度的是對手還剩幾張暗牌。**
+**The proof is sound but sparse; what really sets the danger is how many
+concealed cards the opponent has left.**
 
-- **被證明安全的牌從未被胡。** 20,000 局、約 848 萬組（候選棄牌，對手）裡，
-  example 內的 assert 沒有觸發過。
-- **只有約 5% 的組合被證明安全。** 各列都在 2.7% 到 6.6% 之間。對手每
-  吃碰一次，對它的證明就全部作廢，而 `HeuristicBot` 吃碰得很勤。
-- **扣掉安全牌後，剩下的牌只危險了一點點**（例如 2.44% 變 2.58%），因為被
-  扣掉的只有二十分之一。
-- **對手的暗牌張數把危險度拉開兩百倍。** 對手還握 19 到 20 張時，一張未證明
-  安全的牌被它胡的機率是 0.02%；剩 8 張以下時是 3% 到 5%。
-- **兵卒在每一列都約是士象、車馬炮的 1.5 倍**，與 `discard-danger.md` 一致。
+- **A card proven safe was never won on.**  Over 20,000 rounds and about
+  8.48 million (candidate discard, opponent) combinations, the assert in
+  the example never fired.
+- **Only about 5% of the combinations are proven safe.**  Every row lies
+  between 2.7% and 6.6%.  Each time an opponent eats or pongs, every proof
+  against it is void, and `HeuristicBot` eats and pongs a great deal.
+- **With the safe cards taken out, the rest are only a little more
+  dangerous** (2.44% becomes 2.58%, for example), because only a twentieth
+  was taken out.
+- **The opponent's concealed card count spreads the danger two
+  hundredfold.**  While the opponent still holds 19 to 20 cards, a card not
+  proven safe is won on by it 0.02% of the time; with 8 or fewer left, 3%
+  to 5%.
+- **Soldiers are about 1.5 times 士象 and 車馬炮 in every row**, in
+  agreement with `discard-danger.md`.
 
-## 為什麼證明成立
+## Why the proof holds
 
-`Round::resolve` 對每一張公開的牌先檢查胡：摸牌問四家，棄牌問另外三家，有人
-能胡就立刻結束。所以牌局還在進行，就表示被問到的人當時都胡不到。
+`Round::resolve` checks every public card for a win first: a draw is offered
+to all four seats, a discard to the other three, and the round ends at once
+if anyone can win.  So a round still in play means that none of those asked
+could win at the time.
 
-一家能不能胡某張牌，只看它的暗牌、亮出的牌組與規則。摸到的牌從不進手，暗牌
-只在吃、碰、槓時減少，亮出的牌組也只在那時增加。所以「胡不到」一直成立到
-那一家下一次吃碰槓為止。之後它的暗牌變了、門檻也降了，原本胡不到的牌可能
-變成胡得到，證明必須整個作廢。
+Whether a seat can win on a card depends only on its concealed cards, its
+exposed melds and the rules.  A drawn card never enters a hand; concealed
+cards only decrease, on an eat, a pong or a kong, and exposed melds only
+increase then.  So "cannot win on it" holds until that seat's next eat, pong
+or kong.  After that its concealed cards have changed and its threshold is
+lower too, a card it could not win on may become one it can, and the proof
+must be voided whole.
 
-## 量測方法
+## Method
 
-四家 `HeuristicBot` 以 `Rules::new()` 對局 20,000 局，seed base 20261117，
-莊家輪流。每到一次棄牌，對出牌者每一張可以打的牌（不重複）與另外三家各配成
-一組，記下：
+Four `HeuristicBot`s play 20,000 rounds under `Rules::new()`, seed base
+20261117, the dealer rotating.  At every discard, each card the discarding
+seat could put down (without repeats) is paired with each of the other three
+seats, and two things are recorded:
 
-1. `View::safe` 是否證明這一家胡不到它。
-2. 這一家實際上能不能胡它，判定與 `Round` 相同。
+1. Whether `View::safe` proves that this seat cannot win on it.
+2. Whether this seat can in fact win on it, decided as `Round` decides it.
 
-列以被檢查那一家的暗牌張數分組。「實際棄牌」只取出牌者真正打出的那張。
+Rows group by the concealed card count of the seat tested.  "Actual
+discards" takes only the card the discarding seat really put down.
 
-重現（bot 須為 `0b5d48f`；之後的 bot 打法不同，數字會略有出入）：
+To reproduce (the bot must be `0b5d48f`; later bots play differently, and
+the numbers will differ slightly):
 
 ```sh
 cargo run --release --example safe -- 20000 20261117
 ```
 
-## 數據
+## Data
 
-### 任何可以打的牌，對單一對手
+### Any card that could be discarded, against a single opponent
 
-| 對手暗牌 | 牌種 | 組數 | 已證明安全 | 被胡（全部） | 被胡（未證明） |
+| Opponent's concealed cards | Kind | Combinations | Proven safe | Won on (all) | Won on (not proven) |
 | --- | --- | ---: | ---: | ---: | ---: |
 | 20–19 | 士象 | 915,517 | 4.64% | 0.016% | 0.017% |
 | 20–19 | 車馬炮 | 1,428,488 | 2.68% | 0.017% | 0.017% |
-| 20–19 | 兵卒 | 441,415 | 6.49% | 0.025% | 0.027% |
+| 20–19 | soldiers | 441,415 | 6.49% | 0.025% | 0.027% |
 | 18–17 | 士象 | 689,919 | 5.55% | 0.135% | 0.143% |
 | 18–17 | 車馬炮 | 1,128,166 | 4.35% | 0.125% | 0.130% |
-| 18–17 | 兵卒 | 338,110 | 5.82% | 0.187% | 0.198% |
+| 18–17 | soldiers | 338,110 | 5.82% | 0.187% | 0.198% |
 | 16–15 | 士象 | 325,947 | 5.48% | 0.468% | 0.496% |
 | 16–15 | 車馬炮 | 537,808 | 4.92% | 0.513% | 0.540% |
-| 16–15 | 兵卒 | 170,232 | 4.69% | 0.815% | 0.855% |
+| 16–15 | soldiers | 170,232 | 4.69% | 0.815% | 0.855% |
 | 14–13 | 士象 | 363,346 | 5.57% | 0.817% | 0.865% |
 | 14–13 | 車馬炮 | 598,204 | 5.18% | 0.871% | 0.919% |
-| 14–13 | 兵卒 | 192,950 | 4.87% | 1.370% | 1.440% |
+| 14–13 | soldiers | 192,950 | 4.87% | 1.370% | 1.440% |
 | 12–11 | 士象 | 237,165 | 5.68% | 1.634% | 1.732% |
 | 12–11 | 車馬炮 | 382,858 | 5.52% | 1.602% | 1.696% |
-| 12–11 | 兵卒 | 131,547 | 4.84% | 2.359% | 2.479% |
+| 12–11 | soldiers | 131,547 | 4.84% | 2.359% | 2.479% |
 | 10–9 | 士象 | 109,081 | 5.54% | 2.440% | 2.584% |
 | 10–9 | 車馬炮 | 171,789 | 5.46% | 2.508% | 2.652% |
-| 10–9 | 兵卒 | 62,027 | 4.59% | 3.798% | 3.981% |
+| 10–9 | soldiers | 62,027 | 4.59% | 3.798% | 3.981% |
 | 8–7 | 士象 | 57,816 | 5.52% | 2.977% | 3.151% |
 | 8–7 | 車馬炮 | 90,157 | 5.61% | 3.200% | 3.390% |
-| 8–7 | 兵卒 | 33,268 | 4.98% | 4.638% | 4.881% |
+| 8–7 | soldiers | 33,268 | 4.98% | 4.638% | 4.881% |
 | 6–5 | 士象 | 19,291 | 5.94% | 3.012% | 3.202% |
 | 6–5 | 車馬炮 | 29,546 | 5.65% | 3.445% | 3.652% |
-| 6–5 | 兵卒 | 11,457 | 5.27% | 4.678% | 4.939% |
+| 6–5 | soldiers | 11,457 | 5.27% | 4.678% | 4.939% |
 | 4–3 | 士象 | 3,633 | 5.34% | 3.716% | 3.926% |
 | 4–3 | 車馬炮 | 5,501 | 5.36% | 3.581% | 3.784% |
-| 4–3 | 兵卒 | 2,170 | 5.99% | 4.286% | 4.559% |
+| 4–3 | soldiers | 2,170 | 5.99% | 4.286% | 4.559% |
 | 2–0 | 士象 | 620 | 5.97% | 2.903% | 3.087% |
 | 2–0 | 車馬炮 | 829 | 4.58% | 3.136% | 3.287% |
-| 2–0 | 兵卒 | 256 | 6.64% | 2.734% | 2.929% |
+| 2–0 | soldiers | 256 | 6.64% | 2.734% | 2.929% |
 
-### 實際棄牌，對單一對手
+### Actual discards, against a single opponent
 
-| 對手暗牌 | 牌種 | 組數 | 已證明安全 | 被胡（全部） | 被胡（未證明） |
+| Opponent's concealed cards | Kind | Combinations | Proven safe | Won on (all) | Won on (not proven) |
 | --- | --- | ---: | ---: | ---: | ---: |
 | 20–19 | 士象 | 103,851 | 5.27% | 0.013% | 0.014% |
 | 20–19 | 車馬炮 | 75,212 | 6.94% | 0.023% | 0.024% |
-| 20–19 | 兵卒 | 53,184 | 2.28% | 0.017% | 0.017% |
+| 20–19 | soldiers | 53,184 | 2.28% | 0.017% | 0.017% |
 | 18–17 | 士象 | 82,791 | 6.88% | 0.129% | 0.139% |
 | 18–17 | 車馬炮 | 102,226 | 8.23% | 0.130% | 0.142% |
-| 18–17 | 兵卒 | 22,706 | 2.72% | 0.159% | 0.163% |
+| 18–17 | soldiers | 22,706 | 2.72% | 0.159% | 0.163% |
 | 16–15 | 士象 | 40,234 | 7.12% | 0.403% | 0.434% |
 | 16–15 | 車馬炮 | 65,827 | 8.31% | 0.536% | 0.585% |
-| 16–15 | 兵卒 | 7,233 | 3.59% | 0.705% | 0.731% |
+| 16–15 | soldiers | 7,233 | 3.59% | 0.705% | 0.731% |
 | 14–13 | 士象 | 45,454 | 7.21% | 0.713% | 0.768% |
 | 14–13 | 車馬炮 | 79,323 | 8.29% | 0.898% | 0.979% |
-| 14–13 | 兵卒 | 8,058 | 4.17% | 1.216% | 1.269% |
+| 14–13 | soldiers | 8,058 | 4.17% | 1.216% | 1.269% |
 | 12–11 | 士象 | 31,094 | 7.54% | 1.476% | 1.596% |
 | 12–11 | 車馬炮 | 59,987 | 8.12% | 1.509% | 1.642% |
-| 12–11 | 兵卒 | 5,280 | 5.08% | 2.860% | 3.013% |
+| 12–11 | soldiers | 5,280 | 5.08% | 2.860% | 3.013% |
 | 10–9 | 士象 | 15,434 | 7.02% | 2.371% | 2.550% |
 | 10–9 | 車馬炮 | 29,891 | 7.74% | 2.395% | 2.596% |
-| 10–9 | 兵卒 | 2,694 | 5.16% | 4.343% | 4.579% |
+| 10–9 | soldiers | 2,694 | 5.16% | 4.343% | 4.579% |
 | 8–7 | 士象 | 8,429 | 7.15% | 2.978% | 3.207% |
 | 8–7 | 車馬炮 | 16,665 | 7.58% | 3.150% | 3.409% |
-| 8–7 | 兵卒 | 1,626 | 6.21% | 5.043% | 5.377% |
+| 8–7 | soldiers | 1,626 | 6.21% | 5.043% | 5.377% |
 | 6–5 | 士象 | 3,098 | 7.88% | 3.196% | 3.469% |
 | 6–5 | 車馬炮 | 5,852 | 7.35% | 3.195% | 3.449% |
-| 6–5 | 兵卒 | 688 | 5.52% | 5.233% | 5.538% |
+| 6–5 | soldiers | 688 | 5.52% | 5.233% | 5.538% |
 | 4–3 | 士象 | 649 | 6.47% | 2.928% | 3.130% |
 | 4–3 | 車馬炮 | 1,138 | 7.03% | 4.394% | 4.726% |
-| 4–3 | 兵卒 | 121 | 5.79% | 4.959% | 5.263% |
+| 4–3 | soldiers | 121 | 5.79% | 4.959% | 5.263% |
 | 2–0 | 士象 | 97 | 8.25% | 3.093% | 3.371% |
 | 2–0 | 車馬炮 | 184 | 5.98% | 3.261% | 3.468% |
-| 2–0 | 兵卒 | 20 | 15.00% | 0.000% | 0.000% |
+| 2–0 | soldiers | 20 | 15.00% | 0.000% | 0.000% |
 
-## 怎麼讀
+## How to read it
 
-- **安全牌是品質高、數量少的資訊。** 它能把一張牌對某一家的風險從幾個百分點
-  降到零，但二十次裡只遇到一次。單靠它，bot 的進步不會大。
-- **對手的進度才是大訊號。** 同一張牌，對一個還握 20 張的人幾乎沒有風險，對
-  一個只剩 8 張的人有 3% 到 5%。暗牌張數是公開的。
-- **bot 無意間已經偏向打安全牌。** 實際打出的士象、車馬炮多半有 7% 到 8% 是已證明
-  安全的，高於候選牌的 5%：剛落地的牌自己手上若還有一張，多半是孤張，本來就
-  先打。
+- **A safe card is information of high quality and small quantity.**  It
+  takes a card's risk against one seat from a few per cent down to zero, but
+  comes up only once in twenty.  On it alone the bot will not improve much.
+- **The opponent's progress is the big signal.**  The same card carries
+  almost no risk against someone still holding 20 cards, and 3% to 5%
+  against someone with only 8 left.  Concealed card counts are public.
+- **The bot already leans towards safe discards without meaning to.**  Of
+  the 士象 and 車馬炮 actually discarded, mostly 7% to 8% are proven safe,
+  above the 5% of the candidates: when the seat still holds a copy of a card
+  that has just come down, it is mostly a lone card, which goes first
+  anyway.
 
-## 用在 bot 上的結果
+## Results in the bot
 
-把這兩個訊號加進 `HeuristicBot` 的棄牌，兩次 A/B 都沒有贏，bot 沒有改動。
-危險度取上表「被胡（未證明）」一欄，三個牌種合併，以萬分之一為單位：2、14、
-55、95、180、280、350、370、390、390（最後一列樣本只有 1,705 組，沿用上一列）。
-對照為 `0b5d48f`，各 200,000 局。
+Adding these two signals to `HeuristicBot`'s discard did not win in either
+of two A/Bs, and the bot is unchanged.  The danger is the "Won on (not
+proven)" column of the tables above, the three kinds merged, in units of one
+ten-thousandth: 2, 14, 55, 95, 180, 280, 350, 370, 390, 390 (the last row
+has a sample of only 1,705 combinations, so it reuses the row before).  The
+control is `0b5d48f`, 200,000 deals each.
 
-| 做法 | seed base | 不同的局數 | 得分差（分／局） | 95% CI | 結論 |
+| Approach | seed base | Deals that differ | Score difference (points a deal) | 95% CI | Verdict |
 | --- | ---: | ---: | ---: | --- | --- |
-| 從評分扣掉 12 × 32 × 危險度 | 1794815549 | 5,328 | −0.037 ± 0.010 | [−0.057, −0.017] | loss |
-| 評分相同時才比危險度 | 1794816883 | 2,513 | −0.002 ± 0.007 | [−0.015, +0.011] | 不明 |
+| Take 12 × 32 × danger off the grade | 1794815549 | 5,328 | −0.037 ± 0.010 | [−0.057, −0.017] | loss |
+| Compare danger only when grades tie | 1794816883 | 2,513 | −0.002 ± 0.007 | [−0.015, +0.011] | insufficient data |
 
-第一種做法讓那一家少放銃，但沒有少輸：在第一個棄牌分歧的 16,927 局裡，放銃
-從 3,460 次降到 3,057 次，別家胡而非自己放銃的從 9,879 次升到 10,356 次，
-自己胡從 2,447 次降到 2,272 次。聽牌的人不靠某一家放銃也會胡，因為每張摸牌
-都翻開來問四家。設計上的後續見 `doc/stronger-bot.md`。
+The first approach made that seat deal in less, but not lose less: in the
+16,927 deals that first part at a discard, its deal-ins fell from 3,460 to
+3,057, wins by another seat that it did not deal in rose from 9,879 to
+10,356, and its own wins fell from 2,447 to 2,272.  A waiting seat wins
+without any one seat dealing in, because every drawn card is turned up and
+offered to all four seats.  The design follow-up is in
+`doc/stronger-bot.md`.
 
-## 限制
+## Caveats
 
-- **對手是同一個 bot。** 5% 這個比例取決於對手多常吃碰；危險度的數值取決於
-  對手多快聽牌。真人會給出不同的數字，不變的只有證明本身。
-- **沒有信賴區間。** 同一局的各次棄牌檢查的是幾乎相同的手牌，樣本彼此相關。
-- **只分了暗牌張數與牌種。** 對手還差幾胡、未見的搭檔牌還剩幾張，都沒有
-  拆開看。
+- **The opponents are the same bot.**  The 5% depends on how often the
+  opponents eat and pong; the danger values depend on how fast they come to
+  wait.  People would give different numbers; only the proof itself would
+  not change.
+- **No confidence intervals.**  The discards of one round test nearly the
+  same hands, so the samples are correlated.
+- **Split only by concealed card count and kind.**  How many 胡 the
+  opponent still lacks, and how many of the unseen partner cards are left,
+  were not broken out.

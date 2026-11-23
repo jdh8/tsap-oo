@@ -1,60 +1,82 @@
-# 從分歧點重洗牌堆：A/B 能省多少局？
+# Reshuffling the pile from where the two part: how many deals can an A/B save?
 
-量測日期：2026-11-17。問題：`ab/` 讓候選與對照打同一副牌，但兩邊一旦打得
-不一樣，之後摸到什麼牌就決定了大部分的得分差。在兩邊第一次分歧的地方把剩下
-的牌堆重洗 K 次、各自打完，取得分差的平均，能把同樣的把握壓到更少的局數與
-計算量嗎？這是 `doc/stronger-bot.md` 路線零的第一步。
+Measured 2026-11-17.  The question: `ab/` has the candidate and the control
+play the same deal, but once the two play differently, the cards drawn
+afterwards decide most of the score difference.  If the pile left where the
+two first part is reshuffled K times, each played out by both, and the score
+differences averaged, can the same confidence be had for fewer deals and
+less compute?  This is the first step of route 0 in `doc/stronger-bot.md`.
 
-## 結論
+## Answer
 
-**能。K = 8 時，同樣的標準誤只要原本五分之一多的局數、四分之一的計算量。
-`ab/` 從此預設 K = 8。**
+**Yes.  At K = 8 the same standard error takes a little over a fifth of the
+deals and a quarter of the compute.  `ab/` defaults to K = 8 from now on.**
 
-- **分歧之後的運氣是雜訊的大頭。** 同一個分歧局面重洗牌堆，得分差的標準差
-  是 18 到 19 分；不同局面之間真實期望值的標準差只有 4.4 到 4.7 分。
-- **估計量不偏，而且通過驗收。** 候選與對照相同時，20,000 局沒有一局分歧，
-  得分差剛好是 0。校正用的那組改動（已知 +0.283 ± 0.018）重洗 8、16、32 次
-  各量一次，信賴區間都蓋住 +0.283。
-- **K 在 8 到 16 之間都差不多。** 每單位把握的計算量，K = 8 比原本省 4.3 倍，
-  K = 16 省 4.0 倍，K = 32 省 3.6 倍。局數則是 K 越大越省：5.5、7.9、11.5 倍。
-  候選越常分歧，前面那段的固定成本越不重要，最佳的 K 越小，所以預設取 8。
-- **`MonteCarloBot` 這類候選照舊用原本的估計量**（`RESHUFFLE=0`）。重打的
-  每一次都要再算一次 Monte Carlo，省下的局數換不回那麼多計算量；這一點沒有
-  量。
+- **The luck after the split is the bulk of the noise.**  With the pile
+  reshuffled from one and the same split, the score difference has a
+  standard deviation of 18 to 19 points; the true expectations of different
+  splits have a standard deviation of only 4.4 to 4.7 points.
+- **The estimator is unbiased, and passes acceptance.**  With the candidate
+  the same as the control, not one of 20,000 deals parts and the score
+  difference is exactly 0.  The change used for calibration (known to be
+  +0.283 ± 0.018) was measured once each at 8, 16 and 32 reshuffles, and
+  every confidence interval covers +0.283.
+- **K anywhere from 8 to 16 is about the same.**  In compute per unit of
+  confidence, K = 8 saves 4.3 times over the original, K = 16 4.0 times and
+  K = 32 3.6 times.  In deals, the larger K the more is saved: 5.5, 7.9 and
+  11.5 times.  The more often a candidate parts, the less the fixed cost of
+  the stretch before the split matters and the smaller the best K, so the
+  default is 8.
+- **Candidates like `MonteCarloBot` keep the original estimator**
+  (`RESHUFFLE=0`).  Every replay has to run the Monte Carlo once more, and
+  the deals saved do not buy back that much compute; this was not measured.
 
-## 為什麼不偏
+## Why it is unbiased
 
-分歧之前，每一家的每一個決定都只看得到已經翻開的牌。所以到了分歧那一刻，
-牌堆裡剩下的牌的順序，在已知的一切條件下仍是均勻隨機的。原本那一副牌的
-後半段，只是這個均勻分布裡的一個樣本；換成 K 個新的樣本取平均，期望值不變，
-只把分歧之後的運氣平均掉。
+Before the split, every decision of every seat sees only the cards already
+turned up.  So at the moment of the split, the order of the cards left in
+the pile is still uniformly random given everything known.  The rest of the
+original deal is only one sample from that uniform distribution; averaging K
+new samples in its place leaves the expectation unchanged and only averages
+out the luck after the split.
 
-四家的暗牌是局面的一部分，不能重發。這正是 `Round::determinize` 不能用的
-原因：它連別家的手牌一起重發。
+The four seats' concealed cards are part of the position and cannot be dealt
+again.  That is exactly why `Round::determinize` cannot be used: it deals
+the other seats' hands again as well.
 
-兩邊打完全相同的局，得分差照舊是 0，所以不必重打。
+Where the two sides play exactly the same round, the score difference is 0
+as before, so nothing needs replaying.
 
-## 做法
+## Approach
 
-`ab/src/main.rs`。每一副牌：
+`ab/src/main.rs`.  For each deal:
 
-1. 用該局的 seed 洗出整副牌，候選坐第 2 家打一次。候選每次做決定時，也問
-   對照組的 bot 在同一個位置會怎麼做。
-2. 兩者第一次不同時停下，記下之前的所有決定、兩邊各自的選擇，以及牌堆還剩
-   幾張。牌是從牌堆的尾端摸的，所以剩下的就是原本那副牌的前 `left` 張。
-3. 重複 K 次：把那 `left` 張洗一次，以 `Round::from_pile` 重發同一副牌，照
-   記下的決定重放到分歧點，然後一邊走對照的選擇、四家都是對照；另一邊走
-   候選的選擇、候選繼續坐第 2 家。兩邊用同一次洗出來的牌堆。
-4. 這副牌的得分差是 K 次的平均。沒有分歧的牌記 0。
+1. Shuffle the whole deck with the deal's seed and play it once with the
+   candidate in the second seat.  At each of the candidate's decisions, the
+   control's bot is also asked what it would do in the same place.
+2. Stop where the two first differ, and record every decision before it,
+   each side's choice, and how many cards the pile has left.  Cards are
+   drawn from the end of the pile, so what is left is the first `left` cards
+   of the original deal.
+3. K times over: shuffle those `left` cards once, deal the same deal again
+   with `Round::from_pile`, replay the recorded decisions to the split, then
+   on one side take the control's choice with the control in all four
+   seats, and on the other take the candidate's choice with the candidate
+   staying in the second seat.  Both sides use the pile from the same
+   shuffle.
+4. The deal's score difference is the mean of the K.  A deal that never
+   parts counts 0.
 
-重放只走記下的決定，不呼叫 bot，所以分歧之前那一段幾乎不花時間。函式庫
-不必改：兩個 crate 都只用到公開的 `Round::from_pile` 與 `Round::pile_len`。
+The replay only walks the recorded decisions and calls no bot, so the
+stretch before the split takes almost no time.  The library needs no change:
+both crates use only the public `Round::from_pile` and `Round::pile_len`.
 
-同一個 harness 也做變異數分析（單因子）：在分歧的那些牌之間，K 次之間的
-變異是「同一個局面裡牌堆的運氣」，K 次平均的變異扣掉前者的 1/K 是「局面之間
-真實的差異」。
+The same harness also does the analysis of variance (one-way): among the
+deals that part, the variation among the K replays is "the luck of the pile
+within one split", and the variation of the means over K, less 1/K of the
+former, is "the true differences between splits".
 
-重現（校正組）：
+To reproduce (the calibration set):
 
 ```sh
 S=$(mktemp -d)
@@ -64,7 +86,7 @@ cp -r ab/src ab/Cargo.toml ab/Cargo.lock "$S/ab/"
 git archive 6fc8f21 | tar -xm -C "$S/ab/target/base"
 sed -i '0,/^name = "tsap-oo"$/s//name = "tsap-oo-base"/' \
   "$S/ab/target/base/Cargo.toml"
-# 1b644f2 沒有 `peek` feature，Peeker 跟著拿掉。
+# 1b644f2 has no `peek` feature, so the Peeker goes with it.
 sed -i '/^\[features\]/,$d' "$S/ab/Cargo.toml"
 (cd "$S/ab" && cargo build --release)
 RESHUFFLE=0 "$S/ab/target/release/tsap-oo-ab" 1794765506 200000
@@ -73,53 +95,66 @@ RESHUFFLE=8 "$S/ab/target/release/tsap-oo-ab" 1794846881 40000
 RESHUFFLE=16 "$S/ab/target/release/tsap-oo-ab" 1794846911 40000
 ```
 
-候選與對照相同的驗收，用版本庫原樣：`ab/run.sh 20000`（對照 `e40cca4`，
-seed base 1794846981）。
+The acceptance run, with the candidate the same as the control, uses the
+repository as it stands: `ab/run.sh 20000` (control `e40cca4`, seed base
+1794846981).
 
-每一次的局數都在跑之前定下，seed base 取當時的時鐘；第一行是原本那一次的
-重放。
+Every deal count was fixed before the run, and the seed base taken from the
+clock at the time; the first line is a replay of the original run.
 
-## 數據
+## Data
 
-校正組是「不吃進已完整的牌組」：候選 `1b644f2`，對照 `6fc8f21`，四人桌。
+The calibration set is "not eating into a meld already whole": candidate
+`1b644f2`, control `6fc8f21`, a table of four.
 
-| | 原本 | K = 32 | K = 8 | K = 16 |
+| | Original | K = 32 | K = 8 | K = 16 |
 | --- | ---: | ---: | ---: | ---: |
 | seed base | 1794765506 | 1794846831 | 1794846881 | 1794846911 |
-| 局數 | 200,000 | 12,000 | 40,000 | 40,000 |
-| 不同（原本）／分歧（重洗）的局數 | 16,804 | 1,903 | 6,682 | 6,534 |
-| 得分差（分／局） | +0.283 ± 0.018 | +0.258 ± 0.021 | +0.289 ± 0.017 | +0.284 ± 0.014 |
+| Deals | 200,000 | 12,000 | 40,000 | 40,000 |
+| Deals that differ (original) / part (reshuffled) | 16,804 | 1,903 | 6,682 | 6,534 |
+| Score difference (points a deal) | +0.283 ± 0.018 | +0.258 ± 0.021 | +0.289 ± 0.017 | +0.284 ± 0.014 |
 | 95% CI | [+0.249, +0.318] | [+0.217, +0.300] | [+0.256, +0.322] | [+0.257, +0.312] |
-| 胡牌率，對照 → 候選 | 24.50% → 25.05% | 24.02% → 24.50% | 25.01% → 25.58% | 24.15% → 24.71% |
-| 同一局面內的標準差（分） | | 18.36 | 19.12 | 18.93 |
-| 局面之間的標準差（分） | | 4.63 | 4.41 | 4.74 |
+| Win rate, control → candidate | 24.50% → 25.05% | 24.02% → 24.50% | 25.01% → 25.58% | 24.15% → 24.71% |
+| Standard deviation within a split (points) | | 18.36 | 19.12 | 18.93 |
+| Standard deviation between splits (points) | | 4.63 | 4.41 | 4.74 |
 
-原本那一次的重放與 `CHANGELOG.md` 記的逐位相同，所以新的 harness 在
-`RESHUFFLE=0` 時就是原本的估計量。
+The replay of the original run is identical to the digit with what
+`CHANGELOG.md` records, so the new harness at `RESHUFFLE=0` is the original
+estimator.
 
-「分歧」比「不同」多：兩邊第一次做出不同的決定的牌，約一半最後得分還是一樣。
+"Part" outnumbers "differ": of the deals where the two sides first make
+different decisions, about half end with the same score after all.
 
-### 成本
+### Cost
 
-每副牌的計算量是 harness 用掉的 CPU 時間除以局數，16 個執行緒。每副牌的
-變異是標準差的平方乘以局數（標準差由印出來的信賴區間兩端反推）。
+The compute per deal is the CPU time the harness used over the deal count,
+on 16 threads.  The variance per deal is the square of the standard
+deviation times the deal count (the standard deviation worked back from the
+two ends of the printed confidence interval).
 
-| | 原本 | K = 32 | K = 8 | K = 16 |
+| | Original | K = 32 | K = 8 | K = 16 |
 | --- | ---: | ---: | ---: | ---: |
-| 每副牌的 CPU 時間 | 6.5 ms | 20.8 ms | 8.3 ms | 12.6 ms |
-| 每副牌的變異（分²） | 61.9 | 5.4 | 11.3 | 7.9 |
-| 同樣把握所需的局數 | 1 | 1/11.5 | 1/5.5 | 1/7.9 |
-| 同樣把握所需的計算量 | 1 | 1/3.6 | 1/4.3 | 1/4.0 |
+| CPU time per deal | 6.5 ms | 20.8 ms | 8.3 ms | 12.6 ms |
+| Variance per deal (points²) | 61.9 | 5.4 | 11.3 | 7.9 |
+| Deals for the same confidence | 1 | 1/11.5 | 1/5.5 | 1/7.9 |
+| Compute for the same confidence | 1 | 1/3.6 | 1/4.3 | 1/4.0 |
 
-每副牌的變異約為 p × (μ² + σ²局面 + σ²運氣 ÷ K)：p 是分歧的比例（約 16%），
-μ 是分歧的牌得分差的平均（約 1.7 分）。上表的三個 K 都對得上這個式子。
+The variance per deal is about p × (μ² + σ²split + σ²luck ÷ K): p is the
+share of the deals that part (about 16%), and μ the mean score difference of
+the deals that part (about 1.7 points).  All three K in the table above fit
+this formula.
 
-## 限制
+## Caveats
 
-- **校正只有一組改動。** 它約 16% 的牌分歧。分歧比例差很多的改動（例如三成
-  的牌打法不同的權重擬合），最佳的 K 會不同，省下的倍數也會不同：局面之間
-  的差異越大，重洗幫得越少。
-- **計時不乾淨。** 這幾次跑的時候，另一個以 `nice 10` 執行的兩人桌 Monte
-  Carlo A/B 也在同一台機器上。四次都一樣，倍數只當成約略值。
-- **Monte Carlo 的候選沒有量。** 重打時候選的 bot 從頭建起，`MonteCarloBot`
-  的亂數因此不同；這不影響不偏，只是沒有量值不值得。
+- **The calibration is one change only.**  About 16% of its deals part.  For
+  a change whose share is very different (a fit of the weights that plays
+  30% of the deals differently, say), the best K will differ and so will the
+  factor saved: the larger the differences between splits, the less
+  reshuffling helps.
+- **The timing is not clean.**  During these runs another A/B, a Monte Carlo
+  one at a table of two under `nice 10`, was on the same machine.  It was
+  the same for all four, and the factors are only approximate.
+- **Monte Carlo candidates were not measured.**  On a replay the candidate's
+  bot is built from scratch, so `MonteCarloBot`'s random numbers differ;
+  this does not affect unbiasedness, but whether it is worth it was not
+  measured.

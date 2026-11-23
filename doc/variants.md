@@ -1,62 +1,77 @@
-# 預設以外的賽制：還缺什麼
+# Variants beyond the default: what is missing
 
-整理日期：2026-11-21，基準 `4e461d0`；同一天小桌的廢牌改了（「小桌的
-廢牌」，基準 `107032c`），小桌在那之前量的數字都標了「舊規則」。
-2026-11-22 補：小桌在新規則下重量了 `Outlook`、重新訓練了 `Eval`
-（`eval.md`「兩、三人桌的表」）。
+Compiled 2026-11-21, base `4e461d0`; the same day the dead cards of a small
+table changed ("The dead cards of a small table", base `107032c`), and every
+number measured at a small table before that is marked "old rules".  Added
+2026-11-22: under the new rules the small tables had their `Outlook`
+measured anew and their `Eval` retrained (`eval.md`, "Tables for two and
+three players").
 
-預設是四人、十胡（`Rules::new`）。另外能選的是八胡（`Rules::eight`）與兩、
-三人桌（`Rules::players`），網頁與桌面版在「設定」裡都選得到。**這些賽制的
-規則引擎是完整的，bot 不是：** bot 的常數、表與量測幾乎全部來自四人十胡，
-在別的賽制只是照用。五人桌沒有做。
+The default is four players at ten 胡 (`Rules::new`).  The other choices are
+八胡 (`Rules::eight`) and tables of two and three (`Rules::players`), all of
+them offered under 「設定」 (Settings) on the web page and in the desktop app.
+**The rules engine is complete for these variants; the bots are not:**
+nearly all of the bots' constants, tables and measurements come from four
+players at ten 胡 and are simply used as they are elsewhere.  A table of
+five is not implemented.
 
-| | 四人十胡 | 八胡 | 兩、三人桌 | 五人桌 |
+| | Four players, ten 胡 | 八胡 | Tables of two and three | A table of five |
 | --- | --- | --- | --- | --- |
-| 發牌、吃碰、結算 | 有 | 有 | 有 | 沒有 |
-| 規則有出處 | 有 | 有 | 只有「可以玩」 | 有，沒做 |
-| `HeuristicBot` 的常數 | 量過 | 照用，沒量 | 照用，沒量 | |
-| `Outlook`（牌桌模型） | 量過 | 量過，照用十胡的，資料不足 | 量過；兩人十胡用自己的（win），其餘照用四人桌的 | |
-| `Eval`（閘門外的表） | 訓練過，win | 照用十胡的，資料不足 | 訓練過；兩人十胡用自己的（win），三人桌資料不足，照用四人桌的 | |
-| 提示標的點數 | 全程 | 全程，閘門外是十胡的值 | 全程；兩人十胡是那一桌的值，其餘是四人桌的 | |
-| 算數的 A/B | 每個改動 | 兩組 | 新規則下八組（M、N、W 到 Z、W8、Y8） | |
-| `examples/` 的量測工具 | 有 | 只有 `outlook` | `outlook` 與 `eval` | |
+| Dealing, eats and pongs, settlement | Yes | Yes | Yes | No |
+| The rules have a source | Yes | Yes | Only "can be played" | Yes; not implemented |
+| `HeuristicBot`'s constants | Measured | Used as they are, not measured | Used as they are, not measured | |
+| `Outlook` (the table model) | Measured | Measured; ten 胡's is used, insufficient data | Measured; two players at ten 胡 use their own (win), the rest four players' | |
+| `Eval` (the table past the gate) | Trained, win | Ten 胡's is used, insufficient data | Trained; two players at ten 胡 use their own (win), three players are insufficient data and use four players' | |
+| The points the hint shows | Throughout | Throughout; past the gate they are ten 胡's values | Throughout; at two players and ten 胡 that table's values, elsewhere four players' | |
+| A/Bs that count | Every change | Two | Eight under the new rules (M, N, W to Z, W8, Y8) | |
+| Measuring tools in `examples/` | Yes | `outlook` only | `outlook` and `eval` | |
 
-## 已經有的
+## What is there
 
-- **規則。** 門檻與相公的罰分照 `Rules::threshold`；桌子的大小照
-  `Rules::players`，發牌與結算和四人桌相同（每人 20 張、莊家 21 張，胡牌與
-  相公都和另外每一家結算）。廢牌是尾 6 張加每個空位的 20 張，所以每一桌都
-  摸 25 張（下一節）。`tests/round.rs` 的不變量在兩、三人桌也跑。
-- **兩個客戶端。** 設定 → 玩法、人數；說明裡的門檻跟著換，座位的稱呼照
-  人數（兩人桌只有「對家」）。
-- **bot 讀得到規則的地方都讀了。** `HeuristicBot` 算「還差幾胡」、
-  `ExpectBot` 的 DP 判定胡牌、剪枝、相公的罰分，用的都是 `Rules` 的門檻；
-  DP 的報酬照桌上的家數乘。
-- **`ab/` 的開關。** `THRESHOLD` 與 `PLAYERS`，兩邊同時換。
+- **The rules.**  The threshold and the 相公 penalty follow
+  `Rules::threshold`; the size of the table follows `Rules::players`, with
+  dealing and settlement the same as at four (20 cards each, 21 to the
+  dealer, a win or a 相公 settled with each other seat).  The dead cards are
+  the last 6 plus the 20 of each empty seat, so every table draws 25 cards
+  (the next section).  The invariants of `tests/round.rs` run at tables of
+  two and three as well.
+- **Both clients.**  「設定」 → 「玩法」 (variant), 「人數」 (players); the
+  threshold in the help follows, and the seats are named by the number of
+  players (a table of two has only 「對家」, the seat opposite).
+- **The bots read the rules wherever they can.**  `HeuristicBot` counting
+  "how many 胡 short", `ExpectBot`'s DP judging a win, the pruning, the 相公
+  penalty: all use the threshold of `Rules`; the DP's payoff is multiplied
+  by the seats at the table.
+- **The switches of `ab/`.**  `THRESHOLD` and `PLAYERS`, changed on both
+  sides at once.
 
-## 小桌的廢牌
+## The dead cards of a small table
 
-2026-11-21 改，基準 `107032c`。**空位的手牌算廢牌：** 廢牌是尾 6 張，加
-每個空位本來會發到的 20 張（`Rules::dead`）。
+Changed 2026-11-21, base `107032c`.  **Empty seats' hands are dead:** the
+dead cards are the last 6, plus the 20 each empty seat would have been dealt
+(`Rules::dead`).
 
-| 人數 | 發出去 | 廢牌 | 可摸 | 之前的廢牌 | 之前可摸 |
+| Players | Dealt | Dead | To draw | Dead before | To draw before |
 | ---: | ---: | ---: | ---: | ---: | ---: |
 | 4 | 81 | 6 | 25 | 6 | 25 |
 | 3 | 61 | 26 | 25 | 6 | 45 |
 | 2 | 41 | 46 | 25 | 6 | 65 |
 
-### 為什麼
+### Why
 
-之前 `dead_tail` 不看人數，一律 6 張，和 Board Game Arena 一樣照四人桌發
-牌。查到的來源沒有一個寫人數少時怎麼改（`research/prior-art.md` C 節），
-所以小桌的廢牌數本來就是自己選的；原來的選法讓小桌的牌堆長出 20 到 40
-張，問題是這些牌做了什麼。
+Before, `dead_tail` ignored the number of players: always 6 cards, dealing
+as at a table of four like Board Game Arena.  None of the sources found
+says what changes with fewer players (`research/prior-art.md`, section C),
+so the dead cards of a small table were our own choice all along; the old
+choice made a small table's pile 20 to 40 cards longer, and the question is
+what those cards did.
 
-量測（`107032c` 加 `research/dead-tail.patch` 的 `examples/length.rs`，
-`length 2000 7`）：`HeuristicBot` 自對局，每列 2,000 局，直接設
-`dead_tail`。流局率的標準誤約 0.4 個百分點。
+Measurement (`examples/length.rs` of `research/dead-tail.patch` on
+`107032c`, `length 2000 7`): `HeuristicBot` self-play, 2,000 rounds a row,
+setting `dead_tail` directly.  The standard error of the exhaustion rate is
+about 0.4 percentage points.
 
-| 人數 | 廢牌 | 可摸 | 流局 | 平均摸牌數 | 中位數 | 90 百分位 | 每人摸牌數 |
+| Players | Dead | To draw | Exhausted | Mean draws | Median | 90th percentile | Draws a player |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 4 | 6 | 25 | 3.2% | 12.1 | 12 | 20 | 3.0 |
 | 3 | 6 | 45 | 0.0% | 12.3 | 11 | 21 | 4.1 |
@@ -70,126 +85,180 @@
 | 2 | **46** | 25 | 3.8% | 11.9 | 11 | 21 | 5.9 |
 | 2 | 50 | 21 | 8.5% | 11.6 | 11 | 21 | 5.8 |
 
-- **一局摸幾張和人數無關。** 三種桌子都是平均 12 張，九成的局在 21 張內
-  結束。小桌多出來的牌幾乎摸不到，拿掉它們不會讓一局變短。
-- **多出來的牌只做一件事：讓小桌不會流局。** 只留 6 張時，兩、三人桌
-  2,000 局沒有一局流局，四人桌是 3.2%。流局是規則的一部分（沒有人胡，
-  莊家連莊），小桌等於沒有這一條。
-- **可摸的張數相同，流局率就相同。** 25 張時三種桌子是 3.2%、3.5%、3.8%，
-  在標準誤之內。所以對齊的是可摸的張數，不是廢牌的張數。
-- **每人的圈數還是比四人桌多。** 同樣 12 張由比較少的人分：四人桌每人摸
-  3.0 張，三人桌 4.0，兩人桌 5.9。這靠牌堆改不了。
+- **How many cards a round draws does not depend on the number of players.**
+  All three tables average 12 draws, and nine rounds in ten end within 21.
+  The extra cards of a small table are almost never drawn, and taking them
+  away does not shorten a round.
+- **The extra cards do one thing only: keep a small table from exhausting.**
+  With only 6 held back, not one of 2,000 rounds at two or at three was
+  exhausted, against 3.2% at four.  The exhausted round is part of the rules
+  (no one wins and the dealer stays), and a small table in effect did not
+  have it.
+- **The same cards to draw give the same exhaustion rate.**  At 25 the three
+  tables have 3.2%, 3.5% and 3.8%, within the standard error.  So what is
+  aligned is the cards to draw, not the dead cards.
+- **Each player still gets more turns than at four.**  The same 12 draws are
+  shared among fewer players: 3.0 draws a player at four, 4.0 at three, 5.9
+  at two.  The pile cannot change that.
 
-日本三人麻將拿掉二到八萬，讓牌山與巡數和四人桌相近。這裡不能照抽：少一色
-（28 張），四色兵卒就組不成，兩人桌剩兩色連三色兵卒也沒有，而且牌組在
-`susik`。把空位的手牌留在牌堆底下不發，是不動牌組、不動計分而做到同一件事
-的作法；「空位的手牌」也讓 20 這個數有來歷，不是另外挑一個常數。
+Japanese three-player mahjong removes the two to eight of characters, so
+that the wall and the number of turns come close to those of four players.
+The same cannot be done here: with one colour fewer (28 cards) soldiers of
+four colours cannot be formed, a table of two left with two colours would
+not even have soldiers of three, and the deck is in `susik`.  Leaving the
+empty seats' hands undealt at the bottom of the pile does the same thing
+without touching the deck or the scoring; "the empty seats' hands" also
+gives the number 20 an origin, where it would otherwise be one more constant
+picked.
 
-### 改了什麼
+### What changed
 
-- **`Rules::dead()`** 是摸不到的張數：`dead_tail + 20 × (4 − players)`。
-  `Rules::dead_tail` 還是 6，意思變成滿桌時的廢牌數。`Round` 摸到剩
-  `dead()` 張就流局；`tests/round.rs` 檢查每一桌都只摸 25 張、流局正好發生
-  在第 25 張之後。
-- **讀「還能摸幾張」的地方都改用它：** `ExpectBot::draws` 與 `examples/`
-  的五個程式。
-- **網頁與桌面版：** 牌堆旁標的廢牌數與說明裡的流局條件照人數。
-- **四人桌完全不變。** `dead()` 在四人桌是 6。零分歧見
-  `research/outlook.md`「空位的手牌算廢牌」。
-- **發牌、結算、門檻都沒動。**
+- **`Rules::dead()`** is the number of cards that are never drawn:
+  `dead_tail + 20 × (4 − players)`.  `Rules::dead_tail` is still 6 and now
+  means the dead cards of a full table.  `Round` is exhausted once `dead()`
+  cards are left; `tests/round.rs` checks that every table draws only 25
+  cards and that the round is exhausted right after the 25th.
+- **Everything that reads "draws left" now uses it:** `ExpectBot::draws` and
+  the five programs in `examples/`.
+- **The web page and the desktop app:** the number of dead cards shown
+  beside the pile and the exhaustion condition in the help follow the number
+  of players.
+- **A table of four does not change at all.**  `dead()` is 6 at four.  For
+  the zero deals that part see `research/outlook.md`, "Empty seats' hands
+  are dead".
+- **Dealing, settlement and the threshold are untouched.**
 
-### 對 bot 的影響
+### What it does to the bots
 
-- **`HeuristicBot` 不看牌堆，** 每一手和之前相同，只是局會在 25 張後流局。
-- **`ExpectBot` 照還能摸的張數查表，** 所以小桌之前量的 `Outlook`（66 段與
-  46 段，照 65 與 45 張可摸的局量的）整張作廢：新規則下兩人桌開局是「還能
-  摸 25 張」，舊表的那一段是從打到後段的局借來的值。舊表從 `src/expect.rs`
-  拿掉了，見下面「兩、三人桌還缺的」第 4 項。
-- **淺層的圖在小桌全程用得上。** 它只在還能摸 25 張以內時用
-  （`eval::DRAWS`），之前小桌的局大半在那之前就結束，閘門外等於照
-  `HeuristicBot` 打；現在每一桌都從 25 張開始。
-- **`Eval` 要照桌子重新訓練。** 剪掉牌堆只對齊了一局摸幾張，沒有把空位
-  摸的牌還回來：每人分到的摸牌兩人桌還是四人桌的兩倍，吃得到的牌從 0.28
-  變成 0.74。四人桌的表在兩人桌每個葉節點低估 3 分，閘門外用它輸給照
-  `HeuristicBot` 打（−0.184 ± 0.045）；兩人桌自己的表是 win。見下面
-  「兩、三人桌還缺的」。
+- **`HeuristicBot` does not look at the pile,** so every move is the same as
+  before; only the round is exhausted after 25 draws.
+- **`ExpectBot` looks its tables up by draws left,** so the `Outlook`s
+  measured for the small tables before (66 and 46 segments, measured over
+  rounds with 65 and 45 cards to draw) are void altogether: under the new
+  rules a table of two opens at "25 draws left", and that segment of the old
+  table held values borrowed from rounds played into their late stage.  The
+  old tables were removed from `src/expect.rs`; see item 4 of "What tables
+  of two and three lack" below.
+- **The shallow graph is usable throughout at a small table.**  It is used
+  only within 25 draws left (`eval::DRAWS`); before, most rounds at a small
+  table ended before that, and past the gate play was in effect
+  `HeuristicBot`'s; now every table starts from 25.
+- **`Eval` has to be retrained for each table.**  Cutting the pile only
+  aligned how many cards a round draws; it did not give back the cards the
+  empty seats would draw: each player's share of the draws at two is still
+  twice that at four, and the cards that can be eaten go from 0.28 to 0.74.
+  At a table of two four players' table undervalues every leaf by 3 points,
+  and playing by it past the gate loses to playing as `HeuristicBot`
+  (−0.184 ± 0.045); the table of two's own table is a win.  See "What
+  tables of two and three lack" below.
 
-## 八胡還缺的
+## What 八胡 lacks
 
-1. **`ExpectBot` 用的 `Outlook` 是十胡桌量的。** 八胡的表量了
-   （`Outlook::new`，`research/outlook.md`「八胡」）：閘門內 h 0.085 對十胡
-   的 0.071，L −11.30 對 −12.26，h × 1.5 一樣吃掉校準的偏差。換上它的 A/B
-   （對照 `c922a91`）兩種設定都跨 0：網頁 +0.022 ± 0.013，95% CI
-   [−0.004, +0.048]，40,000 局，seed base 1795400000；本機 +0.005 ± 0.024，
-   [−0.041, +0.052]，20,000 局，seed base 1795500000。資料不足，
-   `ExpectBot::new` 照舊用十胡的表。
-2. **`Eval` 是十胡的表。** 閘門外的淺層圖用它當葉節點的值，差 2 胡就胡的手
-   被當成還差 4 胡。對「閘門外照 `HeuristicBot` 打」的 A/B（對照
-   `09eb4c4`）兩種設定都跨 0：網頁 +0.006 ± 0.074，95% CI [−0.138, +0.151]，
-   10,000 局，seed base 1795200000；本機 +0.080 ± 0.049，[−0.015, +0.175]，
-   20,000 局，seed base 1795300000。資料不足，打法沒動（`eval.md`「八胡」）。
-3. **提示在閘門外標的點數是十胡的值。** 排序沒有量到比 `HeuristicBot` 差，
-   但數字本身不是八胡的期望分數。
-4. **`HeuristicBot` 的常數沒有在八胡量過。** 孤張、搭子、聽牌的權重都是在
-   四人十胡的 A/B 上定的。
-5. **量測工具大多寫死十胡。** `examples/` 的 13 個程式只有 `outlook` 收
-   `THRESHOLD`，其餘是 `Rules::new()`，要量八胡得先讓它們收門檻。
+1. **The `Outlook` `ExpectBot` uses was measured at ten 胡.**  八胡's table
+   has been measured (`Outlook::new`; `research/outlook.md`, "八胡"): within
+   the gate h is 0.085 against ten 胡's 0.071 and L −11.30 against −12.26,
+   and h × 1.5 takes up the calibration's bias just the same.  The A/B of
+   switching to it (control `c922a91`) straddles 0 on both settings: web
+   +0.022 ± 0.013, 95% CI [−0.004, +0.048], 40,000 deals, seed base
+   1795400000; desktop +0.005 ± 0.024, [−0.041, +0.052], 20,000 deals, seed
+   base 1795500000.  Insufficient data; `ExpectBot::new` keeps ten 胡's
+   table.
+2. **`Eval` is ten 胡's table.**  The shallow graph past the gate uses it
+   for the values of its leaves, so a hand 2 胡 from winning is taken for
+   one 4 胡 away.  The A/B against "playing as `HeuristicBot` past the gate"
+   (control `09eb4c4`) straddles 0 on both settings: web +0.006 ± 0.074, 95%
+   CI [−0.138, +0.151], 10,000 deals, seed base 1795200000; desktop +0.080 ±
+   0.049, [−0.015, +0.175], 20,000 deals, seed base 1795300000.
+   Insufficient data; play is unchanged (`eval.md`, "八胡").
+3. **The points the hint shows past the gate are ten 胡's values.**  The
+   ordering was not measured to be worse than `HeuristicBot`'s, but the
+   numbers themselves are not expected scores at 八胡.
+4. **`HeuristicBot`'s constants have not been measured at 八胡.**  The
+   weights of lone cards, 搭子 and waits were all set on A/Bs at four
+   players and ten 胡.
+5. **Most measuring tools hard-code ten 胡.**  Of the 13 programs in
+   `examples/` only `outlook` takes `THRESHOLD`; the rest use `Rules::new()`
+   and must be made to take a threshold before 八胡 can be measured.
 
-## 兩、三人桌還缺的
+## What tables of two and three lack
 
-1. **規則沒有出處。** 查到的來源都說兩、三人可以玩，沒有一個寫出人數少時
-   規則怎麼改（`research/prior-art.md` C 節）。發牌照四人桌，和 Board Game
-   Arena 相同；廢牌是自己定的（「小桌的廢牌」）。兩人桌唯一的對手同時是
-   上家與下家。
-2. **兩人桌的十胡有自己的 `Outlook` 與 `Eval`，別的小桌沒有。** 新規則
-   下兩桌都重量了 `Outlook`（`research/outlook.md`「空位的手牌算廢牌」：
-   e 兩人桌 0.74、三人桌 0.42，四人桌 0.28），各用它標註、訓練了一張
-   `Eval`（`eval.md`「兩、三人桌的表」）。對照都是 `07d5602`：
-   - 兩人十胡，自己的 `Outlook`（乘 1.3）與 `Eval`：網頁 +0.375 ± 0.042
-     （對閘門外照 `HeuristicBot` 打），本機 +0.320 ± 0.056（對四人桌的
-     表），都是 win。`ExpectBot::new` 與 `Eval::of` 在兩人十胡用它們。
-   - 三人十胡，自己的 `Outlook`（乘 1.4）與 `Eval`，對四人桌的表：網頁
-     −0.021 ± 0.025，本機 −0.095 ± 0.061，都是資料不足。照用四人桌的表；
-     四人桌的 `Eval` 在三人桌對照 `HeuristicBot` 是 win（+0.216 ± 0.051，
-     網頁）。
-   - 兩人八胡，兩人十胡的表對四人十胡的表：網頁 +0.302 ± 0.040，win；
-     本機 +0.048 ± 0.056，資料不足。宣告是兩場都 win 才換，所以照用四人
-     桌的表。**網頁設定單獨是 win，還沒用上。**
-3. **提示標的點數只有兩人十胡是那一桌的值。** 三人桌與兩人八胡標的是
-   四人十胡的值：三人桌平均低 1 分，兩人桌低 3 分（十胡量的）。
-4. **三人桌分不出是 `Outlook` 還是 `Eval` 沒幫上忙。** 候選一次換了兩樣；
-   三人桌的表配四人桌的 `Outlook` 沒有量（表是照三人桌的 `Outlook` 標註
-   的，兩者要一起換）。
-5. **舊規則下的數字留在 `research/outlook.md`「兩、三人桌」，都作廢。**
-   包括 `ExpectBot` 對 `HeuristicBot` 的 +0.106 與 +0.118。新規則下小桌的
-   `ExpectBot` 沒有直接對 `HeuristicBot` 量過整體的差。
-6. **`HeuristicBot` 的常數是四人桌的。** 已知一個在小桌不同的地方：不餵
-   下家（`FEED` 4）在舊規則的兩人桌是 win（+0.007 ± 0.003），四人桌不明，
-   所以沒採用（`stronger-bot.md`）。
-7. **量測工具大多寫死四人。** 只有 `outlook` 收 `PLAYERS`；其餘同八胡的
-   第 5 項。
+1. **The rules have no source.**  Every source found says two or three can
+   play, and none writes out how the rules change with fewer players
+   (`research/prior-art.md`, section C).  Dealing is as at a table of four,
+   the same as Board Game Arena; the dead cards are our own decision ("The
+   dead cards of a small table").  At a table of two the only opponent is
+   both the previous seat and the next.
+2. **Two players at ten 胡 have their own `Outlook` and `Eval`; the other
+   small tables do not.**  Under the new rules both tables had `Outlook`
+   measured anew (`research/outlook.md`, "Empty seats' hands are dead": e is
+   0.74 at two and 0.42 at three, 0.28 at four), and each labelled and
+   trained an `Eval` with it (`eval.md`, "Tables for two and three
+   players").  The control is `07d5602` throughout:
+   - Two players at ten 胡, own `Outlook` (times 1.3) and `Eval`: web +0.375
+     ± 0.042 (against playing as `HeuristicBot` past the gate), desktop
+     +0.320 ± 0.056 (against four players' table), both wins.
+     `ExpectBot::new` and `Eval::of` use them at two players and ten 胡.
+   - Three players at ten 胡, own `Outlook` (times 1.4) and `Eval`, against
+     four players' tables: web −0.021 ± 0.025, desktop −0.095 ± 0.061, both
+     insufficient data.  Four players' tables are used as they are; at a
+     table of three four players' `Eval` is a win against `HeuristicBot`
+     (+0.216 ± 0.051, web).
+   - Two players at 八胡, the tables of two players at ten 胡 against those
+     of four players at ten 胡: web +0.302 ± 0.040, win; desktop +0.048 ±
+     0.056, insufficient data.  The declaration was to switch only if both
+     win, so four players' tables are used as they are.  **The web setting
+     alone is a win and is not yet in use.**
+3. **Only at two players and ten 胡 are the points the hint shows that
+   table's values.**  Three players and two players at 八胡 are shown the
+   values of four players at ten 胡: 1 point low on average at three, 3
+   points low at two (measured at ten 胡).
+4. **At three it cannot be told whether it was `Outlook` or `Eval` that did
+   not help.**  The candidate changed both at once; three players' table
+   with four players' `Outlook` was not measured (the table was labelled
+   under three players' `Outlook`, so the two have to change together).
+5. **The numbers under the old rules stay in `research/outlook.md`, "Tables
+   of two and three", all void.**  They include `ExpectBot`'s +0.106 and
+   +0.118 against `HeuristicBot`.  Under the new rules the overall
+   difference of `ExpectBot` from `HeuristicBot` at a small table has not
+   been measured directly.
+6. **`HeuristicBot`'s constants are those of four players.**  One place is
+   known to differ at a small table: not feeding the next seat (`FEED` 4)
+   was a win at a table of two under the old rules (+0.007 ± 0.003) and
+   insufficient data at four, so it was not adopted (`stronger-bot.md`).
+7. **Most measuring tools hard-code four players.**  Only `outlook` takes
+   `PLAYERS`; the rest as in item 5 of 八胡.
 
-八胡的兩、三人桌選得到，兩邊缺的它都缺，而且沒有任何量測。
+八胡 at a table of two or three can be chosen; it lacks what both lack, and
+has no measurement at all.
 
-## 五人桌
+## A table of five
 
-沒有做。來源寫的五人玩法是 8 胡以上可胡、牌不好可以放棄（國瑜企業社），
-超過四人每多一人加一組 28 張（英文維基），見 `research/prior-art.md` C 節。
-要做的話：`Seat::COUNT` 是 4；牌組在 `susik`，是 112 張；放棄這個動作
-`Round` 沒有；bot 與量測同上面兩節。
+Not implemented.  The five-player game the sources describe wins on 8 胡 or
+more and lets a poor hand fold (國瑜企業社), and adds a set of 28 cards for
+each player beyond four (English Wikipedia); see
+`../tsap-oo-book/research/small-tables.md`.  To build it: `Seat::COUNT` is
+4; the deck is in `susik` and has 112 cards; `Round` has no action to fold;
+the bots and the measurements as in the two sections above.
 
-## 補的順序
+## The order to fill them in
 
-由便宜到貴，前一項是後一項的工具：
+From cheap to dear, each item the tool of the next:
 
-1. `examples/` 收門檻與人數（至少 `outlook`、`eval`、`arena`）。不改打法。
-2. 每個賽制量一組 `Outlook`，`ExpectBot::new` 照 `Rules` 選。改打法，各跑
-   A/B；這一步同時給出小桌上 `ExpectBot` 對 `HeuristicBot` 的數字。
-   **做了四人的十胡與八胡、兩人與三人的十胡**（小桌在新規則下重量）。
-   剩下小桌的八胡。
-3. 每個賽制訓練一張 `Eval`（`eval.md` 應用 D）。每一桌都是 25 張可摸，
-   表不必拉長。改打法，各跑 A/B。做完提示才是那個賽制的點數。
-   **做了兩人與三人的十胡**：兩人桌 win，三人桌資料不足。剩下八胡的
-   三種桌子；兩人八胡的網頁設定用兩人十胡的表已經是 win。
-4. `HeuristicBot` 的常數照賽制重量。小桌先試 `FEED`。
-5. 五人桌，如果要。
+1. `examples/` take a threshold and a number of players (at least `outlook`,
+   `eval`, `arena`).  No change to play.
+2. Measure an `Outlook` for every variant, with `ExpectBot::new` choosing by
+   `Rules`.  Changes play; an A/B for each.  This step also gives the
+   numbers of `ExpectBot` against `HeuristicBot` at a small table.  **Done
+   for four players at ten 胡 and at 八胡, and for two and three players at
+   ten 胡** (the small tables measured anew under the new rules).  八胡 at
+   the small tables remains.
+3. Train an `Eval` for every variant (`eval.md`, application D).  Every
+   table has 25 cards to draw, so the table need not be made longer.
+   Changes play; an A/B for each.  Only when this is done are the hint's
+   points those of the variant.  **Done for two and three players at ten
+   胡**: a win at two, insufficient data at three.  The three tables of 八胡
+   remain; at two players and 八胡 the web setting is already a win with the
+   tables of two players at ten 胡.
+4. Measure `HeuristicBot`'s constants anew for each variant.  At the small
+   tables try `FEED` first.
+5. A table of five, if wanted.

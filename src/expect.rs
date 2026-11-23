@@ -614,7 +614,7 @@ impl ExpectBot {
         // ponytail: the four-player ten-胡 tables at 八胡 and at a table of
         // three too.  `Outlook::new`'s measured insufficient data against
         // them at four and, with tables of their own, at three and at two
-        // players' 八胡 (`doc/eval.md`, 兩、三人桌的表).
+        // players' 八胡 (`doc/eval.md`, "Tables for two and three players").
         let (mut outlook, scale) = match (rules.players, rules.threshold) {
             (2, 10) => (Outlook::new(rules), 1.3),
             // The ranks' rates are measured at four players and ten 胡
@@ -684,7 +684,8 @@ impl ExpectBot {
         // learnt from rounds of 25 draws, which start within it.  An
         // outlook may count fewer cards a draw, so the draws are held too:
         // with more left, as a table of two had before `Rules::dead`, the
-        // leaves lost 5.8 points a split (`research/outlook.md`, 兩、三人桌).
+        // leaves lost 5.8 points a split (`research/outlook.md`, "Tables of
+        // two and three").
         let draws = Self::draws(view);
         if draws > crate::eval::DRAWS || self.outlook.segments(draws).len() > crate::eval::CARDS {
             return None;

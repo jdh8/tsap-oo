@@ -121,7 +121,7 @@ impl Eval {
     /// public cards a round: their rows beyond are not learnt.
     // ponytail: three players' own tables and two players' at 八胡 measured
     // insufficient data against the four-player ones (`doc/eval.md`,
-    // 兩、三人桌的表), so they stay out of the binary.
+    // "Tables for two and three players"), so they stay out of the binary.
     #[must_use]
     pub fn of(rules: &crate::Rules) -> Self {
         if (rules.players, rules.threshold) == (2, 10) {

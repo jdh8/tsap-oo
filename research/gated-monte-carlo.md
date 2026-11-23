@@ -1,42 +1,55 @@
-# 只在後段搜尋的 Monte Carlo：閘門開在哪裡？
+# Monte Carlo that searches only late: where does the gate open?
 
-量測日期：2026-11-17。問題：`MonteCarloBot` 128 樣本每一步要幾秒，3,200 局的
-A/B 分不出它比 `HeuristicBot` 強不強。如果只在手牌短、或已經聽牌的時候才
-搜尋，其餘照貪心打，成本降到幾十分之一，同樣的時間能打十倍以上的局數；
-這樣量得到嗎？
+Measured 2026-11-17.  The question: `MonteCarloBot` at 128 samples takes
+seconds a move, and an A/B of 3,200 deals cannot tell whether it is stronger
+than `HeuristicBot`.  If it searched only when the hand is short, or already
+waiting, and played greedily otherwise, the cost would fall by a factor of
+tens, and the same time would play more than ten times the deals; can it be
+measured then?
 
-## 結論
+## Answer
 
-**只在暗牌 10 張以下才搜尋的 `MonteCarloBot` 贏 `HeuristicBot`：+0.070 ±
-0.026 分／局，95% CI [+0.019, +0.121]，40,000 局，win。只在聽牌時搜尋、
-以及兩個條件取聯集，各 40,000 局都是結論不明。三個點估計彼此都在誤差內，
-這批資料分不出哪一個閘門比較好。**
+**A `MonteCarloBot` that searches only with 10 concealed cards or fewer
+beats `HeuristicBot`: +0.070 ± 0.026 points a deal, 95% CI [+0.019, +0.121],
+40,000 deals, win.  Searching only while waiting, and the union of the two
+conditions, are each insufficient data at 40,000 deals.  The three point
+estimates lie within one another's error, and these data cannot tell which
+gate is better.**
 
-- **10 張的閘門是四人桌上第一個贏 `HeuristicBot` 的搜尋。** 不設閘門的
-  同一個 bot 是 +0.148 ± 0.276（3,200 局，結論不明）；兩個區間重疊，
-  量不出閘門擋掉的那九成決定值多少。
-- **它只搜尋 9.7% 的決定，用掉 2.7% 的搜尋時間。** 不設閘門時一局
-  25 CPU 秒、每個決定 3.1 秒；10 張以下的決定每個 0.9 秒。
-- **聽牌的閘門比較寬，卻沒有比較好。** 聽牌時的決定占 18%、時間占
-  6.9%，+0.048 ± 0.030，區間跨 0。
-- **聯集沒有比較大。** 兩個條件任一成立就搜尋，分歧的局數是 2,302，接近
-  兩者之和，得分差卻是 +0.061 ± 0.035。三次用的是不同的牌，差距都在
-  一個標準誤上下，不能說聯集比較差。
-- **效果小。** +0.07 分／局約是 `HeuristicBot` 歷次改進的下緣，胡牌率
-  24.00% → 24.16%。
+- **The 10-card gate is the first search to beat `HeuristicBot` at a table
+  of four.**  The same bot ungated is +0.148 ± 0.276 (3,200 deals,
+  insufficient data); the two intervals overlap, and what the nine tenths of
+  the decisions the gate shuts out are worth cannot be measured.
+- **It searches only 9.7% of the decisions, for 2.7% of the search time.**
+  Ungated, a round takes 25 CPU seconds and a decision 3.1 seconds; a
+  decision at 10 cards or fewer takes 0.9 seconds.
+- **The waiting gate is wider, yet no better.**  Decisions while waiting are
+  18% of all and 6.9% of the time: +0.048 ± 0.030, the interval straddling
+  0.
+- **The union is no larger.**  Searching when either condition holds, the
+  deals that part number 2,302, near the sum of the two, yet the score
+  difference is +0.061 ± 0.035.  The three runs used different deals and the
+  gaps are all around one standard error, so the union cannot be called
+  worse.
+- **The effect is small.**  +0.07 points a deal is about the low end of
+  `HeuristicBot`'s past improvements, with the win rate going 24.00% →
+  24.16%.
 
-## 方法
+## Method
 
-`MonteCarloBot::gated(cards, shanten)` 在兩種情況下搜尋，其餘回傳貪心的
-第一選擇：
+`MonteCarloBot::gated(cards, shanten)` searches in two cases and returns the
+greedy first choice otherwise:
 
-- 棄牌之後的暗牌張數不超過 `cards`；
-- 或者給了 `shanten`，而 `HeuristicBot::shanten` 在那個限度內：0 是聽牌，
-  1 是再吃碰一次就聽牌。眼前的吃碰若能讓手牌聽牌，也算聽牌。
+- the concealed cards after the discard number no more than `cards`;
+- or `shanten` is given and `HeuristicBot::shanten` is within that limit: 0
+  is waiting, 1 is waiting after one more eat or pong.  If the eat or pong
+  on offer would leave the hand waiting, that counts as waiting too.
 
-`ab/` 從 `GATE_CARDS` 與 `GATE_SHANTEN` 讀這兩個數。三次都是四人桌，候選
-坐一家，128 樣本，`RESHUFFLE=0`（每重打一次就是再算一次搜尋），對照是
-`4596efe`，局數在跑之前定為各 40,000，seed base 各自不同：
+`ab/` reads the two numbers from `GATE_CARDS` and `GATE_SHANTEN`.  All three
+runs are at a table of four, the candidate in one seat, 128 samples,
+`RESHUFFLE=0` (every replay would be one more search), the control
+`4596efe`, the deal count fixed before the run at 40,000 each, each with a
+seed base of its own:
 
 ```sh
 SAMPLES=128 RESHUFFLE=0 GATE_CARDS=10 \
@@ -47,74 +60,88 @@ SAMPLES=128 RESHUFFLE=0 GATE_CARDS=10 GATE_SHANTEN=0 \
   ab/target/release/tsap-oo-ab 1794990000 40000
 ```
 
-三次一個接一個跑，用的是編好之後複製出來的執行檔，所以期間沒有重編。
-第一次的執行檔比後兩次早：當時 `HeuristicBot::shanten` 還不看眼前的吃碰。
-只設 `GATE_CARDS` 時不會問 向聽數，所以兩個版本在第一次的設定下打法相同；
-拿第一次的前 2,000 局用兩個執行檔各重放一次，輸出逐位相同（55 局不同，
-−0.062 ± 0.090）。後兩次的執行檔就是提交的版本。
+The three ran one after another, on a binary copied out after the build, so
+nothing was rebuilt in the meantime.  The binary of the first run is older
+than that of the other two: `HeuristicBot::shanten` did not yet look at the
+eat or pong on offer.  With only `GATE_CARDS` set the 向聽數 is never asked
+for, so the two versions play the same under the first run's settings; the
+first 2,000 deals of the first run, replayed once with each binary, give
+output identical to the digit (55 deals differ, −0.062 ± 0.090).  The binary
+of the last two runs is the committed version.
 
-原本排的是 `GATE_CARDS=10 GATE_SHANTEN=1`（20,000 局），在開始之前取消：
-當時的計時顯示一次吃碰以內就聽牌的決定占 37%，太寬（把眼前的吃碰算進去
-之後是 49%，見下表）。換成上面的後兩次。
+What was scheduled at first was `GATE_CARDS=10 GATE_SHANTEN=1` (20,000
+deals), cancelled before it began: the timing at that point showed the
+decisions within one eat or pong of waiting to be 37% of all, too wide (49%
+once the eat or pong on offer is counted, see the table below).  The last
+two runs above replaced it.
 
-## 數據
+## Data
 
-### A/B（各 40,000 局，對照 `4596efe`）
+### A/B (40,000 deals each, control `4596efe`)
 
-| 閘門 | 10 張以下 | 聽牌 | 10 張以下或聽牌 |
+| Gate | 10 cards or fewer | Waiting | 10 cards or fewer, or waiting |
 | --- | ---: | ---: | ---: |
 | `GATE_CARDS` | 10 | 0 | 10 |
-| `GATE_SHANTEN` | 不設 | 0 | 0 |
+| `GATE_SHANTEN` | unset | 0 | 0 |
 | seed base | 1794910000 | 1794950000 | 1794990000 |
-| 不同的局數 | 1,518 | 1,161 | 2,302 |
-| 得分差（分／局） | +0.070 ± 0.026 | +0.048 ± 0.030 | +0.061 ± 0.035 |
+| Deals that differ | 1,518 | 1,161 | 2,302 |
+| Score difference (points a deal) | +0.070 ± 0.026 | +0.048 ± 0.030 | +0.061 ± 0.035 |
 | 95% CI | [+0.019, +0.121] | [−0.011, +0.108] | [−0.009, +0.130] |
-| 結論 | win | 不明 | 不明 |
-| 胡牌率，對照 → 候選 | 24.00% → 24.16% | 24.30% → 24.34% | 24.38% → 24.51% |
-| z（得分差 ÷ 標準誤） | 2.7 | 1.6 | 1.7 |
-| 16 個執行緒的時間 | 44 分鐘 | 90 分鐘 | 104 分鐘 |
+| Verdict | win | insufficient data | insufficient data |
+| Win rate, control → candidate | 24.00% → 24.16% | 24.30% → 24.34% | 24.38% → 24.51% |
+| z (score difference ÷ standard error) | 2.7 | 1.6 | 1.7 |
+| Time on 16 threads | 44 minutes | 90 minutes | 104 minutes |
 
-z 由印出來的三位小數反推，是近似值。時間取自輸出檔的時間戳。
+z is worked back from the three decimals printed and is approximate.  The
+times are from the timestamps of the output files.
 
-### 搜尋的時間花在哪裡
+### Where the search time goes
 
-`gate` example 讓不設閘門的 128 樣本 `MonteCarloBot` 坐第 1 家，另外三家是
-`HeuristicBot`，計每一個決定的時間，再依各個閘門會不會放行來分：
+The `gate` example seats an ungated 128-sample `MonteCarloBot` in seat 1
+with `HeuristicBot` in the other three seats, times every decision, and
+sorts the decisions by whether each gate would let them through:
 
 ```sh
 cargo run --release --example gate -- 256 1794901984 8 128
 ```
 
-seed base 1794901984，256 局，2,065 個決定，一局 25.2 CPU 秒：
+Seed base 1794901984, 256 rounds, 2,065 decisions, 25.2 CPU seconds a round:
 
-| 閘門 | 決定 | 占比 | 時間 | 每個（毫秒） | 推翻貪心的次數 |
+| Gate | Decisions | Share | Time | Each (milliseconds) | Times the greedy choice was overturned |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 不設 | 2,065 | 100.0% | 100.0% | 3,129 | 284 |
-| 10 張以下 | 200 | 9.7% | 2.7% | 876 | 16 |
-| 聽牌 | 372 | 18.0% | 6.9% | 1,194 | 22 |
-| 10 張以下或聽牌 | 460 | 22.3% | 8.3% | 1,162 | 36 |
-| 一次吃碰以內就聽牌 | 1,016 | 49.2% | 31.9% | 2,030 | 88 |
+| Ungated | 2,065 | 100.0% | 100.0% | 3,129 | 284 |
+| 10 cards or fewer | 200 | 9.7% | 2.7% | 876 | 16 |
+| Waiting | 372 | 18.0% | 6.9% | 1,194 | 22 |
+| 10 cards or fewer, or waiting | 460 | 22.3% | 8.3% | 1,162 | 36 |
+| Within one eat or pong of waiting | 1,016 | 49.2% | 31.9% | 2,030 | 88 |
 
-「占比」是決定的個數，「時間」是搜尋時間的占比。8 個執行緒同時跑，所以
-每個決定的毫秒數比單獨跑時長一些；占比不受影響。
+"Share" is of the number of decisions, "Time" the share of the search time.
+8 threads ran at once, so the milliseconds a decision are somewhat longer
+than when run alone; the shares are unaffected.
 
-## 怎麼讀
+## How to read it
 
-- **win 是照鐵則下的。** 區間的下界是 +0.019，z 約 2.7。同一批實驗讀了
-  三個閘門，其中一個過線；兩人桌上 z 約 2.0 的那一次重跑後沒有站住
-  （[`two-seats.md`](two-seats.md)）。要更有把握，用新的 seed base 再跑
-  一次 40,000 局，44 分鐘。
-- **閘門之間分不出來。** 兩兩相減的標準誤是 0.04 上下，差距最多 0.02。
-  要分出 0.02 分，每個閘門要一百萬局以上。
-- **為什麼短手牌便宜。** playout 的長度與每一步的成本都跟著手牌變短。
-  聽牌的手不一定短，所以聽牌的閘門每個決定比較貴。
+- **The win is called by the iron rules.**  The lower bound of the interval
+  is +0.019, and z is about 2.7.  The same batch of experiments read three
+  gates and one of them crossed the line; at a table of two, the run with z
+  about 2.0 did not hold up when rerun ([`two-seats.md`](two-seats.md)).
+  For more confidence, run 40,000 deals once more on a new seed base, 44
+  minutes.
+- **The gates cannot be told apart.**  The standard error of a difference
+  between two of them is around 0.04, and the gaps are 0.02 at most.
+  Telling 0.02 points apart takes over a million deals a gate.
+- **Why short hands are cheap.**  The length of a playout and the cost of
+  each step both shrink with the hand.  A waiting hand is not necessarily
+  short, so the waiting gate costs more a decision.
 
-- **搜尋在後段比較少推翻貪心。** 不設閘門時 14% 的決定被推翻，10 張以下
-  是 8%，聽牌時 6%。
+- **The search overturns the greedy choice less often late.**  Ungated, 14%
+  of the decisions are overturned; at 10 cards or fewer 8%, and while
+  waiting 6%.
 
-## 還沒做的
+## Not yet done
 
-- 10 張的閘門用新的 seed base 重跑一次。
-- 其他的張數（8、12、14）。每一個都是一次 40,000 局以上的 A/B。
-- 網頁不在範圍內：10 張以下的決定原生也要 0.9 秒，網頁維持
-  `HeuristicBot`。這個 bot 是給本機介面用的。
+- Rerun the 10-card gate once on a new seed base.
+- Other card counts (8, 12, 14).  Each is an A/B of 40,000 deals or more.
+- The web page is out of scope: a decision at 10 cards or fewer takes 0.9
+  seconds even natively, and the web page stays with `HeuristicBot`.  This
+  bot is for a native front end.

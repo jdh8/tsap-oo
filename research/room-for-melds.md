@@ -1,132 +1,164 @@
-# 手牌放得下幾個牌組：十胡的ブロック理論
+# How many melds a hand has room for: the ブロック理論 of 十胡
 
-量測日期：2026-11-18。問題：十胡的暗牌只減不增，所以一手牌最後能排成什麼
-形、胡數能到多少，發牌時就有範圍。浮動的只有搭子吃成牌組、孤張吃成對子
-（0 胡）、對子碰出（1 胡）。日本麻將的「5ブロック理論」說一手牌只容得下
-五組，多的搭子要早拆。照樣數十胡的手牌還放得下幾個牌組，前期少吃對子，
-把位置留給有胡的牌組，`HeuristicBot` 會不會變強？bot 的基準為 `b894777`。
+Measured 2026-11-18.  The question: the concealed cards of 十胡 only go
+down, never up, so what shape a hand can end in, and how many 胡 it can
+reach, is bounded from the deal.  All that floats is a 搭子 eaten into a
+meld, a lone card eaten into a pair (0 胡) and a pair ponged (1 胡).
+Japanese mahjong's 「5ブロック理論」 (five-block theory) says a hand has room
+for only five melds, so surplus 搭子 should be broken early.  If
+`HeuristicBot` counts in the same way how many melds a 十胡 hand still has
+room for, eats fewer pairs early and keeps the room for melds that score 胡,
+does it get stronger?  The bot's base is `b894777`.
 
-## 結論
+## Answer
 
-**帳是對的，四個做法卻都沒有贏，bot 沒有改動。**
+**The arithmetic is right, yet none of the four trials won; the bot is
+unchanged.**
 
-- **只數「放得下幾組」看不出差別。** 把搭子可望補上的胡數，封頂在手牌還
-  放得下的三張組數：+0.005 ± 0.004 分／局，不明。它只在 6% 的牌局改變
-  打法。
-- **把對子碰出的 1 胡算進去會輸。** −0.22 到 −0.29 分／局。可望補上的胡
-  一旦比位置多，bot 就為了少兩張散牌，拆掉有胡的牌組去吃對子，反而吃得
-  更多。
-- **未滿門檻一律不吃對子是大輸。** −1.50 分／局，胡牌率從 24.20% 掉到
-  20.33%。吃對子是 bot 消化孤張的主要辦法，平均很值得。
-- **邊際上的吃對子確實是虧的，但次數很少。** 封頂讓 bot 少吃的那些對子，
-  每次 +0.26 ± 0.12 分，每五十局才遇到一次。這是事後分組的數字，不是
-  判決。
+- **Counting "room for how many melds" alone shows no difference.**  Capping
+  the 胡 the 搭子 may yet supply at the number of three-card melds the hand
+  still has room for: +0.005 ± 0.004 points a deal, insufficient data.  It
+  changes play in only 6% of deals.
+- **Counting the 1 胡 of a ponged pair loses.**  −0.22 to −0.29 points a
+  deal.  Once the 胡 hoped for exceed the room, the bot breaks melds that
+  score 胡 to eat pairs, for the sake of two loose cards fewer, and ends up
+  eating more of them.
+- **Never eating a pair below the threshold loses heavily.**  −1.50 points a
+  deal; the win rate falls from 24.20% to 20.33%.  Eating pairs is the bot's
+  main way of getting rid of lone cards, and pays well on average.
+- **The pair eats at the margin do lose, but they are few.**  The pairs the
+  cap keeps the bot from eating are worth +0.26 ± 0.12 points each, and come
+  up once in fifty deals.  That is a number from groups made after the fact,
+  not a verdict.
 
-## 帳
+## The arithmetic
 
-摸到的牌翻開而不進手，暗牌只在吃、碰、槓、棄牌時減少。所以最後的 21 張
-是發到的暗牌組，加上每組剛好含一張外來牌的明牌組。
+A drawn card is turned face up and never enters the hand; the concealed
+cards only go down, at an eat, a pong, a kong or a discard.  So the final 21
+cards are the dealt concealed melds, plus exposed melds that each hold
+exactly one card from outside.
 
-把暗牌排成牌組，牌組以外的牌有 O 張：散牌，加上對子的牌。之後每吃碰
-一次拿進一張、打掉一張，只有胡的那一次不必打。設這 O 張最後成了 u 個
-三張組（搭子吃成、對子碰出），b 個吃成的對子，r 個留在手上的對子：
+Lay the concealed cards out as melds, and O cards lie outside them: the
+loose cards, plus the cards of the pairs.  From then on each claim takes one
+card in and discards one; only the claim that wins discards none.  Say these
+O cards end up as u three-card melds (a 搭子 eaten into a meld, a pair
+ponged), b pairs made by eating and r pairs kept in hand:
 
-- 用掉的暗牌：2u + b + 2r，再加上打掉的 d 張，合計 O 張。
-- 吃碰的次數是 u + b，其中一次是胡，所以 d = u + b − 1。
+- Concealed cards used: 2u + b + 2r, plus the d cards discarded, O in all.
+- There are u + b claims, one of which is the win, so d = u + b − 1.
 
-兩式相消：
+Eliminating d between the two:
 
 **O + 1 = 3u + 2(b + r)**
 
-牌組外的牌加上胡的那張，剛好分成三張組和對子。由此：
+The cards outside the melds, plus the winning card, split exactly into
+three-card melds and pairs.  Hence:
 
-- **三張組的上限是 (O + 1) ÷ 3，無條件捨去。** 21 張至多 7 組，這就是十胡
-  的ブロック上限。
-- **剩下的張數必須是偶數。** O 是 3 的倍數時 O + 1 除以 3 餘 1，餘的那張
-  配不成對子，上限要再減 1。「一個搭子加一張孤張」（O = 3）一組都做
-  不成：吃了搭子就得打孤張，手牌全成牌組卻沒有胡到。
-- **吃一個對子讓 O 少 2。** O 除以 3 餘 2 時是最緊的形（兩個搭子加一張
-  孤張，剛好兩組），這時吃對子，上限一次掉 2。餘 0 或 1 時本來就得湊
-  一個對子，吃對子不掉上限。
+- **At most (O + 1) ÷ 3 three-card melds, rounded down.**  21 cards make at
+  most 7 melds: that is the ブロック limit of 十胡.
+- **The cards left over must be even in number.**  When O is a multiple of
+  3, O + 1 leaves a remainder of 1 on division by 3; that one card cannot
+  make a pair, so the limit drops by 1 more.  "A 搭子 and a lone card"
+  (O = 3) makes no meld at all: eating into the 搭子 means discarding the
+  lone card, and the hand is all melds without having won.
+- **Eating a pair takes 2 off O.**  O with a remainder of 2 on division by 3
+  is the tightest shape (two 搭子 and a lone card, exactly two melds);
+  eating a pair then drops the limit by 2 at once.  With a remainder of 0 or
+  1 the hand has to make a pair anyway, and eating one does not lower the
+  limit.
 
 | O | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 三張組上限 | 0 | 0 | 1 | 0 | 1 | 2 | 1 | 2 | 3 | 2 | 3 | 4 |
+| Three-card melds at most | 0 | 0 | 1 | 0 | 1 | 2 | 1 | 2 | 3 | 2 | 3 | 4 |
 
-這條帳不算運氣：摸到將帥（強制收下，多 1 胡、多打一張）、暗刻槓出、三色
-兵卒吃進第四色，都會讓 O 的餘數換位。拆掉現成的牌組來湊也不算。
+This arithmetic leaves luck out: a drawn general (將帥; taken by force, 1 胡
+more and one more discard), a concealed triplet konged, and soldiers of
+three colours eating the fourth all shift the remainder of O.  Nor does it
+count breaking a ready meld to make the numbers fit.
 
-## bot 原本算了什麼
+## What the bot counted before
 
-`HeuristicBot` 的評分有一項 `short`：牌組的胡離門檻還差幾個半胡，每個扣
-64。它先扣掉 `hope`，也就是散牌裡的搭子可望補上的胡。原本的 `hope`
-有兩個缺口：
+`HeuristicBot`'s grade has a term `short`: how many half-胡 the melds' 胡
+are short of the threshold, 64 off for each.  It first takes off `hope`, the
+胡 the 搭子 among the loose cards may yet supply.  `hope` as it stood had two
+gaps:
 
-- **不封頂。** 兩個搭子、沒有孤張的手牌，`hope` 算兩個都吃得成，帳上只吃
-  得成一個。
-- **不算對子。** 對子在排法裡是 0 胡的牌組，碰出來多的 1 胡不在 `hope`
-  裡。
+- **No cap.**  For a hand of two 搭子 and no lone card, `hope` counts both
+  as eaten into melds; by the arithmetic only one can be.
+- **No pairs.**  A pair is a meld of 0 胡 in the layout; the 1 胡 more that
+  ponging it brings is not in `hope`.
 
-另一方面，吃對子在評分裡是進度：散牌少兩張（吃進去的那張和吃完打掉的
-那張），各省 128，和吃成一個有胡的牌組一樣。
+On the other hand, eating a pair is progress in the grade: two loose cards
+fewer (the one eaten into a pair and the one discarded after the eat), 128
+saved for each, the same as eating into a meld that scores 胡.
 
-## 四個做法
+## The four trials
 
-前三個改 `prospects` 算出來的 `hope`，其他不動：
+The first three change the `hope` that `prospects` computes, and nothing
+else:
 
-| 名稱 | 搭子封頂 | 餘數的條件 | 對子碰的希望 |
+| Name | Cap on 搭子 | Remainder condition | Hope for pongs of pairs |
 | --- | --- | --- | --- |
-| 寬鬆 | 有 | 無 | 有 |
-| 嚴格 | 有 | 有 | 有 |
-| 只封頂 | 有 | 有 | 無 |
+| Lenient | yes | no | yes |
+| Strict | yes | yes | yes |
+| Cap only | yes | yes | no |
 
-- 每張搭子的牌照原本的半胡數；每張可碰的對子牌算 1 個半胡（還有同張沒
-  出現才算）。由大到小排，只取前 2 × 上限張。
-- O 是該排法的散牌加對子的牌；士或象靠著自己的將帥時，那張將帥也算
-  一張，因為它會離開自己的牌組去成將士象。
-- `research/room-for-melds.patch` 是「嚴格」，對 `b894777` 的
-  `src/heuristic.rs`。「寬鬆」是把算 `room` 那一行換成
-  `let room = (outside + 1) / 3;`；「只封頂」是刪掉
-  `hopes.extend([pong; 2]);` 那一行。後兩者的單元測試要跟著改期望值。
+- Each card of a 搭子 keeps its half-胡 as before; each card of a pair that
+  can be ponged counts 1 half-胡 (only while a copy of it is still unseen).
+  Sorted from the largest down, only the first 2 × limit cards count.
+- O is that layout's loose cards plus the cards of its pairs; when a 士 or
+  象 leans on the hand's own general, that general counts as one card too,
+  since it will leave its own meld to make 將士象.
+- `research/room-for-melds.patch` is "strict", against `src/heuristic.rs` at
+  `b894777`.  "Lenient" replaces the line that computes `room` with
+  `let room = (outside + 1) / 3;`; "cap only" deletes the line
+  `hopes.extend([pong; 2]);`.  For the latter two the unit tests' expected
+  values have to change to match.
 
-第四個不動評分：
+The fourth leaves the grade alone:
 
-- **不吃對子。** `research/room-for-melds-nopair.patch`。手上牌組的胡
-  （排法一，散牌每張扣 1 的那個）還不到門檻時，`weighed` 不把吃對子列入
-  考慮；已經夠了才照舊。
+- **No pair eats.**  `research/room-for-melds-nopair.patch`.  While the 胡
+  of the melds in hand (layout one, the one that charges 1 for each loose
+  card) are still short of the threshold, `weighed` does not consider eating
+  a pair; once they are enough it plays as before.
 
-A/B 是 `ab/run.sh 100000 b894777`，候選坐第 2 家，從分歧點重洗牌堆 8 次
-（[`reshuffle.md`](reshuffle.md)）。局數都在跑之前定下，seed base 取當時的
-時鐘。原本還排了「寬鬆」的兩個拆解版本（只加對子、只封頂），在起跑前
-取消，換成「嚴格」與「不吃對子」；「只封頂」是讀完前三個之後才加的。
+The A/B is `ab/run.sh 100000 b894777`, the candidate in the second seat, the
+pile reshuffled 8 times from where the two part
+([`reshuffle.md`](reshuffle.md)).  Every deal count was set before the run,
+and each seed base is the clock at that moment.  Two ablations of "lenient"
+(pairs only, cap only) were scheduled at first as well; they were cancelled
+before the start and replaced by "strict" and "no pair eats"; "cap only" was
+added only after the first three had been read.
 
-重現（以「嚴格」為例）：
+To reproduce (taking "strict" as the example):
 
 ```sh
 git apply research/room-for-melds.patch
 SEED_BASE=1794934225 ab/run.sh 100000 b894777
 ```
 
-## 數據
+## Data
 
-| | 寬鬆 | 嚴格 | 只封頂 | 不吃對子 |
+| | Lenient | Strict | Cap only | No pair eats |
 | --- | ---: | ---: | ---: | ---: |
 | seed base | 1794933710 | 1794934225 | 1794936088 | 1794934919 |
-| 局數 | 100,000 | 100,000 | 100,000 | 100,000 |
-| 分歧的局數 | 28,275 | 33,313 | 6,093 | 52,775 |
-| 得分差（分／局） | −0.290 ± 0.014 | −0.216 ± 0.014 | +0.005 ± 0.004 | −1.497 ± 0.020 |
+| Deals | 100,000 | 100,000 | 100,000 | 100,000 |
+| Deals that part | 28,275 | 33,313 | 6,093 | 52,775 |
+| Score difference (points a deal) | −0.290 ± 0.014 | −0.216 ± 0.014 | +0.005 ± 0.004 | −1.497 ± 0.020 |
 | 95% CI | [−0.317, −0.263] | [−0.244, −0.189] | [−0.003, +0.014] | [−1.536, −1.458] |
-| 結論 | loss | loss | 不明 | loss |
-| 胡牌率，對照 → 候選 | 24.40% → 23.81% | 24.27% → 23.82% | 24.21% → 24.22% | 24.20% → 20.33% |
-| 分歧的局平均（分） | −1.027 | −0.650 | +0.083 | −2.837 |
-| 同一局面內的標準差（分） | 16.44 | 16.08 | 12.65 | 17.91 |
-| 局面之間的標準差（分） | 5.70 | 5.20 | 3.31 | 5.44 |
+| Verdict | loss | loss | insufficient data | loss |
+| Win rate, control → candidate | 24.40% → 23.81% | 24.27% → 23.82% | 24.21% → 24.22% | 24.20% → 20.33% |
+| Mean over the deals that part (points) | −1.027 | −0.650 | +0.083 | −2.837 |
+| Standard deviation within one position (points) | 16.44 | 16.08 | 12.65 | 17.91 |
+| Standard deviation between positions (points) | 5.70 | 5.20 | 3.31 | 5.44 |
 
-## 輸在哪裡
+## Where it loses
 
-照鐵則，宣告輸之前先追查。`research/room-for-melds-trace.patch` 讓 `ab/` 在
-`TRACE=1` 時印出每一個分歧（seed、兩邊的決定、手牌、重洗 8 次的平均
-得分差），並附 `ab/tally.py` 依「對照的決定 → 候選的決定」分組：
+By the iron rule, a loss is traced before it is declared.
+`research/room-for-melds-trace.patch` makes `ab/` print every split under
+`TRACE=1` (the seed, each side's decision, the hand, the mean score
+difference over the 8 reshuffles), and adds `ab/tally.py`, which groups them
+by "the control's decision → the candidate's decision":
 
 ```sh
 git apply research/room-for-melds-trace.patch
@@ -134,158 +166,180 @@ TRACE=1 SEED_BASE=1794934225 ab/run.sh 20000 b894777 > out.txt
 python3 ab/tally.py out.txt 20000
 ```
 
-前三張表各取該次 A/B 的前 20,000 局（同一個 seed base），「只封頂」是
-全部 100,000 局。這些牌就是下判決的那批，分組是看了結果才分的，所以
-各列只能用來找原因與挑下一個實驗。
+The first three tables each take the first 20,000 deals of their A/B (the
+same seed base); "cap only" is all 100,000 deals.  These are the very deals
+the verdict was given on, and the groups were made after seeing the results,
+so the rows serve only to look for causes and to pick the next experiment.
 
-### 寬鬆
+### Lenient
 
-前 20,000 局：5,568 局分歧，−0.321 ± 0.031 分／局。
+First 20,000 deals: 5,568 deals part, −0.321 ± 0.031 points a deal.
 
-| 對照 → 候選 | 局數 | 平均（分） | ± | 每局貢獻（分） |
+| Control → candidate | Deals | Mean (points) | ± | Contribution a deal (points) |
 | --- | ---: | ---: | ---: | ---: |
-| 過 → 吃對子 | 2,332 | −1.66 | 0.16 | −0.1934 |
-| 過 → 碰 | 244 | −4.71 | 0.67 | −0.0575 |
-| 碰 → 過 | 682 | −1.14 | 0.28 | −0.0390 |
-| 吃兵卒 → 過 | 108 | −2.07 | 1.19 | −0.0112 |
-| 吃兵卒 → 吃兵卒 | 68 | −2.60 | 1.35 | −0.0088 |
-| 吃兵卒 → 吃對子 | 28 | −5.73 | 2.05 | −0.0080 |
-| 棄牌 → 棄牌 | 1,037 | −0.12 | 0.30 | −0.0062 |
-| 過 → 吃兵卒 | 29 | −3.91 | 1.86 | −0.0057 |
-| 吃車馬炮 → 過 | 241 | −0.38 | 0.38 | −0.0046 |
-| 吃車馬炮 → 吃對子 | 125 | −0.18 | 0.62 | −0.0012 |
-| 吃將士象 → 吃將 | 16 | −1.22 | 1.42 | −0.0010 |
-| 吃將士象 → 過 | 226 | −0.08 | 0.51 | −0.0010 |
-| 過 → 吃車馬炮 | 6 | −1.15 | 0.80 | −0.0003 |
-| 過 → 吃將士象 | 44 | −0.11 | 0.97 | −0.0003 |
-| 吃將士象 → 碰 | 3 | −1.08 | 1.08 | −0.0002 |
-| 吃對子 → 吃車馬炮 | 2 | +0.00 | 0.00 | +0.0000 |
-| 吃將士象 → 吃對子 | 29 | +0.47 | 1.38 | +0.0007 |
-| 碰 → 吃將士象 | 114 | +1.25 | 0.69 | +0.0071 |
-| 吃對子 → 過 | 234 | +0.78 | 0.32 | +0.0091 |
+| pass → eat pair | 2,332 | −1.66 | 0.16 | −0.1934 |
+| pass → pong | 244 | −4.71 | 0.67 | −0.0575 |
+| pong → pass | 682 | −1.14 | 0.28 | −0.0390 |
+| eat soldiers → pass | 108 | −2.07 | 1.19 | −0.0112 |
+| eat soldiers → eat soldiers | 68 | −2.60 | 1.35 | −0.0088 |
+| eat soldiers → eat pair | 28 | −5.73 | 2.05 | −0.0080 |
+| discard → discard | 1,037 | −0.12 | 0.30 | −0.0062 |
+| pass → eat soldiers | 29 | −3.91 | 1.86 | −0.0057 |
+| eat 車馬炮 → pass | 241 | −0.38 | 0.38 | −0.0046 |
+| eat 車馬炮 → eat pair | 125 | −0.18 | 0.62 | −0.0012 |
+| eat 將士象 → eat 將 | 16 | −1.22 | 1.42 | −0.0010 |
+| eat 將士象 → pass | 226 | −0.08 | 0.51 | −0.0010 |
+| pass → eat 車馬炮 | 6 | −1.15 | 0.80 | −0.0003 |
+| pass → eat 將士象 | 44 | −0.11 | 0.97 | −0.0003 |
+| eat 將士象 → pong | 3 | −1.08 | 1.08 | −0.0002 |
+| eat pair → eat 車馬炮 | 2 | +0.00 | 0.00 | +0.0000 |
+| eat 將士象 → eat pair | 29 | +0.47 | 1.38 | +0.0007 |
+| pong → eat 將士象 | 114 | +1.25 | 0.69 | +0.0071 |
+| eat pair → pass | 234 | +0.78 | 0.32 | +0.0091 |
 
-### 嚴格
+### Strict
 
-前 20,000 局：6,653 局分歧，−0.187 ± 0.032 分／局。
+First 20,000 deals: 6,653 deals part, −0.187 ± 0.032 points a deal.
 
-| 對照 → 候選 | 局數 | 平均（分） | ± | 每局貢獻（分） |
+| Control → candidate | Deals | Mean (points) | ± | Contribution a deal (points) |
 | --- | ---: | ---: | ---: | ---: |
-| 過 → 吃對子 | 1,970 | −1.28 | 0.17 | −0.1260 |
-| 過 → 碰 | 202 | −3.58 | 0.74 | −0.0361 |
-| 碰 → 過 | 608 | −1.18 | 0.32 | −0.0360 |
-| 吃兵卒 → 過 | 118 | −3.75 | 0.87 | −0.0221 |
-| 吃兵卒 → 吃對子 | 21 | −7.35 | 2.36 | −0.0077 |
-| 吃車馬炮 → 吃對子 | 122 | −0.71 | 0.58 | −0.0043 |
-| 過 → 吃兵卒 | 22 | −2.66 | 2.03 | −0.0029 |
-| 過 → 吃將士象 | 41 | −1.11 | 1.18 | −0.0023 |
-| 吃兵卒 → 吃兵卒 | 63 | −0.69 | 1.29 | −0.0022 |
-| 吃將士象 → 吃將 | 8 | −0.44 | 2.82 | −0.0002 |
-| 吃對子 → 吃兵卒 | 1 | +0.25 | | +0.0000 |
-| 吃車馬炮 → 碰 | 3 | +0.42 | 0.87 | +0.0001 |
-| 吃將士象 → 碰 | 2 | +3.44 | 2.94 | +0.0003 |
-| 吃對子 → 吃車馬炮 | 6 | +2.12 | 1.84 | +0.0006 |
-| 過 → 吃車馬炮 | 15 | +1.08 | 1.30 | +0.0008 |
-| 吃將士象 → 吃對子 | 49 | +0.64 | 0.89 | +0.0016 |
-| 吃車馬炮 → 過 | 256 | +0.45 | 0.34 | +0.0057 |
-| 吃對子 → 過 | 900 | +0.19 | 0.19 | +0.0086 |
-| 碰 → 吃將士象 | 136 | +1.50 | 0.65 | +0.0102 |
-| 吃將士象 → 過 | 231 | +0.88 | 0.61 | +0.0102 |
-| 棄牌 → 棄牌 | 1,879 | +0.16 | 0.19 | +0.0148 |
+| pass → eat pair | 1,970 | −1.28 | 0.17 | −0.1260 |
+| pass → pong | 202 | −3.58 | 0.74 | −0.0361 |
+| pong → pass | 608 | −1.18 | 0.32 | −0.0360 |
+| eat soldiers → pass | 118 | −3.75 | 0.87 | −0.0221 |
+| eat soldiers → eat pair | 21 | −7.35 | 2.36 | −0.0077 |
+| eat 車馬炮 → eat pair | 122 | −0.71 | 0.58 | −0.0043 |
+| pass → eat soldiers | 22 | −2.66 | 2.03 | −0.0029 |
+| pass → eat 將士象 | 41 | −1.11 | 1.18 | −0.0023 |
+| eat soldiers → eat soldiers | 63 | −0.69 | 1.29 | −0.0022 |
+| eat 將士象 → eat 將 | 8 | −0.44 | 2.82 | −0.0002 |
+| eat pair → eat soldiers | 1 | +0.25 | | +0.0000 |
+| eat 車馬炮 → pong | 3 | +0.42 | 0.87 | +0.0001 |
+| eat 將士象 → pong | 2 | +3.44 | 2.94 | +0.0003 |
+| eat pair → eat 車馬炮 | 6 | +2.12 | 1.84 | +0.0006 |
+| pass → eat 車馬炮 | 15 | +1.08 | 1.30 | +0.0008 |
+| eat 將士象 → eat pair | 49 | +0.64 | 0.89 | +0.0016 |
+| eat 車馬炮 → pass | 256 | +0.45 | 0.34 | +0.0057 |
+| eat pair → pass | 900 | +0.19 | 0.19 | +0.0086 |
+| pong → eat 將士象 | 136 | +1.50 | 0.65 | +0.0102 |
+| eat 將士象 → pass | 231 | +0.88 | 0.61 | +0.0102 |
+| discard → discard | 1,879 | +0.16 | 0.19 | +0.0148 |
 
-「過 → 吃對子」的兩個例子（暗牌依紅、黃、綠、白，後面是亮出的牌組）：
+Two examples of "pass → eat pair" (the concealed cards by red, yellow,
+green, white, then the exposed melds):
 
-- seed 1794934260：`帥仕相兵兵.仕仕俥傌炮兵兵.將象車車包.車包`，亮出
-  紅帥。來一張綠包，對照過，候選拿綠 `車車包` 裡的包去吃成 `包包`，
-  −6.50 分。
-- seed 1794934230：`帥仕相俥俥傌傌炮兵兵.兵.士象車馬馬包包.將將`。來一張
-  紅相，對照過，候選拿紅 `帥仕相` 裡的相去吃成 `相相`，+1.13 分。
+- seed 1794934260: `帥仕相兵兵.仕仕俥傌炮兵兵.將象車車包.車包`, the red
+  帥 exposed.  A green 包 comes; the control passes, and the candidate takes
+  the 包 out of the green `車車包` to eat it into `包包`, −6.50 points.
+- seed 1794934230: `帥仕相俥俥傌傌炮兵兵.兵.士象車馬馬包包.將將`.  A red
+  相 comes; the control passes, and the candidate takes the 相 out of the
+  red `帥仕相` to eat it into `相相`, +1.13 points.
 
-### 只封頂
+### Cap only
 
-全部 100,000 局：6,093 局分歧，+0.005 ± 0.004 分／局。
+All 100,000 deals: 6,093 deals part, +0.005 ± 0.004 points a deal.
 
-| 對照 → 候選 | 局數 | 平均（分） | ± | 每局貢獻（分） |
+| Control → candidate | Deals | Mean (points) | ± | Contribution a deal (points) |
 | --- | ---: | ---: | ---: | ---: |
-| 碰 → 過 | 517 | −1.06 | 0.27 | −0.0055 |
-| 過 → 吃對子 | 908 | −0.46 | 0.14 | −0.0042 |
-| 吃車馬炮 → 吃對子 | 46 | −0.66 | 0.63 | −0.0003 |
-| 過 → 吃兵卒 | 16 | −1.85 | 1.09 | −0.0003 |
-| 碰 → 吃將士象 | 34 | −0.06 | 0.88 | −0.0000 |
-| 過 → 吃車馬炮 | 31 | +0.07 | 1.19 | +0.0000 |
-| 吃對子 → 吃兵卒 | 4 | +0.62 | 0.38 | +0.0000 |
-| 吃兵卒 → 吃兵卒 | 3 | +1.17 | 0.23 | +0.0000 |
-| 碰 → 吃車馬炮 | 1 | +3.75 | | +0.0000 |
-| 吃將士象 → 吃對子 | 13 | +0.53 | 0.39 | +0.0001 |
-| 吃兵卒 → 過 | 3 | +3.67 | 1.79 | +0.0001 |
-| 吃將士象 → 碰 | 4 | +3.22 | 3.13 | +0.0001 |
-| 過 → 吃將士象 | 58 | +0.25 | 0.58 | +0.0001 |
-| 吃將士象 → 吃將 | 16 | +1.06 | 2.03 | +0.0002 |
-| 吃車馬炮 → 過 | 223 | +0.08 | 0.28 | +0.0002 |
-| 過 → 碰 | 116 | +0.15 | 0.48 | +0.0002 |
-| 吃對子 → 吃車馬炮 | 29 | +4.43 | 2.39 | +0.0013 |
-| 吃將士象 → 過 | 107 | +1.47 | 0.54 | +0.0016 |
-| 吃對子 → 過 | 1,949 | +0.26 | 0.12 | +0.0050 |
-| 棄牌 → 棄牌 | 2,015 | +0.32 | 0.14 | +0.0064 |
+| pong → pass | 517 | −1.06 | 0.27 | −0.0055 |
+| pass → eat pair | 908 | −0.46 | 0.14 | −0.0042 |
+| eat 車馬炮 → eat pair | 46 | −0.66 | 0.63 | −0.0003 |
+| pass → eat soldiers | 16 | −1.85 | 1.09 | −0.0003 |
+| pong → eat 將士象 | 34 | −0.06 | 0.88 | −0.0000 |
+| pass → eat 車馬炮 | 31 | +0.07 | 1.19 | +0.0000 |
+| eat pair → eat soldiers | 4 | +0.62 | 0.38 | +0.0000 |
+| eat soldiers → eat soldiers | 3 | +1.17 | 0.23 | +0.0000 |
+| pong → eat 車馬炮 | 1 | +3.75 | | +0.0000 |
+| eat 將士象 → eat pair | 13 | +0.53 | 0.39 | +0.0001 |
+| eat soldiers → pass | 3 | +3.67 | 1.79 | +0.0001 |
+| eat 將士象 → pong | 4 | +3.22 | 3.13 | +0.0001 |
+| pass → eat 將士象 | 58 | +0.25 | 0.58 | +0.0001 |
+| eat 將士象 → eat 將 | 16 | +1.06 | 2.03 | +0.0002 |
+| eat 車馬炮 → pass | 223 | +0.08 | 0.28 | +0.0002 |
+| pass → pong | 116 | +0.15 | 0.48 | +0.0002 |
+| eat pair → eat 車馬炮 | 29 | +4.43 | 2.39 | +0.0013 |
+| eat 將士象 → pass | 107 | +1.47 | 0.54 | +0.0016 |
+| eat pair → pass | 1,949 | +0.26 | 0.12 | +0.0050 |
+| discard → discard | 2,015 | +0.32 | 0.14 | +0.0064 |
 
-### 不吃對子
+### No pair eats
 
-前 20,000 局：10,645 局分歧，−1.416 ± 0.043 分／局。
+First 20,000 deals: 10,645 deals part, −1.416 ± 0.043 points a deal.
 
-| 對照 → 候選 | 局數 | 平均（分） | ± | 每局貢獻（分） |
+| Control → candidate | Deals | Mean (points) | ± | Contribution a deal (points) |
 | --- | ---: | ---: | ---: | ---: |
-| 吃對子 → 過 | 9,833 | −2.77 | 0.08 | −1.3630 |
-| 過 → 吃將士象 | 158 | −1.88 | 0.51 | −0.0149 |
-| 過 → 吃車馬炮 | 202 | −1.15 | 0.35 | −0.0116 |
-| 吃對子 → 吃車馬炮 | 80 | −2.47 | 0.85 | −0.0099 |
-| 過 → 碰 | 305 | −0.59 | 0.38 | −0.0090 |
-| 吃對子 → 吃將士象 | 31 | −4.71 | 1.38 | −0.0073 |
-| 過 → 吃兵卒 | 33 | −0.46 | 1.56 | −0.0008 |
-| 吃對子 → 吃兵卒 | 3 | +2.75 | 5.10 | +0.0004 |
+| eat pair → pass | 9,833 | −2.77 | 0.08 | −1.3630 |
+| pass → eat 將士象 | 158 | −1.88 | 0.51 | −0.0149 |
+| pass → eat 車馬炮 | 202 | −1.15 | 0.35 | −0.0116 |
+| eat pair → eat 車馬炮 | 80 | −2.47 | 0.85 | −0.0099 |
+| pass → pong | 305 | −0.59 | 0.38 | −0.0090 |
+| eat pair → eat 將士象 | 31 | −4.71 | 1.38 | −0.0073 |
+| pass → eat soldiers | 33 | −0.46 | 1.56 | −0.0008 |
+| eat pair → eat soldiers | 3 | +2.75 | 5.10 | +0.0004 |
 
-## 怎麼讀
+## How to read it
 
-- **算了對子碰的兩個版本，輸在吃更多對子。** 「過 → 吃對子」占「寬鬆」
-  損失的六成、「嚴格」的三分之二。上面兩個例子都是拿現成牌組或搭子裡的
-  牌去吃對子。推測的機制：對子的牌一進 `hope`，可望補上的胡就比位置多，
-  拆掉一個搭子不再讓 `short` 變大，少兩張散牌的 256 於是勝出。這個機制
-  只從例子看出來，沒有另外量；但拿掉對子碰的希望之後，「過 → 吃對子」從
-  每局 −0.126 掉到 −0.004。
-- **碰的取捨原本就比較準。** 算了對子碰的兩個版本，多碰（−3.6 到 −4.7 分）
-  與少碰（−1.1 到 −1.2 分）都是負的。
-- **吃對子平均很值得。** 「不吃對子」在一半的牌局擋下第一個對子，每次
-  賠 2.77 分。
-- **封頂擋下的對子是另一群。** 「只封頂」的「吃對子 → 過」每次 +0.26 ±
-  0.12 分，「嚴格」的是 +0.19 ± 0.19 分，「寬鬆」的是 +0.78 ± 0.32 分，三次
-  都是正的。帳說會掉上限的那些對子，少吃確實沒有壞處，可能有一點好處；
-  只是 100,000 局裡只有 1,949 次。
-- **「只封頂」也有賠的地方。** 少碰（−1.06 ± 0.27 分）和多吃對子（−0.46 ±
-  0.14 分）合計每局 −0.010，把其他各列合計的 +0.015 抵掉六成。
+- **The two versions that count pongs of pairs lose by eating more pairs.**
+  "Pass → eat pair" is 60% of the loss of "lenient" and two thirds of that
+  of "strict".  Both examples above take a card out of a ready meld or a
+  搭子 to eat a pair.  The presumed mechanism: once the cards of the pairs
+  enter `hope`, the 胡 hoped for exceed the room, breaking a 搭子 no longer
+  makes `short` grow, and the 256 for two loose cards fewer wins out.  This
+  mechanism is read off the examples only and was not measured apart; but
+  with the hope for pongs of pairs taken out, "pass → eat pair" falls from
+  −0.126 a deal to −0.004.
+- **The choice of pongs was the more accurate to begin with.**  In the two
+  versions that count pongs of pairs, ponging more (−3.6 to −4.7 points) and
+  ponging less (−1.1 to −1.2 points) are both negative.
+- **Eating a pair pays well on average.**  "No pair eats" blocks the first
+  pair in half the deals and loses 2.77 points each time.
+- **The pairs the cap blocks are a different group.**  "Eat pair → pass" is
+  +0.26 ± 0.12 points each time under "cap only", +0.19 ± 0.19 points under
+  "strict" and +0.78 ± 0.32 points under "lenient", positive all three
+  times.  Eating fewer of the pairs the arithmetic says lower the limit
+  indeed does no harm, and may do a little good; only there are just 1,949
+  of them in 100,000 deals.
+- **"Cap only" loses in places too.**  Ponging less (−1.06 ± 0.27 points)
+  and eating more pairs (−0.46 ± 0.14 points) come to −0.010 a deal
+  together, cancelling 60% of the +0.015 the other rows add up to.
 
-## 限制
+## Caveats
 
-- **分組是事後的。** 各列的正負是在下判決的同一批牌上看的，不能當成
-  判決；拿它們設計的規則要用新的 seed base 重量。
-- **四次實驗的牌局大量重疊。** seed base 相隔幾百到兩千多，局數是
-  100,000，所以四個數字不是四次獨立的驗證。
-- **只記每局第一次分歧。** 之後的差別都算在第一次分歧頭上，所以看不出
-  吃對子的代價是前期大還是後期大。
-- **封頂只進了 `short` 一項。** 每個半胡扣 64，吃對子少兩張散牌省 256。
-  帳說的是「做不成」，評分只當成「遠一點」；權重沒有動，也沒有試別的
-  權重。
-- **帳不算運氣。** 摸到將帥、槓、四色兵卒都能讓做不成的形做成，上限因此
-  偏緊；偏多少沒有量。
-- **上限只算一種排法。** bot 把手牌排兩次（重胡數與重張數），各自封頂，
-  沒有找上限最高的排法。暗刻槓出與三色兵卒吃進第四色的胡也不在 `hope`
-  裡。
-- **對手是同一個 bot。** 對照與另外兩家都是 `HeuristicBot`。
-- **「嚴格」的 patch 會讓一個測試失敗。** `heuristic::tests::shanten` 結尾
-  檢查三局裡每一種向聽數都出現過；改了打法之後「差兩步」沒有出現。那是
-  取樣的檢查，不是向聽數算錯。
+- **The groups are after the fact.**  The sign of each row was read on the
+  same deals the verdict was given on and is no verdict; a rule designed
+  from them has to be measured again on a fresh seed base.
+- **The deals of the four experiments overlap heavily.**  The seed bases are
+  a few hundred to a little over two thousand apart and the deal count is
+  100,000, so the four numbers are not four independent checks.
+- **Only the first split of each deal is recorded.**  Every later difference
+  is charged to the first split, so it cannot be seen whether eating a pair
+  costs more early or late.
+- **The cap enters the term `short` alone.**  Each half-胡 costs 64, and
+  eating a pair saves 256 for two loose cards fewer.  The arithmetic says
+  "cannot be made"; the grade only takes it as "a little further off"; the
+  weights were not touched, and no other weights were tried.
+- **The arithmetic leaves luck out.**  A drawn general, a kong, or soldiers
+  of four colours can each make a shape that cannot be made, so the limit is
+  on the tight side; by how much was not measured.
+- **The limit is computed for one layout only.**  The bot lays the hand out
+  twice (weighing the 胡 and weighing the cards), caps each by itself, and
+  does not look for the layout with the highest limit.  The 胡 of a
+  concealed triplet konged and of soldiers of three colours eating the
+  fourth are not in `hope` either.
+- **The opponents are the same bot.**  The control and the other two seats
+  are all `HeuristicBot`.
+- **The "strict" patch makes one test fail.**  `heuristic::tests::shanten`
+  ends by checking that every 向聽數 came up in its three rounds; with play
+  changed, "two away" did not come up.  That is a check on the sample, not a
+  wrong 向聽數.
 
-## 還沒試的
+## Not yet tried
 
-- **封頂只用來拒吃對子，不影響過、碰與棄牌。** 「只封頂」裡「吃對子 →
-  別的」幾列合計約 +0.006 分／局，這是事後挑出來的上限，換一批牌多半會
-  縮水。要分出這麼小的差，得先定四十萬局以上。
-- **把「做不成」當成死牌而不是扣分。** 上限加上將帥的補救仍到不了門檻
-  時，直接照 `dead` 處理。
+- **The cap used only to refuse pair eats, leaving passes, pongs and
+  discards alone.**  The "eat pair → something else" rows of "cap only" add
+  up to about +0.006 points a deal; that is an upper bound picked out after
+  the fact, and will most likely shrink on other deals.  Telling a
+  difference this small apart needs 400,000 deals or more declared first.
+- **Treating "cannot be made" as a dead hand rather than a deduction.**
+  When the limit, even with the generals' help, still cannot reach the
+  threshold, handle the hand as `dead` outright.

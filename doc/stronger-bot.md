@@ -1,623 +1,852 @@
-# 更強的 bot：Monte Carlo 以外的路線
+# A stronger bot: routes other than Monte Carlo
 
-日期：2026-11-16。對照基準：`10a046f`。
+Dated 2026-11-16.  Control base: `10a046f`.
 
-這份文件說明 `HeuristicBot` 之後要往哪裡變強、先做哪一條、每一步怎麼算數。
-實驗的數字記在 `CHANGELOG.md`，量測記在 `research/`，別人做過什麼記在
-`research/prior-art.md`；這裡只留設計與目前的狀態。
+This document says where `HeuristicBot` gets stronger from here, which route
+comes first, and what counts at each step.  The experiments' numbers are in
+`CHANGELOG.md`, the measurements in `research/`, and what others have done in
+`research/prior-art.md`; only the design and the current state are kept here.
 
-## 目標與限制
+## Goal and constraints
 
-- **「更強」的定義**是 `ab/run.sh` 的結果：候選 bot 坐一家、另外三家是
-  `main` HEAD 的 `HeuristicBot`，與四家都是對照組的同一副牌相比，每局得分差的
-  95% 信賴區間高於 0（見 `CLAUDE.md` 的 Iron rules）。
-- **網頁版要用得上。** 網頁的對手與提示都是 `HeuristicBot`。`MonteCarloBot`
-  128 樣本編成 wasm 後每步平均 0.83 秒，太慢。所以這裡的路線都要把成本留在
-  離線，或維持 `HeuristicBot` 的量級。
-- **計分決定了防守值多少。** 贏家向另外三家各收自己的胡數，放銃的人不多賠。
-  所以放銃的代價是「這一局現在就結束，我賠一份」，平均約 12 分，再加上原本
-  還有機會自己胡的那部分。
+- **"Stronger" is defined** by the result of `ab/run.sh`: the candidate bot
+  in one seat with `main` HEAD's `HeuristicBot` in the other three, against
+  the same deal with four control bots, and the 95% confidence interval of
+  the score difference a round lies above 0 (see the Iron rules in
+  `CLAUDE.md`).
+- **The web page must be able to use it.**  The web page's opponents and
+  hint are both `HeuristicBot`.  `MonteCarloBot` at 128 samples compiled to
+  wasm averages 0.83 seconds a move, too slow.  So every route here must
+  keep its cost offline, or stay at the order of `HeuristicBot`.
+- **The scoring decides what defence is worth.**  The winner collects its 胡
+  from each of the other three seats, and the seat that deals in pays no
+  more.  So the cost of dealing in is "the round ends now and I pay one
+  share", about 12 points on average, plus whatever chance there still was
+  of winning oneself.
 
-## 現況
+## Current state
 
-- `HeuristicBot` 是一步貪心：手牌的胡數，扣掉散牌與離門檻的差距，再看搭子
-  還有幾張沒出現的牌能補。它數自己看過的牌，但不猜別家手上有什麼。
-- `MonteCarloBot` 128 樣本對現在的 `HeuristicBot`：+0.148 ± 0.276 分／局，
-  95% CI [−0.392, +0.689]，結論不明。它做的是「假設沒看到的牌均勻分布，然後
-  多看幾步」。這表示在同一份資訊下多算，剩下的空間可能不大。兩人桌上
-  同一個 bot 第一次是 +0.347 ± 0.175，重跑是 +0.050 ± 0.172，結論不明
-  （路線五）。
-- 只在暗牌 10 張以下才搜尋的 `MonteCarloBot` 是 +0.070 ± 0.026 分／局，
-  95% CI [+0.019, +0.121]，40,000 局，win（路線六）。四人桌上第一個贏
-  `HeuristicBot` 的搜尋，成本是不設閘門的幾十分之一。
-- 偷看對手手牌的 Peeker 在兩人桌是 +2.824 ± 0.192 分／局，win（路線一）。
-  同一套搜尋，差別只在對手的手牌是真的還是猜的。
-- `HeuristicBot` 歷次改進每次約 +0.08 到 +0.28 分／局。A/B 跑 200,000 局的
-  標準誤約 0.01 到 0.03，打法不同的牌局越多越大，所以 0.05 分以下的改進要
-  更多局才看得到。
-- 手上的 1 胡約值 1.4 分；它在評分裡算 32（`research/fitted-weights.md`）。
-  評分本身是排序用的整數，沒有單位。
+- `HeuristicBot` is one-step greedy: the hand's 胡, less the loose cards and
+  the distance from the threshold, then how many cards not yet seen can fill
+  its 搭子.  It counts the cards it has seen but does not guess what the
+  other seats hold.
+- `MonteCarloBot` at 128 samples against the current `HeuristicBot`: +0.148
+  ± 0.276 points a deal, 95% CI [−0.392, +0.689], insufficient data.  What
+  it does is "assume the unseen cards are spread evenly, then look a few
+  steps further".  This suggests that computing more on the same information
+  may leave little room.  At a table of two the same bot was +0.347 ± 0.175
+  the first time and +0.050 ± 0.172 on the rerun, insufficient data
+  (route 5).
+- A `MonteCarloBot` that searches only with 10 concealed cards or fewer is
+  +0.070 ± 0.026 points a deal, 95% CI [+0.019, +0.121], 40,000 deals, win
+  (route 6).  It is the first search to beat `HeuristicBot` at a table of
+  four, at a cost tens of times smaller than the ungated one's.
+- The Peeker, which peeks at the opponents' hands, is +2.824 ± 0.192 points
+  a deal at a table of two, win (route 1).  It is the same search; the only
+  difference is whether the opponents' hands are real or guessed.
+- Each past improvement to `HeuristicBot` was about +0.08 to +0.28 points a
+  round.  An A/B of 200,000 deals has a standard error of about 0.01 to
+  0.03, larger the more deals are played differently, so an improvement
+  under 0.05 points needs more deals to be seen.
+- 1 胡 in hand is worth about 1.4 points; the grade counts it as 32
+  (`research/fitted-weights.md`).  The grade itself is an integer for
+  ranking, with no unit.
 
-## 先前研究怎麼說
+## What prior research says
 
-十胡與四色牌沒有找到任何 AI 論文，能借的是麻將與 gin rummy
-（`research/prior-art.md`，各項的出處都在那裡）。與這份計畫有關的是：
+No AI paper was found on 十胡 or Four Color Cards; what can be borrowed comes
+from mahjong and gin rummy (`research/prior-art.md`, which has the source of
+each item).  What bears on this plan:
 
-- **麻將 AI 的對手模型幾乎都用來算放銃的損失。** 日麻放銃者付全額，所以
-  值得；十胡不多賠。Mizukami 與 Tsuruoka 加上對手模型之後放銃率降了、和牌率
-  也降了，與這裡的防守實驗是同一個現象。這一塊搬不過來。
-- **gin rummy 比賽的冠軍靠的是「這張牌對對手有多大用處」。** MARJJ 的棄牌
-  評分是自己手牌的價值加上這一項；把其中一組歸零，勝率掉到 47% 到 48%。
-  這支持「不餵下家」。同一篇也發現參數在很寬的範圍裡不敏感，與路線二相同。
-- **對手推論值多少，各個遊戲差很多，所以要先量天花板。** 讓搜尋直接偷看
-  對手的牌：Scrabble 每局多 37 分而實際推論只拿到 5 分；gin rummy 的勝率從
-  26% 到 85%；鬥地主幾乎沒有差別；兩人麻將裡隨機的對手模型與學來的一樣好。
-- **`../gin-rummy-engine` 的經驗是樣本數比對手模型重要。** 兩人 gin rummy
-  裡同樣架構的 Monte Carlo 明顯贏過貪心 bot，追上最強對手靠的是把 playout
-  算快再加樣本；三個「搞懂對手」的診斷都被 A/B 否定，其中把對手的手牌發得
-  更準反而變弱。
-- **評估的雜訊有現成的解法。** 大家都用同一副牌配對（`ab/` 已經是）。配對
-  之後剩下的雜訊，backgammon 用 rollout、撲克用扣掉運氣的估計量來壓，
-  兩人撲克所需的手數因此少 5 到 10 倍。
+- **Mahjong AIs use their opponent models almost entirely to compute the
+  loss from dealing in.**  In Japanese mahjong the seat that deals in pays
+  in full, so it is worth it; in 十胡 it pays no more.  After Mizukami and
+  Tsuruoka added an opponent model the deal-in rate fell and the win rate
+  fell too, the same phenomenon as the defence experiments here.  This part
+  does not carry over.
+- **The champion of the gin rummy competition relied on "how useful is this
+  card to the opponent".**  MARJJ grades a discard by the value of its own
+  hand plus this term; with one group of them zeroed, the win rate drops to
+  47% to 48%.  This supports "not feeding the next seat".  The same paper
+  also found the parameters insensitive over a wide range, the same as
+  route 2.
+- **What opponent inference is worth differs widely between games, so
+  measure the ceiling first.**  Letting the search peek at the opponents'
+  cards directly: in Scrabble it adds 37 points a game while actual
+  inference got only 5; in gin rummy the win rate goes from 26% to 85%; in
+  Dou Dizhu there is almost no difference; in two-player mahjong a random
+  opponent model is as good as a learnt one.
+- **The lesson of `../gin-rummy-engine` is that the sample count matters
+  more than the opponent model.**  In two-player gin rummy a Monte Carlo of
+  the same architecture clearly beats the greedy bot, and catching up with
+  the strongest opponent came from making the playout fast and adding
+  samples; all three "understand the opponent" diagnoses were refuted by
+  A/B, and one of them, dealing the opponent's hand more accurately, made it
+  weaker.
+- **Evaluation noise has ready-made solutions.**  Everyone pairs on the same
+  deal (`ab/` already does).  The noise left after pairing is pressed down
+  with rollouts in backgammon and with estimators that subtract the luck in
+  poker, so two-player poker needs 5 to 10 times fewer hands.
 
-## 路線
+## Routes
 
-| | 路線 | 用到新資訊 | 網頁可用 | 工程量 |
+| | Route | Uses new information | Usable on the web page | Engineering |
 | --- | --- | --- | --- | --- |
-| 零 | 把量測做準 | 不改 bot | 不影響 | 小 |
-| 一 | 讀對手 | 是 | 是 | 小，可分段 |
-| 二 | 用資料擬合評分常數 | 否 | 是 | 中 |
-| 三 | 精確的單人期望值 | 否 | 視深度而定 | 中 |
-| 四 | 把 Monte Carlo 蒸餾成快速模型 | 否 | 是 | 大 |
-| 五 | 兩人桌當實驗場 | 不改 bot | 不影響 | 小 |
-| 六 | 只在後段搜尋的 Monte Carlo | 否 | 否，留給本機介面 | 小 |
+| 0 | Measure accurately | no bot change | not affected | small |
+| 1 | Read the opponents | yes | yes | small, can be staged |
+| 2 | Fit the grade's constants to data | no | yes | medium |
+| 3 | Exact single-player expectation | no | depends on the depth | medium |
+| 4 | Distil Monte Carlo into a fast model | no | yes | large |
+| 5 | A table of two as a test bed | no bot change | not affected | small |
+| 6 | Monte Carlo that searches only late | no | no, left to the native interface | small |
 
-路線零排最前面：七次 A/B 有五次結論不明，卡住的是標準誤，不是想法。接著是
-路線一，因為只有它讓 bot 用上原本沒用的資訊；二、三、四是把同一份資訊算得
-更準，而 Monte Carlo 的結果暗示那邊的空間有限。
+Route 0 comes first: five of seven A/Bs gave insufficient data, and what
+blocks them is the standard error, not the ideas.  Then route 1, because
+only it lets the bot use information it did not use before; routes 2, 3 and
+4 compute the same information more accurately, and the Monte Carlo result
+hints that the room there is limited.
 
-**目前的狀態**：路線一的防守部分（第一、二層）做過兩次實驗，路線二做過
-三次，都沒有贏，bot 沒有改動。防守在十胡裡不值錢；評分的常數換成擬合出來的
-值，強度也看不出差別。評分換算成分也量過：手牌換得成，選擇換不成。聽牌的
-手不吃碰成更少聽牌張數的規則試過一次，結論不明。兩人桌探測過一次（路線五）：
-引擎改一個常數就能打，兩個已知有效的改動在兩人桌上仍然有效，但沒有比較
-容易看出來；`MonteCarloBot` 在兩人桌第一次量到的正信賴區間，重跑後沒有
-重現。Peeker 量過了：兩人桌上看得到對手的手牌值 2.8 分／局，對手推論的
-天花板夠高。
-路線零的第一步做完了：從分歧點重洗牌堆 8 次，同樣的把握只要四分之一的計算量，
-`ab/` 從此預設這麼做。「不餵下家」四人桌沒有贏，兩人桌小贏。
-路線六量過了：`MonteCarloBot` 只在暗牌 10 張以下搜尋，四人桌 +0.070 ±
-0.026，win；只在聽牌時搜尋、兩者取聯集都是結論不明。`HeuristicBot` 與
-網頁沒有改動。
+**Current state**: the defensive part of route 1 (layers 1 and 2) was tried
+in two experiments and route 2 in three; none won and the bot is unchanged.
+Defence is worth little in 十胡; with the grade's constants replaced by
+fitted values, no difference in strength shows either.  Converting the grade
+to points was measured too: it works for hands, not for choices.  The rule
+that a waiting hand does not eat or pong into fewer waiting cards was tried
+once, insufficient data.  The table of two was probed once (route 5): the
+engine plays it with one constant changed, and two changes known to work
+still work at a table of two but are no easier to see; the positive
+confidence interval `MonteCarloBot` first measured at a table of two did not
+reproduce on the rerun.  The Peeker was measured: seeing the opponent's hand
+at a table of two is worth 2.8 points a deal, so the ceiling of opponent
+inference is high enough.
+The first step of route 0 is done: reshuffling the pile 8 times from the
+point of parting gives the same confidence for a quarter of the compute, and
+`ab/` does so by default from now on.  "Not feeding the next seat" did not
+win at a table of four and won narrowly at a table of two.
+Route 6 was measured: `MonteCarloBot` searching only with 10 concealed cards
+or fewer, at a table of four, +0.070 ± 0.026, win; searching only while
+waiting and the union of the two were both insufficient data.
+`HeuristicBot` and the web page are unchanged.
 
-下一步建議的順序：
+Suggested order of next steps:
 
-1. **做對手推論，先在兩人桌**：「自己要的牌還在不在」與 Monte Carlo 的
-   發牌。天花板是 +2.77 ± 0.26 分／局（Peeker 減 Monte Carlo，
-   `research/two-seats.md`），比 `HeuristicBot` 歷次的改進大一個數量級。
-2. **在四人桌量 Peeker。** 兩人桌的大小搬不動（路線五）；四人桌的天花板
-   決定推論值不值得搬回去。
-3. **其餘 `HeuristicBot` 的想法改用重洗的 A/B 重量**：先前不明的幾個（只在
-   評分相同時比危險度、只擋聽牌張數掉一半以上的吃碰）現在便宜四倍。
+1. **Do opponent inference, first at a table of two**: "are the cards I want
+   still there" and the Monte Carlo deal.  The ceiling is +2.77 ± 0.26
+   points a deal (Peeker minus Monte Carlo, `research/two-seats.md`), an
+   order of magnitude above `HeuristicBot`'s past improvements.
+2. **Measure the Peeker at a table of four.**  The sizes at a table of two
+   do not carry over (route 5); the ceiling at a table of four decides
+   whether inference is worth carrying back.
+3. **Measure the other `HeuristicBot` ideas again with the reshuffled A/B**:
+   the ones that gave insufficient data before (comparing danger only when
+   the grades tie, blocking only the eats and pongs that drop the waiting
+   cards by half or more) are now four times cheaper.
 
-## 路線零：把量測做準（第一步已做）
+## Route 0: measure accurately (first step done)
 
-### 雜訊在哪裡
+### Where the noise is
 
-`ab/` 讓候選與對照打同一副牌。兩邊打法相同的局，得分差剛好是 0；所有的雜訊
-都在打法不同的那些局。由各次實驗的標準誤反推，那些局的得分差標準差是 27 到
-37 分，和一個座位一局得分的標準差（約 30）差不多。也就是說，配對只消掉了
-分歧之前的運氣；兩邊一旦打得不一樣，之後摸到什麼牌就決定了大部分的得分差。
+`ab/` has the candidate and the control play the same deal.  On deals where
+the two play alike the score difference is exactly 0; all the noise is in
+the deals played differently.  Working back from each experiment's standard
+error, the score difference on those deals has a standard deviation of 27 to
+37 points, about the standard deviation of one seat's score in a round
+(about 30).  That is, pairing cancels only the luck before the parting; once
+the two play differently, what is drawn afterwards decides most of the score
+difference.
 
-這就是「做對的事不一定被獎勵」在數字上的樣子：一個平均值 1 到 6 分的決定，
-埋在標準差 30 分的運氣裡。
+This is what "doing the right thing is not always rewarded" looks like in
+numbers: a decision worth 1 to 6 points on average, buried in luck with a
+standard deviation of 30 points.
 
-### 做法：從分歧點重洗牌堆
+### Method: reshuffle the pile from the point of parting
 
-兩邊第一次做出不同的決定時記下局面，把剩下的牌堆重洗 K 次，兩邊各從那個
-局面打完 K 次，取得分差的平均。
+When the two first make different decisions, record the position, reshuffle
+the pile left K times, play both out from that position K times, and take
+the mean score difference.
 
-- **不偏。** 分歧之前每一個決定都只依已經翻開的牌，所以剩下的牌堆的順序
-  在那一刻仍是均勻隨機的。重洗不改期望值，只把分歧之後的運氣平均掉。四家的
-  暗牌是局面的一部分，不能重發。
-- **函式庫不必改。** 牌從牌堆尾端摸，剩下的牌堆就是原本那副牌的前幾張；
-  洗那幾張、用 `Round::from_pile` 重發、照記下的決定重放到分歧點即可。
+- **Unbiased.**  Every decision before the parting depends only on cards
+  already turned up, so the order of the pile left is still uniformly random
+  at that moment.  Reshuffling does not change the expectation; it only
+  averages out the luck after the parting.  The four seats' concealed cards
+  are part of the position and cannot be redealt.
+- **The library needs no change.**  Cards are drawn from the tail of the
+  pile, so the pile left is the first few cards of the original deck;
+  shuffle those, redeal with `Round::from_pile`, and replay the recorded
+  decisions up to the point of parting.
 
-### 結果（`research/reshuffle.md`）
+### Results (`research/reshuffle.md`)
 
-拿「不吃進已完整的牌組」那一次（`1b644f2` 對 `6fc8f21`，已知 +0.283 ±
-0.018，200,000 局）校正：
+Calibrated on the "do not eat into a meld already complete" run (`1b644f2`
+against `6fc8f21`, known to be +0.283 ± 0.018, 200,000 deals):
 
-- **同一個局面裡牌堆的運氣，標準差 18 到 19 分；局面之間真實的差異只有
-  4.4 到 4.7 分。** 雜訊的大頭確實在分歧之後。
-- **驗收通過。** 候選與對照相同時 20,000 局沒有一局分歧，得分差剛好是 0；
-  重洗 8、16、32 次的信賴區間都蓋住 +0.283。
-- **K = 8 時，同樣的把握只要約五分之一的局數、四分之一的計算量。** K = 16
-  與 K = 32 的局數更少，計算量差不多或稍多。
+- **Within one position the luck of the pile has a standard deviation of 18
+  to 19 points; the true difference between positions is only 4.4 to 4.7
+  points.**  The bulk of the noise is indeed after the parting.
+- **Acceptance passed.**  With the candidate and the control identical, not
+  one of 20,000 deals parts and the score difference is exactly 0; the
+  confidence intervals at 8, 16 and 32 reshuffles all cover +0.283.
+- **At K = 8 the same confidence takes about a fifth of the deals and a
+  quarter of the compute.**  K = 16 and K = 32 take fewer deals still, for
+  about the same compute or slightly more.
 
-`ab/` 從此預設 K = 8（`RESHUFFLE`），`CLAUDE.md` 的量測鐵則跟著改。
-`MonteCarloBot` 這類候選照舊用 `RESHUFFLE=0`：重打一次就是再算一次搜尋。
+`ab/` defaults to K = 8 from now on (`RESHUFFLE`), and the measurement iron
+rules in `CLAUDE.md` change with it.  Candidates like `MonteCarloBot` use
+`RESHUFFLE=0` as before: every replay is another search.
 
-### 之後可以加的
+### What can be added later
 
-依文獻報告的效果排序，都排在上面那一步之後：
+In order of the effect the literature reports, all after the step above:
 
-- **扣掉摸牌的運氣。** 每摸一張牌，把「這張牌之前的期望評分 − 之後的評分」
-  加到得分上；這一項期望為零。兩人撲克上有效，六人撲克只降了兩成的變異。
-- **依座位切開牌堆。** 每一家只從自己那一疊摸，吃碰改變順序時別家摸到的牌
-  不變。國標麻將的比賽這樣做，沒有給數字。
-- **邊跑邊檢定。** 夠了就停，平均局數變少；「局數在看資料前定下」要改成
-  「界線在看資料前定下」。
+- **Subtract the luck of the draw.**  For each card drawn, add "the expected
+  grade before this card − the grade after" to the score; this term has zero
+  expectation.  It works in two-player poker; in six-player poker it cut the
+  variance by only a fifth.
+- **Cut the pile by seat.**  Each seat draws only from its own stack, so when
+  eats and pongs change the order, the cards the other seats draw do not
+  change.  Chinese Official mahjong competitions do this, and give no
+  numbers.
+- **Test as the run goes.**  Stop when there is enough, so the average deal
+  count falls; "the deal count is set before seeing the data" must become
+  "the boundary is set before seeing the data".
 
-## 路線一：讀對手
+## Route 1: read the opponents
 
-### 公開資訊
+### Public information
 
-`Round::events` 記下每一次摸牌、棄牌、吃、碰、槓，全部是公開的。加上各家
-亮出的牌組與暗牌張數，一個座位能知道：
+`Round::events` records every draw, discard, eat, pong and kong, all public.
+With each seat's exposed melds and concealed card count, a seat can know:
 
-- 每張牌落地時，誰被問過、誰沒有胡。
-- 每一家什麼時候吃碰過（它的暗牌只在那時改變）。
-- 每一家還剩幾張暗牌、亮出的牌組值幾胡。
-- 每一種牌還有幾張沒出現。
+- For each card put down, who was asked and who did not win.
+- When each seat ate or ponged (its concealed cards change only then).
+- How many concealed cards each seat has left and how many 胡 its exposed
+  melds are worth.
+- How many of each kind of card have not appeared.
 
-從這些資訊能做的推論，依可靠程度分成四層。
+The inferences these allow fall into four layers by reliability.
 
-### 第一層：安全牌（已量測，bot 未採用）
+### Layer 1: safe cards (measured, not adopted by the bot)
 
-胡是強制的，所以一張牌落地而沒人胡，被問到的每一家當時都胡不到它。暗牌只在
-吃碰槓時改變，所以這個結論一直成立到那一家下一次吃碰槓。這是從規則推出來的
-證明，與對手怎麼打無關。
+Winning is compulsory, so when a card is put down and nobody wins, none of
+the seats asked could win on it then.  Concealed cards change only on an
+eat, pong or kong, so the conclusion holds until that seat's next eat, pong
+or kong.  This is a proof from the rules, independent of how the opponents
+play.
 
-`View::safe(seat)` 回傳某一家已被證明胡不到的牌。`tests/round.rs` 的對局
-測試檢查每一次胡牌都不是胡在被證明安全的牌上。
+`View::safe(seat)` returns the cards a seat is proved unable to win on.  The
+play tests in `tests/round.rs` check that no win is ever on a card proved
+safe.
 
-量測結果（`research/safe-cards.md`）：證明從未出錯，但只涵蓋約 5% 的（候選
-棄牌，對手）組合，因為對手每吃碰一次就全部作廢。
+Measurement (`research/safe-cards.md`): the proof was never wrong, but it
+covers only about 5% of the (candidate discard, opponent) pairs, because
+every eat or pong by the opponent voids all of it.
 
-### 第二層：對手的進度（已量測，bot 未採用）
+### Layer 2: the opponents' progress (measured, not adopted by the bot)
 
-同一份量測顯示，一張未證明安全的牌被某一家胡的機率，隨那一家的暗牌張數變化
-約兩百倍：還握 19 到 20 張時 0.02%，剩 8 張以下時 3% 到 5%。暗牌張數是公開
-的。這告訴 bot 哪個對手值得防。
+The same measurement shows that the chance a card not proved safe is won on
+by a seat varies about two hundredfold with that seat's concealed card
+count: 0.02% while it still holds 19 to 20 cards, 3% to 5% at 8 or fewer.
+The concealed card count is public.  This tells the bot which opponent is
+worth defending against.
 
-### 兩次實驗：棄牌的危險度
+### Two experiments: the danger of a discard
 
-兩次都以 `0b5d48f` 為對照，各 200,000 局，局數在跑之前定下。危險度是每個
-沒被證明安全的對手，依它的暗牌張數查出的被胡機率，三家加總。
+Both against `0b5d48f`, 200,000 deals each, the deal count set before the
+run.  The danger is, for each opponent not proved safe, the chance of being
+won on looked up by its concealed card count, summed over the three seats.
 
-| 做法 | seed base | 不同的局數 | 得分差（分／局） | 95% CI | 結論 |
+| Method | seed base | Deals that differ | Score difference (points a deal) | 95% CI | Verdict |
 | --- | ---: | ---: | ---: | --- | --- |
-| 從評分扣掉 12 × 32 × 危險度 | 1794815549 | 5,328 | −0.037 ± 0.010 | [−0.057, −0.017] | loss |
-| 評分相同時才比危險度 | 1794816883 | 2,513 | −0.002 ± 0.007 | [−0.015, +0.011] | 不明 |
+| 12 × 32 × danger taken off the grade | 1794815549 | 5,328 | −0.037 ± 0.010 | [−0.057, −0.017] | loss |
+| Danger compared only when the grades tie | 1794816883 | 2,513 | −0.002 ± 0.007 | [−0.015, +0.011] | insufficient data |
 
-第一種做法假設得分的 1 分等於評分的 32。追查同一批牌局裡第一個棄牌分歧的
-16,927 局，候選 bot 那一家的結果是：
+The first method assumes 1 point of score equals 32 of grade.  Tracing the
+16,927 deals of the same batch whose first parting is a discard, the
+outcomes of the candidate bot's seat are:
 
-| 結果 | 對照 | 候選 |
+| Outcome | Control | Candidate |
 | --- | ---: | ---: |
-| 自己胡 | 2,447 | 2,272 |
-| 放銃 | 3,460 | 3,057 |
-| 別家胡，不是自己放銃 | 9,879 | 10,356 |
-| 流局或相公 | 1,141 | 1,242 |
+| Wins itself | 2,447 | 2,272 |
+| Deals in | 3,460 | 3,057 |
+| Another seat wins, not on its discard | 9,879 | 10,356 |
+| Exhausted round or 相公 | 1,141 | 1,242 |
 
-放銃少了 403 次，輸的總次數卻多了 74 次，自己胡少了 175 次。對照組放銃而
-候選沒放的 1,691 局裡，有 1,394 局（82%）還是別家胡了。
+Deal-ins fell by 403, yet the losses in total rose by 74 and its own wins
+fell by 175.  Of the 1,691 deals where the control dealt in and the
+candidate did not, another seat won anyway in 1,394 (82%).
 
-### 學到什麼
+### What was learnt
 
-- **防守在十胡裡不值錢。** 每張摸牌都翻開來問四家，聽牌的人不靠你放銃也會
-  胡；放銃的人又不多賠。躲掉一次銃，多半只是換一個人放。
-- **手牌的進度比想像中貴。** 為了打安全牌而放慢的手牌，損失大於躲銃的收穫。
-  路線二量到評分的 32 約值 1.4 分，「1 分 = 32」把評分估得太便宜。
-- **不需要匯率的版本沒有可見的效果。** 只在評分相同時比危險度，200,000 局的
-  標準誤已經到 0.007，仍看不出差別。
-- **後段可能不同，但樣本不夠。** 第一種做法在牌堆剩 13 張以下才分歧的 704 局
-  是 +0.38 ± 0.39 分；前段與中段是負的。
+- **Defence is worth little in 十胡.**  Every drawn card is turned up and
+  offered to all four seats, so a waiting seat wins without your dealing in;
+  and the seat that deals in pays no more.  Dodging a deal-in mostly just
+  changes who deals in.
+- **The hand's progress is dearer than thought.**  A hand slowed down to
+  play safe cards loses more than dodging deal-ins gains.  Route 2 measured
+  32 of grade at about 1.4 points; "1 point = 32" prices the grade too
+  cheaply.
+- **The version that needs no exchange rate has no visible effect.**
+  Comparing danger only when the grades tie, the standard error over 200,000
+  deals is already down to 0.007 and still no difference shows.
+- **The late game may differ, but the sample is too small.**  The first
+  method is +0.38 ± 0.39 points on the 704 deals that part only with 13
+  cards or fewer left in the pile; the early and the middle game are
+  negative.
 
-### 第三層：壁（暫緩）
+### Layer 3: walls (deferred)
 
-對手要胡一張牌，手上得有能跟它成組的牌：同一張（單吊、對倒），或同色的另外
-兩種（成順），或別色的兵卒。這些搭檔牌還剩幾張沒出現，是出牌者數得出來的，
-可以把每張牌的危險度分得更細。
+For an opponent to win on a card, its hand must hold cards that meld with
+it: the same card (a pair wait or a triplet wait), or the other
+two kinds of the same colour (making a run), or soldiers of other colours.
+How many of these partner cards have not appeared is something the discarder
+can count, and it grades each card's danger more finely.
 
-這仍然是防守，受上面同一個結論限制，所以先不做。
+This is still defence, bound by the same conclusion above, so it is not done
+for now.
 
-### 第四層：行為推論（之後）
+### Layer 4: inference from behaviour (later)
 
-對手沒吃、沒碰、從手裡打出什麼，都透露它缺什麼。例如從手裡打出紅俥的人，
-多半沒有紅傌紅炮在等。這類推論能涵蓋的情況比安全牌多得多，但它學的是
-`HeuristicBot` 的習慣，對真人不一定成立。做這一層之前要先決定是否接受這個
-限制。
+What an opponent did not eat, did not pong and discarded from its hand all
+reveal what it lacks.  For example, a seat that discards a red 俥 from its
+hand is mostly not waiting with the red 傌 and red 炮.  Such inference covers
+far more cases than safe cards do, but what it learns is `HeuristicBot`'s
+habits, which need not hold for people.  Whether to accept that limit must
+be decided before this layer is built.
 
-### 還沒試的方向
+### Directions not yet tried
 
-讀對手不只用來躲銃。下面這些用的是同一份公開資訊，目的是讓自己胡得更快，
-或讓對手胡得更慢：
+Reading the opponents is not only for dodging deal-ins.  The following use
+the same public information, to win faster oneself or to make the opponents
+win slower:
 
-- **先量天花板：偷看手牌的 Monte Carlo。** 讓 `MonteCarloBot` 的發牌直接用
-  別家真正的手牌（牌堆仍然隨機），在同一個 A/B 上對 `HeuristicBot`。任何
-  對手推論都不會比它好。偷看也只多零點幾分的話，下面的「自己要的牌還在
-  不在」「Monte Carlo 的發牌」與第四層都可以不做。它同時消掉了搜尋在每個
-  發牌裡各自做決定的毛病，所以會高估推論拿得到的部分；當上限用剛好。
+- **Measure the ceiling first: a Monte Carlo that peeks at the hands.**  Let
+  `MonteCarloBot`'s deal use the other seats' real hands (the pile still
+  random), against `HeuristicBot` on the same A/B.  No opponent inference
+  can do better than it.  If even peeking adds only a few tenths of a point,
+  "are the cards I want still there" and "the Monte Carlo deal" below and
+  layer 4 can all be skipped.  It also removes the search's fault of
+  deciding separately in each deal, so it overestimates what inference can
+  get; as an upper bound that is just right.
 
-  這個 bot 叫 **Peeker**，名字就說它作弊，免得哪天被當成冠軍放上桌。擋住它
-  的是位置，不是名字：
+  This bot is called **Peeker**; the name says it cheats, lest it be seated
+  one day as a champion.  What keeps it out is where it lives, not its name:
 
-  - `Strategy` 只拿得到 `View`，`View` 不給別家的手牌，所以 Peeker 寫不成
-    合法的 `Strategy`，除非在 `View` 上開後門。
-  - 後門不開成公開的 API。用 `#[doc(hidden)]` 加上非預設的 feature `peek`
-    擋住；`web/` 不開這個 feature，就編不進去。
-  - Peeker 本身放在 `ab/`（或兩人桌的 scratch copy），不進 library。它是量
-    天花板的工具，不是可以坐上桌的 bot。
+  - A `Strategy` gets only a `View`, and `View` does not give the other
+    seats' hands, so the Peeker cannot be written as a legal `Strategy`
+    without a back door in `View`.
+  - The back door is not opened as public API.  `#[doc(hidden)]` and a
+    non-default feature `peek` keep it shut; `web/` does not enable the
+    feature, so it cannot be compiled in.
+  - The Peeker itself lives in `ab/` (or the scratch copy for the table of
+    two), not in the library.  It is a tool for measuring the ceiling, not a
+    bot that may sit at the table.
 
-  **量到的天花板（兩人桌，已量測）。** 128 樣本的 Peeker 對 `e40cca4` 的
-  `HeuristicBot`，3,200 局，seed base 1794847090，`RESHUFFLE=0`：+2.824 ±
-  0.192 分／局，95% CI [+2.449, +3.200]，win；1,616 局不同，胡牌率 49.31% →
-  60.88%。同樣條件下不偷看的 `MonteCarloBot` 是 +0.050 ± 0.172（seed base
-  1794846583），兩者相減 +2.77 ± 0.26。偷看多的不是零點幾分，所以下面兩項
-  與第四層值得做。四人桌還沒量。
-- **不餵下家（已量測，bot 未採用）。** 棄牌時扣掉 `FEED` × 下家吃得到的
-  機率（`research/feed-next-seat.md`）。`FEED` 32 推翻了孤張的打出順序，
-  四人桌 −0.172 ± 0.017，loss；`FEED` 4 只在同類牌之間挑，四人桌兩次都
-  不明（+0.015 ± 0.008、−0.007 ± 0.004），兩人桌 +0.007 ± 0.003，win。
-  下家在兩人桌是唯一的對手，在四人桌只是三家之一，與預期相同；但大小在
-  四人桌量不到。
-- **自己要的牌還在不在。** bot 現在把沒看到的牌一律當成還會來。對手握著不放
-  的牌其實不會來；從它吃碰了什麼、打了什麼，可以修正每個搭子的價值。
-- **Monte Carlo 的發牌。** `View::determinize` 目前均勻發牌，會發出不可能的
-  牌局（有人早就該胡了）。第一層的證明可以直接拿來剔除這些牌局。
-  `../gin-rummy-engine` 把發給對手的手牌修準之後，對最強的對手反而變弱；
-  這一項要先有天花板的數字才做。
+  **The ceiling measured (table of two, measured).**  The Peeker at 128
+  samples against `e40cca4`'s `HeuristicBot`, 3,200 deals, seed base
+  1794847090, `RESHUFFLE=0`: +2.824 ± 0.192 points a deal, 95% CI [+2.449,
+  +3.200], win; 1,616 deals differ, win rate 49.31% → 60.88%.  Under the
+  same conditions the `MonteCarloBot` that does not peek is +0.050 ± 0.172
+  (seed base 1794846583), and the difference of the two is +2.77 ± 0.26.
+  Peeking adds more than a few tenths of a point, so the two items below
+  and layer 4 are worth doing.  The table of four is not yet measured.
+- **Not feeding the next seat (measured, not adopted by the bot).**  At a
+  discard, take off `FEED` × the chance the next seat can eat it
+  (`research/feed-next-seat.md`).  `FEED` 32 overturned the order in which
+  lone cards are discarded, −0.172 ± 0.017 at a table of four, loss; `FEED`
+  4 only chooses among cards of the same kind, insufficient data both times
+  at a table of four (+0.015 ± 0.008, −0.007 ± 0.004) and +0.007 ± 0.003 at
+  a table of two, win.  The next seat is the only opponent at a table of two
+  and just one of three at a table of four, as expected; but the size
+  cannot be measured at a table of four.
+- **Are the cards I want still there.**  The bot now treats every unseen
+  card as still to come.  The cards an opponent holds on to will in fact not
+  come; what it ate, ponged and discarded can correct the value of each
+  搭子.
+- **The Monte Carlo deal.**  `View::determinize` currently deals uniformly,
+  and deals impossible rounds (someone should have won long ago).  The proof
+  of layer 1 can be used directly to reject those.  `../gin-rummy-engine`
+  got weaker against the strongest opponent after making the hands dealt to
+  the opponent more accurate; this item waits for a ceiling number first.
 
-防守方面，匯率不只一個（見路線二「把評分換算成分」），上面的結論沒有變，
-排在後面：
+On the defensive side, there is more than one exchange rate (see "Converting
+the grade to points" under route 2), the conclusion above is unchanged, and
+these come later:
 
-- **棄胡。** 手牌沒希望時，為了安全放棄進度。
-- **吃碰後的棄牌。** 吃碰之後必須打一張，那張牌的危險度沒有算進吃碰的評分。
+- **Folding.**  Give up progress for safety when the hand has no hope.
+- **The discard after an eat or pong.**  After an eat or pong a card must be
+  discarded, and that card's danger is not counted in the grade of the eat
+  or pong.
 
-## 路線二：用資料擬合評分常數（已量測，bot 未採用）
+## Route 2: fit the grade's constants to data (measured, not adopted by the bot)
 
-`WEIGHT`、`COSTS`、`SCALE`、`OWN`、`WAIT` 是手調的。`HeuristicBot::terms` 把
-評分拆成七項（胡數、散牌、離門檻的差距、散牌的同張、搭子、孤張、聽牌張數），
-`fit` example 用自對局的結果對它們做兩種最小平方擬合（`research/fitted-weights.md`）：
+`WEIGHT`, `COSTS`, `SCALE`, `OWN` and `WAIT` are hand-tuned.
+`HeuristicBot::terms` splits the grade into seven terms (胡, loose cards,
+distance from the threshold, copies of loose cards, 搭子, lone cards, waiting
+cards), and the `fit` example fits them to self-play results by least
+squares in two ways (`research/fitted-weights.md`):
 
-- **手牌。** 每次棄牌時四家手牌的各項，對上該局最後的得分，加上牌局進度的
-  控制變數。
-- **選擇。** 把出牌者每一張可以打的牌都打到結束，以得分的差對各項的差擬合。
-  同一個決策共用的東西全部消掉。
+- **Hands.**  Each term of the four seats' hands at every discard, against
+  the round's final score, with control variables for the progress of the
+  round.
+- **Choices.**  Play every card the discarder could discard out to the end,
+  and fit the differences in score to the differences in the terms.
+  Everything shared within one decision cancels.
 
-### 結果
+### Results
 
-兩種擬合互相吻合，和手調的權重差很多（評分的單位，手上的 1 胡算 32）：
+The two fits agree with each other and differ much from the hand-tuned
+weights (in units of grade, 1 胡 in hand counting 32):
 
-| 項 | 手調 | 手牌擬合 | 選擇擬合 |
+| Term | Hand-tuned | Fitted on hands | Fitted on choices |
 | --- | ---: | ---: | ---: |
-| 胡數值幾分 | | 1.38 | 1.42 |
-| 散牌 | −128 | −51 | −45 |
-| 離門檻的差距（每半胡） | −64 | −18 | −11 |
+| Points a 胡 is worth | | 1.38 | 1.42 |
+| Loose cards | −128 | −51 | −45 |
+| Distance from the threshold (per half 胡) | −64 | −18 | −11 |
 | 搭子 | 1 | 2.0 | 2.8 |
-| 聽牌張數 | 8 | 26 | 24 |
+| Waiting cards | 8 | 26 | 24 |
 
-照著打卻沒有贏。三次都以 `10a046f` 為對照，各 200,000 局，局數在跑之前定下。
+Playing by them did not win, though.  All three against `10a046f`, 200,000
+deals each, the deal count set before the run.
 
-| 做法 | seed base | 不同的局數 | 得分差（分／局） | 95% CI | 結論 |
+| Method | seed base | Deals that differ | Score difference (points a deal) | 95% CI | Verdict |
 | --- | ---: | ---: | ---: | --- | --- |
-| 手牌擬合的全部權重 | 1794819512 | 59,981 | −0.005 ± 0.034 | [−0.071, +0.060] | 不明 |
-| 只把 `WAIT` 從 8 改成 24 | 1794820392 | 2,221 | +0.002 ± 0.007 | [−0.012, +0.017] | 不明 |
-| 只取相近選擇擬合：搭子 ×8、`WAIT` 72 | 1794822233 | 35,378 | −0.070 ± 0.025 | [−0.120, −0.021] | loss |
+| All the weights fitted on hands | 1794819512 | 59,981 | −0.005 ± 0.034 | [−0.071, +0.060] | insufficient data |
+| Only `WAIT` changed from 8 to 24 | 1794820392 | 2,221 | +0.002 ± 0.007 | [−0.012, +0.017] | insufficient data |
+| The fit on close choices only: 搭子 ×8, `WAIT` 72 | 1794822233 | 35,378 | −0.070 ± 0.025 | [−0.120, −0.021] | loss |
 
-### 學到什麼
+### What was learnt
 
-- **匯率是 1 胡約 1.4 分**，牌堆剩 13 張以下時約 1.0 分。
-- **評分對權重不敏感。** 散牌的權重砍到四成、聽牌的權重變三倍，三成的牌局
-  打法不同，得分卻看不出差別。常數不是瓶頸。
-- **bot 的排序平均是對的。** 評分落後不到 16 的其他棄牌，打到結束平均少
-  0.46 分；落後越多少得越多。
-- **擬合讀到的是評分的彎曲，不是權重的錯。** 落後 64 以內每 32 約 2 分，
-  落後 256 以上每 32 不到 1 分。線性模型把大差距的項壓低、小差距的項抬高。
-- **在一種決定上擬合的權重不能搬到另一種。** 第三次實驗的權重來自「牌組
-  相同、只差留哪張散牌」的棄牌，在那種決定上沒有差別，輸在拆牌組與吃碰。
+- **The exchange rate is about 1.4 points a 胡**, about 1.0 with 13 cards or
+  fewer left in the pile.
+- **The grade is insensitive to the weights.**  With the loose cards' weight
+  cut to 40% and the waiting weight tripled, 30% of the deals are played
+  differently and yet no difference in score shows.  The constants are not
+  the bottleneck.
+- **The bot's ranking is right on average.**  The other discards graded less
+  than 16 behind score 0.46 points less on average when played out to the
+  end; the further behind, the more they lose.
+- **What the fit reads is the grade's curvature, not wrong weights.**
+  Within 64 behind, every 32 is about 2 points; beyond 256 behind, every 32
+  is under 1 point.  A linear model presses down the terms with large gaps
+  and lifts those with small ones.
+- **Weights fitted on one kind of decision do not carry to another.**  The
+  third experiment's weights come from discards "with the same melds,
+  differing only in which loose card is kept"; on that kind of decision
+  there was no difference, and it lost on breaking melds and on eats and
+  pongs.
 
-### 把評分換算成分（已量測，bot 未採用）
+### Converting the grade to points (measured, not adopted by the bot)
 
-西洋棋引擎把評估值換算成兵。照樣把評分換算成得分，結果是
-（`research/grade-in-points.md`）：
+Chess engines convert their evaluation to pawns.  Converting the grade to
+score in the same way gives (`research/grade-in-points.md`):
 
-- **手牌換得成。** 評分對得分是一條單調的曲線，−640 到 0 之間每 32 約
-  0.5 分，0 到 640 之間約 1.4 分。
-- **要分段。** 評分 0 的手牌在牌堆 23 張以上值 +8.2 分，14 到 22 張 −2.0
-  分，13 張以下 −4.9 分。
-- **選擇換不成。** 用曲線預測改打另一張的代價，落後 64 以內的選擇實際
-  少的是預測的 3 倍多。直接量的話，落後 32 到 64 少 4.1 分，落後 64 到
-  128 只少 1.6 分，連單調都不是。
-- **落後 8 以內是平手**（+0.04 ± 0.10 分）。
+- **It works for hands.**  Score against grade is a monotonic curve, about
+  0.5 points per 32 between −640 and 0 and about 1.4 points between 0 and
+  640.
+- **It must be in segments.**  A hand graded 0 is worth +8.2 points with 23
+  cards or more in the pile, −2.0 points with 14 to 22, and −4.9 points with
+  13 or fewer.
+- **It does not work for choices.**  Predicting the cost of discarding
+  another card from the curve, the choices within 64 behind actually lose
+  more than 3 times the prediction.  Measured directly, 32 to 64 behind
+  loses 4.1 points and 64 to 128 behind only 1.6 points, which is not even
+  monotonic.
+- **Within 8 behind is a tie** (+0.04 ± 0.10 points).
 
-所以沒有一個匯率能把「防守省下的分」和「評分落後多少」放在同一個秤上：
-小差距每 32 約 3 分，大差距約 0.6 到 0.8 分。路線一的實驗要用分做單位
-時，得直接把選擇打到結束去量，不能從評分換算。
+So no single exchange rate puts "the points defence saves" and "how far
+behind in grade" on one scale: small gaps are about 3 points per 32, large
+ones about 0.6 to 0.8 points.  When an experiment of route 1 needs points as
+its unit, it must measure by playing the choices out to the end, not convert
+from the grade.
 
-### 一次實驗：聽牌的手不吃碰成更少的聽牌張數
+### One experiment: a waiting hand does not eat or pong into fewer waiting cards
 
-八胡的一手牌：桌上 3 胡，手上五張將帥，紅炮紅炮 一對，黃兵 綠卒 兩張
-散牌，已滿 8 胡，聽 紅兵 白卒 最多 8 張。下家摸出 紅炮，bot 選碰：多
-1 胡、少一張散牌（評分省 128），聽的牌卻剩單吊最多 3 張，胡的時候也從 11 胡
-變成 9 胡。評分把聽的那兩張兵卒照一般散牌扣，每張活牌只加 8。
+A hand at 八胡: 3 胡 on the table, five generals (將帥) in hand, a pair of
+red 炮, two loose cards, a yellow 兵 and a green 卒, already at 8 胡, waiting
+on the red 兵 and the white 卒, 8 cards at most.  The next seat draws a red
+炮 and the bot chooses to pong: 1 more 胡 and one loose card fewer (128 saved
+in grade), but the wait is down to a pair wait on 3 cards at most, and
+the win goes from 11 胡 to 9 胡.  The grade fines the two waiting soldiers as
+ordinary loose cards, and adds only 8 for each live card.
 
-候選的規則：過的時候已經聽牌，就把吃碰之後聽牌張數變少的選擇排到過的
-後面。以 `fc6ca57` 為對照，200,000 局，局數在跑之前定下。
+The candidate's rule: when passing already leaves the hand waiting, rank the
+choices whose eat or pong leaves fewer waiting cards behind passing.
+Against `fc6ca57`, 200,000 deals, the deal count set before the run.
 
-| 做法 | seed base | 不同的局數 | 得分差（分／局） | 95% CI | 結論 |
+| Method | seed base | Deals that differ | Score difference (points a deal) | 95% CI | Verdict |
 | --- | ---: | ---: | ---: | --- | --- |
-| 聽牌張數變少的吃碰排在過之後 | 1794828275 | 3,607 | +0.007 ± 0.011 | [−0.014, +0.029] | 不明 |
+| Eats and pongs that leave fewer waiting cards rank behind passing | 1794828275 | 3,607 | +0.007 ± 0.011 | [−0.014, +0.029] | insufficient data |
 
-勝率是 24.23% 對 24.19%。資料不夠，bot 沒有改動。規則擋掉的吃碰不分
-大小：聽 4 張變 3 張、換來 1 胡的也擋。只擋聽牌張數掉一半以上的版本還
-沒試，要分出 0.007 分需要約兩百萬局。
+The win rates are 24.23% against 24.19%.  The data are not enough and the
+bot is unchanged.  The rule blocks such eats and pongs whatever their size:
+one that goes from 4 waiting cards to 3 for 1 胡 is blocked too.  The version
+that blocks only a drop of half or more in the waiting cards is untried, and
+resolving 0.007 points needs about two million deals.
 
-### 四次實驗：手牌放得下幾個牌組
+### Four experiments: how many melds a hand has room for
 
-暗牌只減不增，所以牌組外的張數加上胡的那張，剛好分成三張組和對子
-（`research/room-for-melds.md`）。吃一個對子用掉兩張的位置、換 0 胡；原本的
-評分看不到這個代價，還把它當成少兩張散牌的進度。都以 `b894777` 為對照，
-各 100,000 局，局數在跑之前定下。
+Concealed cards only decrease, so the cards outside the melds plus the
+winning card split exactly into three-card melds and pairs
+(`research/room-for-melds.md`).  Eating a pair uses up two cards' room for 0
+胡; the original grade does not see this cost, and even counts it as
+progress, two loose cards fewer.  All against `b894777`, 100,000 deals each,
+the deal count set before the run.
 
-| 做法 | seed base | 分歧的局數 | 得分差（分／局） | 95% CI | 結論 |
+| Method | seed base | Deals that part | Score difference (points a deal) | 95% CI | Verdict |
 | --- | ---: | ---: | ---: | --- | --- |
-| 搭子與對子碰的希望，封頂在放得下的組數 | 1794933710 | 28,275 | −0.290 ± 0.014 | [−0.317, −0.263] | loss |
-| 同上，剩下的牌必須成對 | 1794934225 | 33,313 | −0.216 ± 0.014 | [−0.244, −0.189] | loss |
-| 只封頂搭子，不算對子碰 | 1794936088 | 6,093 | +0.005 ± 0.004 | [−0.003, +0.014] | 不明 |
-| 未滿門檻不吃對子 | 1794934919 | 52,775 | −1.497 ± 0.020 | [−1.536, −1.458] | loss |
+| Hope from 搭子 and from pongs of pairs, capped at the melds there is room for | 1794933710 | 28,275 | −0.290 ± 0.014 | [−0.317, −0.263] | loss |
+| The same, with the cards left over held to pairs | 1794934225 | 33,313 | −0.216 ± 0.014 | [−0.244, −0.189] | loss |
+| Cap on the 搭子 only, no pongs of pairs | 1794936088 | 6,093 | +0.005 ± 0.004 | [−0.003, +0.014] | insufficient data |
+| No pair eaten below the threshold | 1794934919 | 52,775 | −1.497 ± 0.020 | [−1.536, −1.458] | loss |
 
-吃對子平均很值得，一律不吃輸 1.5 分／局。算進對子碰的希望之後，
-bot 反而拆有胡的牌組去吃對子。只封頂的版本只在 6% 的牌局改變打法；它
-少吃的那些對子每次 +0.26 ± 0.12 分，是事後分組的數字。
+Eating a pair is well worth it on average; never eating one loses 1.5 points
+a deal.  With the hope of ponging pairs counted in, the bot instead breaks
+melds that score 胡 to eat pairs.  The cap-only version changes play in only
+6% of the deals; the pairs it no longer eats are +0.26 ± 0.12 points each, a
+figure from grouping after the fact.
 
-### 還沒試的
+### Not yet tried
 
-- **胡數的天花板。** 上面只封頂的版本，少碰和多吃對子是賠的，少吃對子是
-  賺的，事後估的上限約 +0.006 分／局。原本要試的「封頂只用來拒吃對子」
-  換成精確的帳：算出一手牌不靠運氣最多幾胡，只擋會讓它掉到門檻以下的
-  吃對子。設計與分批的進度在 [`hu-ceiling.md`](hu-ceiling.md)。
-- **在分的單位上取平均。** `HeuristicBot::draw` 對各張可能摸到的牌取評分
-  的平均；曲線是彎的，先換成分再平均會改變吃碰的決定。曲線在選擇上不準，
-  沒有理由預期它會贏。
-- **隨局勢變的權重。** 依牌堆分段的擬合顯示散牌越到後面越便宜、聽牌越貴。
-  整組權重換掉都看不出差別，分段的版本要兩百萬局以上才分得出來。
-- **非線性或新的特徵。** 這已經是路線三、四的範圍。
+- **The 胡 ceiling.**  In the cap-only version above, fewer pongs and more
+  pair eats lose and fewer pair eats gain, and the bound estimated after the
+  fact is about +0.006 points a deal.  The "cap used only to refuse pair
+  eats" that was to be tried is replaced by an exact arithmetic: work out
+  the most 胡 a hand can reach without luck, and block only the pair eats
+  that would drop it below the threshold.  The design and the progress by
+  batch are in [`hu-ceiling.md`](hu-ceiling.md).
+- **Average in units of points.**  `HeuristicBot::draw` averages the grade
+  over the cards that may be drawn; the curve bends, so converting to points
+  before averaging would change the eat and pong decisions.  The curve is
+  inaccurate on choices, and there is no reason to expect it to win.
+- **Weights that vary with the state of the round.**  The fit segmented by
+  pile shows loose cards getting cheaper and waiting dearer the later it is.
+  Swapping the whole set of weights shows no difference, so a segmented
+  version needs two million deals or more to be resolved.
+- **Non-linear or new features.**  That is already the territory of routes 3
+  and 4.
 
-## 路線三：精確的單人期望值
+## Route 3: exact single-player expectation
 
-把「胡數減散牌成本」換成「剩 n 次摸牌內胡牌的機率與期望胡數」的動態規劃。
-吃牌已經有一層這種期望（`HeuristicBot::draw`），棄牌還是靜態評分。結果是
-確定的，沒有取樣雜訊，但它仍是均勻信念下的前瞻，受 Monte Carlo 量到的那個
-天花板限制。
+Replace "胡 minus the cost of loose cards" with a dynamic programme of "the
+chance of winning within n draws left, and the expected 胡".  Eats already
+have one layer of this expectation (`HeuristicBot::draw`); discards are
+still graded statically.  The result is deterministic, with no sampling
+noise, but it is still lookahead under a uniform belief, bound by the
+ceiling Monte Carlo measured.
 
-開始的條件：原本是「路線二顯示靜態特徵解釋不了的殘差很大」，但路線二量不到
-這件事：它只說明這七項的線性組合已經用到底。
+The condition to start was "route 2 shows a large residual that static
+features cannot explain", but route 2 cannot measure that: it only shows
+that the linear combination of these seven terms is used up.
 
-2026-11-18 的補充。天花板的探針（[`hu-ceiling.md`](hu-ceiling.md) 批次 2）
-是第一筆支持的數據：甲、乙兩組的 CI 在 0 之上，表示靜態評分把「到不到得了」
-的價錢算錯了，雖然只有 +0.014 與 +0.025 分／局。下面是還沒量過的推論。
+Addendum of 2026-11-18.  The ceiling's probe ([`hu-ceiling.md`](hu-ceiling.md)
+batch 2) is the first supporting data: the CIs of groups A and B lie above
+0, which means the static grade misprices "whether it can get there", though
+by only +0.014 and +0.025 points a deal.  What follows is inference not yet
+measured.
 
-- **圖很小的理由。** 摸到的牌沒人要就進棄牌堆，所以暗牌只在吃碰時變，每次
-  少一到四張；狀態是（暗牌、亮出的胡、剩幾次機會），是一張深度十上下的
-  DAG。V(手, t) = Σ 各張活牌出現的機率 × max(過, 最好的吃碰與棄牌 →
-  V(手′, t+1)) + 沒有用的牌 × V(手, t+1)，每一巡再乘上別家沒有結束這一局
-  的機率。
-- **成本的估計。** 一手 20 張若有 10³ 到 10⁴ 個到得了的子手牌，乘上約 60 次
-  機會與至多 28 種牌，是 10⁶ 到 10⁷ 次查表，毫秒的量級；Monte Carlo 每個
-  決定 0.9 到 3.1 秒。子手牌的個數是猜的，要先量。
-- **不只是便宜。** 128 個樣本只分得出幾分的差距（一家的得分標準差近 30），
-  而且 playout 之後照貪心打；動態規劃沒有取樣雜訊，之後照最佳打。所以
-  Monte Carlo 量到的增益不是它的上限。它也夠快，A/B 可以用 `RESHUFFLE=8`。
-- **比看起來難的地方。** `live` 不在狀態裡，只能在根節點固定、每個決定重算；
-  不是每張牌都輪得到我（吃只能吃自己摸的與上家的，別家的碰優先）；別家結束
-  這一局要用每巡的機率（`research/safe-cards.md` 的表）；九塊因為棄牌與
-  十胡的門檻而不能完全分開算；報酬要用分，不是胡。
-- **預期仍然小。** 這還是同一份均勻信念的資訊；只在後段搜尋的 Monte Carlo
-  是 +0.070 分／局。
+- **Why the graph is small.**  A drawn card nobody wants goes to the
+  discards, so the concealed cards change only on an eat or pong, one to
+  four fewer each time; the state is (concealed cards, exposed 胡, chances
+  left), a DAG some ten deep.  V(hand, t) = Σ over the live cards of the
+  chance it appears × max(pass, the best eat or pong and discard →
+  V(hand′, t+1)) + useless cards × V(hand, t+1), each turn round the table
+  multiplied by the chance that no other seat ends the round.
+- **The estimate of the cost.**  If a hand of 20 has 10³ to 10⁴ reachable
+  sub-hands, times about 60 chances and at most 28 kinds of card, that is
+  10⁶ to 10⁷ table lookups, the order of milliseconds; Monte Carlo takes 0.9
+  to 3.1 seconds a decision.  The number of sub-hands is a guess and must be
+  measured first.
+- **Not only cheaper.**  128 samples resolve only gaps of a few points (a
+  seat's score has a standard deviation near 30), and after that the playout
+  plays greedily; dynamic programming has no sampling noise and plays
+  optimally afterwards.  So the gain Monte Carlo measured is not its upper
+  bound.  It is also fast enough for the A/B to use `RESHUFFLE=8`.
+- **Where it is harder than it looks.**  `live` is not in the state, and can
+  only be fixed at the root and recomputed at each decision; not every card
+  comes my way (an eat takes only my own draw and the previous seat's card,
+  and the other seats' pongs go first); the other seats ending the round
+  needs a chance per turn (the table in `research/safe-cards.md`); the nine
+  blocks cannot be worked wholly apart because of the discard and the ten-胡
+  threshold; and the payoff must be in points, not 胡.
+- **Still expected to be small.**  This is still the same information under
+  a uniform belief; the Monte Carlo that searches only late is +0.070 points
+  a deal.
 
-第一步是一個像 `census` 的 example，從自對局的決定點數到得了的子手牌與邊。
-它不改打法，不必跑 A/B。
+The first step is an example like `census` that counts the reachable
+sub-hands and edges from the decision points of self-play.  It does not
+change play and needs no A/B.
 
-2026-11-18 數了（`examples/nodes.rs`，`research/dp-nodes.md`）：狀態是
-（暗牌、亮出的胡），天花板到不了門檻就剪。剛發的 20 張手平均 7.0 × 10⁵ 個
-節點、5.8 × 10⁷ 條邊，普查一次 22 秒；只剪 `generals = 0` 也到不了的，還剩
-八成。上面的估計低了兩到三個數量級，網頁與 A/B 都用不起，`hu-ceiling.md`
-批次 4 不由它接手。手牌 12 張約 2 × 10³ 個節點、41 毫秒，10 張約 6 × 10²
-個、11 毫秒：只有路線六那種閘門之後的區段是毫秒的量級。若要做，是設閘門的
-動態規劃，與設閘門的 Monte Carlo 同一個閘門，先拿它的 +0.070 當對照。設計、
-分批的進度與掛在上面的應用在 [`expectation.md`](expectation.md)。
+Counted on 2026-11-18 (`examples/nodes.rs`, `research/dp-nodes.md`): the
+state is (concealed cards, exposed 胡), pruned where the ceiling cannot reach
+the threshold.  A freshly dealt hand of 20 averages 7.0 × 10⁵ nodes and 5.8 ×
+10⁷ edges, 22 seconds a census; pruning only what cannot get there at
+`generals = 0` either, 80% are left.  The estimate above was two to three
+orders of magnitude low; neither the web page nor the A/B can afford it, and
+it does not take over batch 4 of `hu-ceiling.md`.  A hand of 12 cards is
+about 2 × 10³ nodes and 41 milliseconds, one of 10 about 6 × 10² and 11
+milliseconds: only the stretch past a gate like route 6's is on the order of
+milliseconds.  If it is built, it is a gated dynamic programme, at the same
+gate as the gated Monte Carlo, whose +0.070 is the control to take first.
+The design, the progress by batch and the applications hung on it are in
+[`expectation.md`](expectation.md).
 
-## 路線四：把 Monte Carlo 蒸餾成快速模型
+## Route 4: distil Monte Carlo into a fast model
 
-離線用高樣本數的 Monte Carlo 標註決策，訓練小模型模仿，再用新模型當 playout
-策略反覆迭代。這直接解決 Monte Carlo 在網頁上太慢的問題，但需要資料管線與
-一個純 Rust 的模型，而且上限是 Monte Carlo 找得到的東西。
+Label decisions offline with a Monte Carlo of many samples, train a small
+model to imitate it, then iterate with the new model as the playout policy.
+This directly solves Monte Carlo being too slow on the web page, but it
+needs a data pipeline and a pure-Rust model, and its upper bound is what
+Monte Carlo can find.
 
-開始的條件：帶對手模型的 Monte Carlo 在 A/B 上明確贏過 `HeuristicBot`。
+The condition to start: a Monte Carlo with an opponent model clearly beats
+`HeuristicBot` on the A/B.
 
-2026-11-19 的補充。老師可以換成路線三的動態規劃：它的值沒有取樣雜訊，
-設閘門的版本已經贏過 `HeuristicBot` 與設閘門的 Monte Carlo。模型是九塊
-樣式的查表，當成淺層的圖的葉節點。設計與分批的進度在
-[`eval.md`](eval.md)。
+Addendum of 2026-11-19.  The teacher can be swapped for route 3's dynamic
+programme: its values have no sampling noise, and the gated version has
+already beaten `HeuristicBot` and the gated Monte Carlo.  The model is
+lookup tables of the nine blocks' patterns, used as the leaf nodes of a
+shallow graph.  The design and the progress by batch are in
+[`eval.md`](eval.md).
 
-## 路線五：兩人桌當實驗場（已探測）
+## Route 5: a table of two as a test bed (probed)
 
-### 理由
+### Rationale
 
-四人桌上做錯事不一定被處罰，另外三家會把後果接走：防守實驗裡，對照放銃而
-候選沒放的 1,691 局有 82% 還是別家胡了。兩人零和裡每一分都從對手那裡來，
-對的決定可能比較常被獎勵，也就比較容易看出好的決定長什麼樣子。想法是先在
-兩人桌做 Monte Carlo 與對手推論，有了結論再擴到三人、四人。
+At a table of four a mistake is not always punished; the other three seats
+take the consequences away: in the defence experiments, 82% of the 1,691
+deals where the control dealt in and the candidate did not were won by
+another seat anyway.  In two-player zero-sum every point comes from the
+opponent, so right decisions may be rewarded more often, and it is easier
+to see what a good decision looks like.  The idea is to do Monte Carlo and
+opponent inference at a table of two first, and extend to three and four
+players once there are conclusions.
 
-### 兩人桌是什麼
+### What a table of two is
 
-- **規則不變。** 每人 20 張、莊家 21 張、6 張廢牌、十胡。查到的來源都說
-  兩人、三人可以玩，沒有一個寫出人數少時要改什麼；Board Game Arena 的排位
-  預設就是兩人，規則不隨人數變（`research/prior-art.md` C 節）。
-  （2026-11-21 補：廢牌後來改成 6 張加每個空位的 20 張，每一桌都摸 25
-  張；`variants.md`「小桌的廢牌」。這一節的數字是改之前量的。）
-- **引擎改一個常數。** `Seat::COUNT` 改成 2（或 3）就能發牌、打完、結算，
-  只有測試與幾個 example 寫死了四家。
-- **遊戲的結構變了。** 唯一的對手同時是上家與下家，我打出或摸出的每一張牌
-  它都能吃；它胡的每一局都由我付；牌堆是 71 張，幾乎不流局（20,000 局裡
-  1 局，四人桌 599 局）。
+- **The rules do not change.**  20 cards each, 21 for the dealer, 6 dead
+  cards, ten 胡.  Every source found says two or three can play, and none
+  writes out what to change with fewer players; Board Game Arena's ranked
+  default is two players, with rules that do not vary with the number
+  (`research/prior-art.md`, section C).  (Added 2026-11-21: the dead cards
+  later became 6 plus the 20 of each empty seat, so every table draws 25
+  cards; `variants.md`, "The dead cards of a small table".  The numbers in
+  this section were measured before the change.)
+- **The engine changes one constant.**  With `Seat::COUNT` set to 2 (or 3)
+  it deals, plays out and settles; only the tests and a few examples
+  hard-code four seats.
+- **The structure of the game changes.**  The only opponent is both the
+  previous seat and the next seat, and can eat every card I discard or
+  draw; every round it wins is paid for by me; the pile is 71 cards, and the
+  round almost never exhausts (1 round in 20,000, against 599 at a table of
+  four).
 
-### 探測的結果
+### Results of the probe
 
-兩個四人桌上已知有效的改動，在兩人桌各重量一次，各 200,000 局，局數在跑
-之前定下（`research/two-seats.md`）。A 是「保留聽牌的手」，B 是「不吃進已
-完整的牌組」。
+Two changes known to work at a table of four were each measured again at a
+table of two, 200,000 deals each, the deal count set before the run
+(`research/two-seats.md`).  A is "keep a waiting hand", B is "do not eat
+into a meld already complete".
 
-| | A 四人 | A 兩人 | B 四人 | B 兩人 |
+| | A, four players | A, two players | B, four players | B, two players |
 | --- | ---: | ---: | ---: | ---: |
 | seed base | 1794772616 | 1794830208 | 1794765506 | 1794830528 |
-| 不同的局數 | 3,551 | 3,901 | 16,804 | 21,854 |
-| 得分差（分／局） | +0.111 ± 0.010 | +0.030 ± 0.005 | +0.283 ± 0.018 | +0.222 ± 0.011 |
+| Deals that differ | 3,551 | 3,901 | 16,804 | 21,854 |
+| Score difference (points a deal) | +0.111 ± 0.010 | +0.030 ± 0.005 | +0.283 ± 0.018 | +0.222 ± 0.011 |
 | z | 10.7 | 6.3 | 16.1 | 19.3 |
-| 不同的局裡，平均 ÷ 標準差 | 0.18 | 0.10 | 0.12 | 0.13 |
-| 同樣把握所需的計算量 | 1 | 1.8 | 1 | 0.4 |
+| Mean ÷ standard deviation, on the deals that differ | 0.18 | 0.10 | 0.12 | 0.13 |
+| Compute for the same confidence | 1 | 1.8 | 1 | 0.4 |
 
-`MonteCarloBot` 128 樣本對 `HeuristicBot` 也在兩人桌重量了一次（`3aa5b0c`，
-3,200 局，與四人桌那次相同，局數在跑之前定下）：
+`MonteCarloBot` at 128 samples against `HeuristicBot` was also measured
+again at a table of two (`3aa5b0c`, 3,200 deals, the same as the run at a
+table of four, the deal count set before the run):
 
-| | 四人 | 兩人 |
+| | Four players | Two players |
 | --- | ---: | ---: |
 | seed base | 1794777431 | 1794830779 |
-| 不同的局數 | 1,082 | 1,251 |
-| 得分差（分／局） | +0.148 ± 0.276 | +0.347 ± 0.175 |
+| Deals that differ | 1,082 | 1,251 |
+| Score difference (points a deal) | +0.148 ± 0.276 | +0.347 ± 0.175 |
 | 95% CI | [−0.392, +0.689] | [+0.005, +0.689] |
-| 胡牌率，對照 → 候選 | 24.47% → 24.97% | 49.44% → 50.41% |
-| 結論 | 不明 | win |
+| Win rate, control → candidate | 24.47% → 24.97% | 49.44% → 50.41% |
+| Verdict | insufficient data | win |
 
-照鐵則這是贏，但下界貼著 0（z 約 2.0）。兩人桌這 3,200 局用了 16 CPU
-小時（16 個執行緒 71 分鐘）。
+By the iron rules this is a win, but the lower bound hugs 0 (z about 2.0).
+These 3,200 deals at a table of two took 16 CPU hours (71 minutes on 16
+threads).
 
-用新的 seed base 重跑沒有重現（`e40cca4`，3,200 局，seed base 1794846583，
-1,202 局不同）：+0.050 ± 0.172，95% CI [−0.287, +0.388]，胡牌率 51.47% →
-51.47%，結論不明。兩次依變異數的倒數加權是 +0.196 ± 0.123，區間仍然跨 0。
+A rerun on a fresh seed base did not reproduce it (`e40cca4`, 3,200 deals,
+seed base 1794846583, 1,202 deals differ): +0.050 ± 0.172, 95% CI [−0.287,
++0.388], win rate 51.47% → 51.47%, insufficient data.  The two weighted by
+inverse variance are +0.196 ± 0.123, and the interval still straddles 0.
 
-### 兩人桌學到什麼
+### What the table of two taught
 
-- **兩人桌一局便宜四成**，兩個改動在兩人桌上仍然是贏，方向一致。
-- **沒有比較容易看出來。** 一個改動在兩人桌要 1.8 倍的計算量，另一個只要
-  0.4 倍。打法不同的那些局裡，訊號對雜訊的比在兩種桌子上都是 0.10 到 0.18。
-- **「做對的事不被獎勵」有兩個成分。** 一個是運氣：決定之後摸到什麼牌。
-  它在兩種桌子上一樣大，路線零處理的就是它。另一個是結構：四人桌上同一個
-  決定真的比較不值錢，因為後果被另外三家分走。這一塊不是雜訊，是遊戲本身；
-  兩人桌把它放大，量到的卻是兩人桌的事實。
-- **大小搬不動。** 「保留聽牌的手」在四人桌值一次輸贏的 13%，在兩人桌只有
-  6%。
-- **多看幾步在兩人桌也量不到。** 同樣 3,200 局，四人桌的 z 是 0.5，兩人桌
-  第一次是 2.0，重跑是 0.3。`../gin-rummy-engine` 裡 Monte Carlo 明顯贏過
-  貪心 bot，這裡沒有；3,200 局容得下 +0.3 分上下的真值，也容得下 0。
-- **看得到對手的手牌值 2.8 分／局。** 同一套搜尋加上真的手牌（Peeker，
-  路線一）是 +2.824 ± 0.192。兩人桌上值錢的是資訊，不是多算。
-- **Monte Carlo 的實驗卡在算力，不是局數。** 每一局 18 CPU 秒。路線零幫
-  不上：重打一次就是再算一次 Monte Carlo。這裡要的是把 playout 算快，
-  `../gin-rummy-engine` 追上最強對手靠的就是這個。
+- **A round at a table of two is 40% cheaper**, and both changes still win
+  at a table of two, in the same direction.
+- **It is no easier to see.**  One change needs 1.8 times the compute at a
+  table of two, the other only 0.4 times.  On the deals played differently,
+  the ratio of signal to noise is 0.10 to 0.18 at both tables.
+- **"Doing the right thing is not rewarded" has two components.**  One is
+  luck: what is drawn after the decision.  It is as large at both tables,
+  and it is what route 0 deals with.  The other is structure: at a table of
+  four the same decision really is worth less, because the consequences are
+  shared out among the other three seats.  This part is not noise but the
+  game itself; a table of two magnifies it, yet what is measured is a fact
+  about the table of two.
+- **The sizes do not carry over.**  "Keep a waiting hand" is worth 13% of
+  one win or loss at a table of four and only 6% at a table of two.
+- **Looking a few steps further cannot be measured at a table of two
+  either.**  On the same 3,200 deals, z is 0.5 at a table of four, 2.0 the
+  first time at a table of two and 0.3 on the rerun.  In
+  `../gin-rummy-engine` Monte Carlo clearly beats the greedy bot; here it
+  does not; 3,200 deals have room for a true value around +0.3 points, and
+  for 0 as well.
+- **Seeing the opponent's hand is worth 2.8 points a deal.**  The same
+  search with the real hands (Peeker, route 1) is +2.824 ± 0.192.  What is
+  valuable at a table of two is information, not more computing.
+- **The Monte Carlo experiments are stuck on compute, not on the deal
+  count.**  Each round is 18 CPU seconds.  Route 0 cannot help: every replay
+  is another Monte Carlo.  What is needed here is a faster playout, which is
+  exactly how `../gin-rummy-engine` caught up with the strongest opponent.
 
-### 文獻怎麼說
+### What the literature says
 
-- **搬得動的是方法，不是打法。** Libratus 到 Pluribus、兩人麻將的 ACH 到
-  四人的 LuckyJ（後者沒有論文，只有媒體轉述），搬過去的都是演算法；沒有
-  一例是把人少的版本學到的打法用到人多的版本。反方向的例子：為多人桌寫的
-  撲克程式 Poki 到了兩人桌很容易被打敗。
-- **別人選兩人的理由是均衡的保證**，不是比較容易學。這個保證幫不到對固定
-  `HeuristicBot` 的 A/B。
-- **兩人麻將的評估並不便宜。** 同一副牌換座位打 20 萬局，95% 信賴區間仍是
-  ±0.13 番，而要量的效果只有 0.14 到 0.22 番。
+- **What carries over is the method, not the play.**  From Libratus to
+  Pluribus, and from two-player mahjong's ACH to the four-player LuckyJ (the
+  latter has no paper, only press accounts), what carried over was the
+  algorithm; in no case was play learnt at the version with fewer players
+  used at the version with more.  An example the other way: Poki, a poker
+  program written for tables of many players, is easily beaten at a table of
+  two.
+- **Others choose two players for the guarantee of an equilibrium**, not
+  because it is easier to learn.  That guarantee does not help an A/B
+  against a fixed `HeuristicBot`.
+- **Evaluating two-player mahjong is not cheap.**  Playing 200,000 games,
+  each with the seats swapped, the 95% confidence interval is still ±0.13
+  fan, while the effects to measure are only 0.14 to 0.22 fan.
 
-### 建議
+### Recommendation
 
-把兩人桌留著當第二個實驗場，不當成通往四人桌的捷徑。
+Keep the table of two as a second test bed, not as a shortcut to the table
+of four.
 
-- **做法。** `ab/run.sh` 加一個座位數的開關，匯出兩個版本時各改那個常數，
-  函式庫不動。兩人桌成為正式玩法（例如網頁上的一對一）之前，不必把座位數
-  做成參數，也不必為它補測試。
-- **什麼時候用。** 想法屬於「跟對手互動」（餵牌、防守、讀對手）或「多看
-  幾步」時，兩種桌子各量一次；兩邊一起看，才知道兩人桌學到的搬不搬得動。
-  只改自己手牌效率的想法，在四人桌量就夠了。
-- **對手推論的研究先在兩人桌做。** Peeker 在這裡 3,200 局就有十幾個標準誤
-  的訊號。發牌的改進先在兩人桌量，贏了再到四人桌驗證。均勻發牌的
-  Monte Carlo 不必再跑：要定出它的大小得 40,000 局上下。
-- **擴到三人的條件。** 有一個改動在兩人桌明確贏，而且在四人桌同號。
+- **How.**  `ab/run.sh` gets a switch for the seat count, changing that
+  constant in each of the two versions as it exports them; the library is
+  untouched.  Until the table of two becomes a proper way to play (one
+  against one on the web page, say), the seat count need not be made a
+  parameter, and no tests need be added for it.
+- **When to use it.**  When an idea is about "interacting with the
+  opponents" (feeding, defence, reading the opponents) or "looking a few
+  steps further", measure once at each table; only with both in view is it
+  known whether what the table of two taught carries over.  An idea that
+  changes only the efficiency of one's own hand need only be measured at a
+  table of four.
+- **Research on opponent inference is done at a table of two first.**  The
+  Peeker has a signal of over ten standard errors there in 3,200 deals.
+  Improvements to the deal are measured at a table of two first, then
+  verified at a table of four if they win.  The Monte Carlo that deals
+  uniformly need not be run again: fixing its size would take around 40,000
+  deals.
+- **The condition for extending to three players.**  A change that clearly
+  wins at a table of two and has the same sign at a table of four.
 
-## 路線六：只在後段搜尋的 Monte Carlo（已量測）
+## Route 6: Monte Carlo that searches only late (measured)
 
-### 理由
+### Rationale
 
-Monte Carlo 的實驗卡在算力（路線五）：不設閘門時一局 25 CPU 秒，
-3,200 局分不出 +0.15 分。時間幾乎都花在長手牌上，playout 長、每一步也貴。
-只在後段搜尋，同樣的時間能打十倍以上的局數。
+The Monte Carlo experiments are stuck on compute (route 5): ungated, a round
+takes 25 CPU seconds, and 3,200 deals cannot resolve +0.15 points.  Nearly
+all the time goes on long hands, where the playout is long and each step is
+dear too.  Searching only late, the same time plays more than ten times the
+deals.
 
-### 做法
+### Method
 
-`MonteCarloBot::gated(cards, shanten)`：暗牌不超過 `cards` 張，或 向聽數
-（`HeuristicBot::shanten`，離聽牌還差幾次吃碰）不超過 `shanten` 時才搜尋，
-其餘照貪心打。向聽數是搜尋出來的：數牌組與搭子的公式看不到胡牌要的十胡。
-它不是評分的一項，`HeuristicBot` 的打法不變。
+`MonteCarloBot::gated(cards, shanten)`: it searches only when the concealed
+cards are no more than `cards`, or the 向聽數
+(`HeuristicBot::shanten`, how many eats or pongs short of waiting) is no
+more than `shanten`, and plays greedily otherwise.  The 向聽數 is
+found by search: a formula that counts melds and 搭子 cannot see the ten 胡 a
+win needs.  It is not a term of the grade, and `HeuristicBot`'s play is
+unchanged.
 
-### 結果（`research/gated-monte-carlo.md`）
+### Results (`research/gated-monte-carlo.md`)
 
-四人桌，128 樣本，`RESHUFFLE=0`，對照 `4596efe`，各 40,000 局，局數在跑
-之前定下。
+A table of four, 128 samples, `RESHUFFLE=0`, control `4596efe`, 40,000 deals
+each, the deal count set before the run.
 
-| 閘門 | seed base | 不同的局數 | 得分差（分／局） | 95% CI | 結論 |
+| Gate | seed base | Deals that differ | Score difference (points a deal) | 95% CI | Verdict |
 | --- | ---: | ---: | ---: | --- | --- |
-| 暗牌 10 張以下 | 1794910000 | 1,518 | +0.070 ± 0.026 | [+0.019, +0.121] | win |
-| 聽牌 | 1794950000 | 1,161 | +0.048 ± 0.030 | [−0.011, +0.108] | 不明 |
-| 10 張以下或聽牌 | 1794990000 | 2,302 | +0.061 ± 0.035 | [−0.009, +0.130] | 不明 |
+| 10 concealed cards or fewer | 1794910000 | 1,518 | +0.070 ± 0.026 | [+0.019, +0.121] | win |
+| Waiting | 1794950000 | 1,161 | +0.048 ± 0.030 | [−0.011, +0.108] | insufficient data |
+| 10 cards or fewer, or waiting | 1794990000 | 2,302 | +0.061 ± 0.035 | [−0.009, +0.130] | insufficient data |
 
-### 學到什麼
+### What was learnt
 
-- **後段的搜尋量得到。** 10 張的閘門只搜尋 9.7% 的決定、用掉
-  2.7% 的搜尋時間，40,000 局只要 44 分鐘。
-- **閘門之間分不出來。** 三個點估計都在彼此的誤差內；聽牌的閘門沒有比
-  數張數的好，聯集也沒有比較大。
-- **效果仍然小。** +0.07 分／局是 `HeuristicBot` 歷次改進的下緣。這與
-  Peeker 的結論一致：同一份資訊下多算，剩下的空間不大。
-- **它是對手推論的平台。** 發牌改準之後值多少，可以在這個閘門裡量，
-  一次 A/B 不到一小時。
+- **Late search can be measured.**  The 10-card gate searches only 9.7% of
+  the decisions and uses 2.7% of the search time; 40,000 deals take only 44
+  minutes.
+- **The gates cannot be told apart.**  The three point estimates lie within
+  one another's error; the waiting gate is no better than the one that
+  counts cards, and the union is no larger.
+- **The effect is still small.**  +0.07 points a deal is the lower edge of
+  `HeuristicBot`'s past improvements.  This agrees with the Peeker's
+  conclusion: computing more on the same information leaves little room.
+- **It is the platform for opponent inference.**  What a more accurate deal
+  is worth can be measured inside this gate, at under an hour an A/B.
 
-### 之後
+### Next
 
-- 10 張的閘門 z 約 2.7，同一批讀了三個閘門；用新的 seed base 重跑一次。
-- 本機的介面（`MonteCarloBot` 原本就留給它）用 10 張的閘門當對手與提示。
-- 網頁維持 `HeuristicBot`：10 張以下的決定原生也要 0.9 秒。
+- The 10-card gate has z about 2.7, and three gates were read in the same
+  batch; rerun it once on a fresh seed base.
+- The native interface (which `MonteCarloBot` was kept for all along) uses
+  the 10-card gate for its opponents and hint.
+- The web page stays with `HeuristicBot`: a decision at 10 cards or fewer
+  takes 0.9 seconds even natively.
 
-## 不做的事
+## What is not done
 
-- **CFR 這類求均衡的方法。** 四人、非兩方零和，資訊集太大。兩人桌理論上
-  有均衡可求，但 gin rummy 比賽裡用它的隊伍也只用在 knock 這種獨立的
-  小決定，棄牌的資訊集多到用不上；十胡的胡是強制的，沒有對應的小決定。
-- **把 Monte Carlo 接進網頁。** 已經試過，太慢；設了閘門的每個決定原生
-  也要 0.9 秒（路線六）。
+- **Methods that find an equilibrium, such as CFR.**  Four players, not
+  two-sided zero-sum, and the information sets are too large.  A table of
+  two has an equilibrium to find in theory, but the teams that used it in
+  the gin rummy competition used it only for small independent decisions
+  such as the knock, the discard's information sets being too many for it;
+  in 十胡 winning is compulsory, and there is no matching small decision.
+- **Putting Monte Carlo in the web page.**  It was tried and is too slow;
+  even gated, a decision takes 0.9 seconds natively (route 6).
 
-## 已知的限制
+## Known limits
 
-A/B 的對手永遠是 `HeuristicBot`。第一、三層只用規則與已見的牌，不受影響；
-第二層的機率表、第四層、路線二與路線四學到的都是怎麼贏 `HeuristicBot`，對
-真人的強度量不到。
+The A/B's opponent is always `HeuristicBot`.  Layers 1 and 3 use only the
+rules and the cards seen, and are not affected; layer 2's probability table,
+layer 4, route 2 and route 4 all learn how to beat `HeuristicBot`, and
+strength against people cannot be measured.
 
-`../gin-rummy-engine` 的作法是每次改動都對三個對手量：一個目標，兩個「不能
-退步」的守門對手。這裡最便宜的守門對手是舊版的 `HeuristicBot`：`ab/run.sh`
-本來就能把任何一個版本匯出來當對照。開始做第四層或路線四之前要先有這個。
+`../gin-rummy-engine` measures every change against three opponents: one
+target and two "must not regress" gatekeepers.  The cheapest gatekeeper here
+is an old version of `HeuristicBot`: `ab/run.sh` can already export any
+version as the control.  This must be in place before layer 4 or route 4 is
+started.
 
-## 未決問題
+## Open questions
 
-- 10 張的閘門重跑後站不站得住？其他的張數呢？
+- Does the 10-card gate stand up on a rerun?  What about other card counts?
 
-- 聽牌時的吃碰：只擋聽牌張數大幅變少的版本會不會贏？
-- 擋掉讓天花板掉到門檻以下的吃對子，會不會贏？（`hu-ceiling.md`）
-- 權重該不該隨局勢變？需要兩百萬局以上的 A/B。
-- 後段的防守是不是正的？704 局不夠，需要專門只改後段的實驗。
-- 「不餵下家」在四人桌是不是正的？兩次 FEED 4 都不明，要百萬局以上。
-- 第四層值不值得做，如果它只對 `HeuristicBot` 有效？
-- 偷看手牌的 Monte Carlo 在四人桌贏多少？兩人桌是 +2.824 ± 0.192。
-- 從公開的牌推論對手的手牌，拿得到 Peeker 那 2.8 分的多少？
-- 跟對手互動的決定在兩人桌是不是比較值錢？是的話，同一個改動在四人桌
-  同不同號？
-- 兩人桌要不要成為正式的玩法？那需要測試，以及一個為兩人桌調過的 bot。
+- Eats and pongs while waiting: would the version that blocks only a large
+  drop in the waiting cards win?
+- Would blocking the pair eats that drop the ceiling below the threshold
+  win?  (`hu-ceiling.md`)
+- Should the weights vary with the state of the round?  It needs an A/B of
+  two million deals or more.
+- Is late defence positive?  704 deals are not enough; it needs an
+  experiment that changes only the late game.
+- Is "not feeding the next seat" positive at a table of four?  Both runs of
+  FEED 4 gave insufficient data; it needs a million deals or more.
+- Is layer 4 worth doing if it works only against `HeuristicBot`?
+- By how much does the Monte Carlo that peeks at the hands win at a table of
+  four?  At a table of two it is +2.824 ± 0.192.
+- How much of the Peeker's 2.8 points can inferring the opponents' hands
+  from the public cards get?
+- Are decisions that interact with the opponent worth more at a table of
+  two?  If so, does the same change have the same sign at a table of four?
+- Should the table of two become a proper way to play?  That needs tests,
+  and a bot tuned for the table of two.

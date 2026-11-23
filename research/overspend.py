@@ -42,45 +42,45 @@ gain = lambda rows: sum(r["v_pair"] - max(r["v_pass"], r["v_other"]) for r in ro
 
 def group(r):
     if r["c1a"] < T:
-        return "甲 再摸一張將帥也不到"
+        return "A short even with one more general drawn"
     if r["c0a"] >= T:
-        return "丙 上限以內"
-    return "乙1 超支：吃了才欠一張" if r["c0b"] >= T else "乙2 吃之前就欠一張"
+        return "C within the limit"
+    return "B1 overspent: one short only after eating" if r["c0b"] >= T else "B2 one short already before eating"
 
 
 def passing(r):
     if r["pass_g"] == r["kings"]:
-        return "0 已經是完成形"
+        return "0 Already 完成形"
     if r["pass_o"] > 0:
-        return f"2 搭子聽 {min(int(r['pass_o']), 5)} 張" + ("以上" if r["pass_o"] >= 5 else "")
-    return "1 士象等自己的將帥" if r["pass_g"] > 0 else "3 沒聽"
+        return f"2 搭子 waits on {min(int(r['pass_o']), 5)}" + (" or more" if r["pass_o"] >= 5 else "")
+    return "1 士象 waiting for its own general" if r["pass_g"] > 0 else "3 Not waiting"
 
 
 decisions = (
-    ["決定", "吃了", "引擎估 吃 − 不吃（分）", "吃的局胡牌", "不吃的局胡牌"],
+    ["Decisions", "Eaten", "Engine's estimate, eat − pass (points)", "Won after eating", "Won after passing"],
     lambda c: [len(c), len(ate(c)), f"{gain(c):+.2f}", rate(ate(c)), rate([r for r in c if r["played"] != "pair"])],
 )
 print(f"{len(pairs)} pair decisions, {len(waiting)} waiting hands")
-table("可以吃對子的決定，依吃完的天花板", decisions[0], group, pairs, decisions[1])
+table("Decisions where a pair can be eaten, by the ceiling after eating", decisions[0], group, pairs, decisions[1])
 full = [r for r in pairs if r["kings"] > 0 and r["eat_g"] == r["kings"]]
-table("吃完是完成形的，依天花板與延伸", decisions[0],
-      lambda r: group(r)[:2].strip() + ("，有延伸可聽" if r["eat_o"] > 0 else "，延伸 0 張"), full, decisions[1])
-table("吃完是完成形、延伸 0 張的，依不吃時聽什麼", decisions[0], passing,
+table("Those 完成形 after eating, by ceiling and extension", decisions[0],
+      lambda r: group(r)[:2].strip() + (", with extensions to wait on" if r["eat_o"] > 0 else ", extends 0"), full, decisions[1])
+table("Those 完成形 after eating that extend 0, by what passing waits on", decisions[0], passing,
       [r for r in full if r["eat_o"] == 0], decisions[1])
 
 
 def wait(r):
     if r["kings"] > 0 and r["generals"] == r["kings"]:
-        return f"0 完成形，延伸 {min(int(r['others']), 4)} 張" + ("以上" if r["others"] >= 4 else "")
+        return f"0 完成形, extends {min(int(r['others']), 4)}" + (" or more" if r["others"] >= 4 else "")
     if r["generals"] > 0:
-        return "2 士象等自己的將帥"
-    return f"1 搭子，聽 {min(int(r['others']), 5)} 張" + ("以上" if r["others"] >= 5 else "")
+        return "2 士象 waiting for its own general"
+    return f"1 搭子, waits on {min(int(r['others']), 5)}" + (" or more" if r["others"] >= 5 else "")
 
 
 # The DP's chance is of the hands it plays whole, 14 cards or fewer
 valued = [r for r in waiting if not math.isnan(r["chance"])]
-bands = (("摸 15 以上", 15, 99), ("摸 8–14", 8, 14), ("摸 0–7", 0, 7))
+bands = (("15 draws or more", 15, 99), ("8–14 draws", 8, 14), ("0–7 draws", 0, 7))
 within = lambda c, lo, hi: [r for r in c if lo <= r["draws"] <= hi]
 chance = lambda c: f"{100 * sum(r['chance'] for r in c) / len(c):.0f}%" if c else "-"
-table("聽牌的手：實際胡牌率（引擎估的，手數）", [b[0] for b in bands], wait, valued,
-      lambda c: [f"{rate(w)}（{chance(w)}，{len(w)}）" for _, lo, hi in bands for w in [within(c, lo, hi)]])
+table("Waiting hands: actual win rate (engine's estimate, hands)", [b[0] for b in bands], wait, valued,
+      lambda c: [f"{rate(w)} ({chance(w)}, {len(w)})" for _, lo, hi in bands for w in [within(c, lo, hi)]])

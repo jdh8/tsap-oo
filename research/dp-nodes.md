@@ -1,45 +1,61 @@
-# 單人動態規劃的節點數
+# The node count of single-player dynamic programming
 
-量測日期：2026-11-18。問題：`doc/stronger-bot.md` 路線三的動態規劃，狀態是
-（暗牌、亮出的胡），邊是「吃碰一張還沒出現的牌再打一張」，天花板到不了門檻
-的手剪掉。它估一手 20 張有 10³ 到 10⁴ 個到得了的子手牌、10⁶ 到 10⁷ 次查表、
-毫秒的量級。數出來是多少？不改打法，基準為 `67d849a`。
+Measured 2026-11-18.  The question: in the dynamic programming of route 3 of
+`doc/stronger-bot.md`, a state is (concealed cards, exposed 胡), an edge is
+"claim a card not yet seen, then discard one", and hands whose ceiling
+cannot reach the threshold are pruned.  It estimated that a hand of 20 cards
+has 10³ to 10⁴ reachable sub-hands and 10⁶ to 10⁷ table lookups, on the
+order of milliseconds.  What does the count come to?  No change to play; the
+base is `67d849a`.
 
-## 結論
+## Answer
 
-- **估低了兩到三個數量級。** 剛發的 20 張手平均 7.0 × 10⁵ 個節點、5.8 × 10⁷
-  條邊，數一次 22 秒；最大的一手 1.2 × 10⁶ 個節點、1.2 × 10⁸ 條邊。
-  網頁的提示與 800,000 局的 A/B 都用不起。
-- **只剪「`generals = 0` 也到不了門檻」的節點，剩下八成。** 剪枝救不了它。
-- **手牌 12 張以下才是毫秒的量級**：12 張平均 2.0 × 10³ 個節點、5.8 × 10⁴
-  條邊、41 毫秒；11 張 1.1 × 10³、2.8 × 10⁴、20 毫秒；10 張 6 × 10²、
-  1.5 × 10⁴、11 毫秒。和路線六的閘門（暗牌 10 張以下才搜尋）是同一個區段。
-- 所以 `doc/hu-ceiling.md` 批次 4 不由動態規劃接手，四個候選各自 A/B。設閘門
-  的動態規劃是另一條路線，成本與設閘門的 Monte Carlo 相近。
+- **The estimate was two to three orders of magnitude too low.**  A freshly
+  dealt hand of 20 cards averages 7.0 × 10⁵ nodes and 5.8 × 10⁷ edges, and
+  takes 22 seconds to count once; the largest hand has 1.2 × 10⁶ nodes and
+  1.2 × 10⁸ edges.  Neither the web page's hint nor an A/B of 800,000 deals
+  can afford it.
+- **Pruning only the nodes that "do not reach the threshold at
+  `generals = 0` either" leaves 80% of them.**  Pruning does not save it.
+- **Only hands of 12 cards or fewer are on the order of milliseconds**: 12
+  cards average 2.0 × 10³ nodes, 5.8 × 10⁴ edges and 41 ms; 11 cards
+  1.1 × 10³, 2.8 × 10⁴ and 20 ms; 10 cards 6 × 10², 1.5 × 10⁴ and 11 ms.
+  That is the same stretch as the gate of route 6 (search only at 10
+  concealed cards or fewer).
+- So batch 4 of `doc/hu-ceiling.md` is not taken over by dynamic
+  programming; its four candidates each get their own A/B.  A gated DP is
+  another route, at a cost close to that of the gated Monte Carlo.
 
-## 方法
+## Method
 
-`examples/nodes.rs`。四家 `HeuristicBot` 自對局，每家每次決定之後、手牌定下來
-時（打完或過了），從那一手起廣度優先：
+`examples/nodes.rs`.  Four `HeuristicBot`s in self-play; after every
+decision of every seat, once the hand has settled (it has discarded or
+passed), breadth first from that hand:
 
-- 節點是（暗牌、亮出的胡）。同一手暗牌可以從不同的牌組走到，例如碰士士再打
-  相，和將士相吃進士相再打士，亮出的胡不同，所以暗牌本身不是狀態。
-- 邊：每一張還沒出現的牌（`live`，與 `HeuristicBot::start` 同一個算法，在根
-  固定不動）、它在 `locked_completions` 裡能成的每個牌組（將帥不吃成對子）、
-  之後每一張能打的牌。
-- 留下的節點是 `ceiling(generals = 1)` 到門檻的；其中 `generals = 0` 也到的
-  另外計數（「確定」）。剪掉的節點也記下來，不重算。
-- 每個決定點記節點數、確定的節點數、邊數與時間；邊數算的是走到留下的節點的
-  邊，含走到已經看過的節點。
+- A node is (concealed cards, exposed 胡).  The same concealed cards can be
+  reached through different melds, for example ponging 士士 and then
+  discarding 相, against eating 士相 into 將士相 and then discarding 士; the
+  exposed 胡 differ, so the concealed cards alone are not the state.
+- An edge: every card not yet seen (`live`, by the same computation as
+  `HeuristicBot::start`, fixed at the root), every meld it can make in
+  `locked_completions` (generals (將帥) are not eaten into pairs), and every
+  card that can be discarded after.
+- The nodes kept are those whose `ceiling(generals = 1)` reaches the
+  threshold; those that reach it at `generals = 0` as well are counted apart
+  ("certain").  Pruned nodes are remembered too and not computed again.
+- Each decision point records the nodes, the certain nodes, the edges and
+  the time; the edges counted are those that lead to a kept node, including
+  one already seen.
 
-時間是這個普查的時間：每個新節點兩次 `ceiling`，每條邊一次 `HashMap` 查詢，
-沒有做任何期望值的算術。動態規劃至少要走過同樣的邊。
+The time is that of this census: two calls of `ceiling` for each new node
+and one `HashMap` lookup for each edge, with none of the arithmetic of an
+expectation.  The DP has to walk the same edges at least.
 
-## 數字
+## Numbers
 
-5 局，seed 1，所有手牌大小（`nodes 5 1`）：
+5 rounds, seed 1, hands of every size (`nodes 5 1`):
 
-| 張數 | 決定點 | 節點／點 | 確定／點 | 邊／點 | 最多節點 | 最多邊 | 毫秒／點 |
+| Cards | Decision points | Nodes a point | Certain a point | Edges a point | Most nodes | Most edges | ms a point |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 20 | 17 | 699,775 | 556,517 | 57,846,262 | 1,225,317 | 118,096,407 | 21,814 |
 | 19 | 1 | 132,504 | 109,910 | 9,401,181 | 132,504 | 9,401,181 | 3,796 |
@@ -49,9 +65,9 @@
 | 15 | 5 | 16,503 | 11,746 | 643,687 | 33,076 | 1,309,333 | 353 |
 | 14 | 14 | 8,040 | 5,730 | 300,434 | 20,502 | 825,158 | 168 |
 
-200 局，seed 2，手牌 13 張以下（`nodes 200 2 13`）：
+200 rounds, seed 2, hands of 13 cards or fewer (`nodes 200 2 13`):
 
-| 張數 | 決定點 | 節點／點 | 確定／點 | 邊／點 | 最多節點 | 最多邊 | 毫秒／點 |
+| Cards | Decision points | Nodes a point | Certain a point | Edges a point | Most nodes | Most edges | ms a point |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 13 | 225 | 5,405 | 3,921 | 205,698 | 29,606 | 1,654,648 | 114 |
 | 12 | 297 | 1,957 | 1,352 | 57,890 | 9,231 | 414,569 | 41 |
@@ -62,94 +78,115 @@
 | 7 | 55 | 63 | 41 | 812 | 221 | 3,966 | 0.9 |
 | 6 | 40 | 16 | 10 | 126 | 61 | 726 | 0.2 |
 | 5 | 25 | 18 | 12 | 152 | 72 | 887 | 0.2 |
-| 4 以下 | 14 | 3 | 1 | 9 | 9 | 31 | 0.0 |
+| 4 or fewer | 14 | 3 | 1 | 9 | 9 | 31 | 0.0 |
 
-## 只打鬆牌
+## Discarding only loose cards
 
-量測日期：2026-11-18，基準 `2dcc17e`。問題：成組的牌幾乎不會想打，搭子也
-不太想打；節點只試這些棄牌的話，圖小多少？`nodes` 的第四個參數：
+Measured 2026-11-18, base `2dcc17e`.  The question: a card in a meld is
+hardly ever one to discard, and a card in a 搭子 seldom is; if a node tries
+only the discards that leaves, how much smaller is the graph?  The fourth
+argument of `nodes`:
 
-- **1：** 只打 `HeuristicBot` 的兩個排法（鬆牌成本 1 與 16）裡至少有一個
-  當成鬆牌的牌；一張都沒有時照舊全試。
-- **2：** 其中再只打不和別的鬆牌成搭子的孤張；沒有孤張時退回 1。
-- **3：** 見下面「搭子要等的牌還活著才算」。
+- **1:** discard only the cards that at least one of `HeuristicBot`'s two
+  layouts (a loose card costing 1 and 16) takes as loose; when there is
+  none at all, try every card as before.
+- **2:** of those, discard only the lone cards that make no 搭子 with
+  another loose card; when there is no lone card, fall back to 1.
+- **3:** see "A 搭子 counts only while the card it waits on is live" below.
 
-每點的平均，括號是對不剪的倍數（`nodes 5 1 20 p` 與 `nodes 200 2 13 p`；
-20 張的兩次是同時跑的，時間略偏高）：
+Means per point, with the factor against no pruning in brackets
+(`nodes 5 1 20 p` and `nodes 200 2 13 p`; the two runs at 20 cards ran at
+the same time, so their times are a little high):
 
-| 張數 | 剪法 | 節點 | 邊 | 毫秒 |
+| Cards | Pruning | Nodes | Edges | ms |
 | ---: | ---: | ---: | ---: | ---: |
 | 20 | 0 | 699,775 | 57,846,262 | 21,814 |
-| 20 | 1 | 104,580（÷ 7） | 4,578,275（÷ 13） | 5,176 |
-| 20 | 2 | 33,697（÷ 21） | 658,851（÷ 88） | 1,241 |
+| 20 | 1 | 104,580 (÷ 7) | 4,578,275 (÷ 13) | 5,176 |
+| 20 | 2 | 33,697 (÷ 21) | 658,851 (÷ 88) | 1,241 |
 | 17 | 0 | 65,139 | 3,891,157 | 1,605 |
 | 17 | 2 | 6,205 | 111,895 | 176 |
 | 16 | 2 | 2,857 | 38,048 | 73 |
 | 14 | 2 | 1,396 | 19,112 | 32 |
 | 13 | 0 | 5,405 | 205,698 | 114 |
-| 13 | 1 | 1,913（÷ 2.8） | 43,865（÷ 4.7） | 50 |
-| 13 | 2 | 1,227（÷ 4.4） | 17,847（÷ 12） | 28 |
+| 13 | 1 | 1,913 (÷ 2.8) | 43,865 (÷ 4.7) | 50 |
+| 13 | 2 | 1,227 (÷ 4.4) | 17,847 (÷ 12) | 28 |
 | 10 | 0 | 608 | 14,690 | 10.8 |
-| 10 | 1 | 316（÷ 1.9） | 5,299（÷ 2.8） | 6.4 |
-| 10 | 2 | 229（÷ 2.7） | 2,563（÷ 5.7） | 4.4 |
+| 10 | 1 | 316 (÷ 1.9) | 5,299 (÷ 2.8) | 6.4 |
+| 10 | 2 | 229 (÷ 2.7) | 2,563 (÷ 5.7) | 4.4 |
 
-- 20 張仍然是 1.2 秒，和設閘門的 Monte Carlo 同一個量級；剪枝救不了整手牌。
-- 它把閘門往上推：剪法 2 的 16 張（73 毫秒）比不剪的 13 張（114 毫秒）便宜。
-- 這只數了圖的大小。剪掉的棄牌讓值偏低多少、根的選擇變不變，要等核心
-  （`doc/expectation.md` 批次 1）在不剪也算得動的手上逐點對照；時間含每條
-  邊兩次排法，核心也得付。
+- 20 cards still take 1.2 seconds, the same order as the gated Monte Carlo;
+  pruning does not save the full hand.
+- It pushes the gate up: 16 cards under pruning 2 (73 ms) are cheaper than
+  13 cards unpruned (114 ms).
+- This counts the size of the graph only.  How much too low the pruned
+  discards make the values, and whether the choice at the root changes,
+  waits for the core (`doc/expectation.md`, batch 1) to compare point by
+  point on hands it can compute unpruned as well; the time includes two
+  layouts for each edge, which the core has to pay too.
 
-### 短的節點不剪
+### Short nodes left unpruned
 
-第五個參數 N：圖裡暗牌 N 張以下的節點照舊全試，只剪比它長的。理由是短的
-手便宜，也最可能出現不該剪的棄牌。剪法 2，`nodes 5 1 20 2 N`，每點的節點與
-毫秒（N = 7 與 10 兩次同時跑）：
+The fifth argument N: nodes of N concealed cards or fewer in the graph try
+every discard as before, and only longer ones are pruned.  The reason is
+that short hands are cheap, and the likeliest to hold a discard that should
+not be pruned.  Pruning 2, `nodes 5 1 20 2 N`, nodes and ms per point (the
+runs at N = 7 and 10 ran at the same time):
 
-| 張數 | N = 0 | N = 7 | N = 10 |
+| Cards | N = 0 | N = 7 | N = 10 |
 | ---: | ---: | ---: | ---: |
-| 20 | 33,697／1,241 | 61,904／1,785 | 157,556／4,388 |
-| 17 | 6,205／176 | 12,675／293 | 30,073／697 |
-| 16 | 2,857／73 | 4,457／96 | 9,191／196 |
-| 14 | 1,396／32 | 2,926／57 | 5,974／121 |
-| 13 | 1,542／31 | 3,411／58 | 5,876／107 |
+| 20 | 33,697 / 1,241 | 61,904 / 1,785 | 157,556 / 4,388 |
+| 17 | 6,205 / 176 | 12,675 / 293 | 30,073 / 697 |
+| 16 | 2,857 / 73 | 4,457 / 96 | 9,191 / 196 |
+| 14 | 1,396 / 32 | 2,926 / 57 | 5,974 / 121 |
+| 13 | 1,542 / 31 | 3,411 / 58 | 5,876 / 107 |
 
-圖的節點大半是短的手，所以底下不剪就把省下的還回去一大半：N = 7 貴一倍，
-N = 10 貴四倍，13 張時幾乎回到不剪的 114 毫秒。
+Most of the graph's nodes are short hands, so leaving the bottom unpruned
+gives back most of what was saved: N = 7 costs twice as much and N = 10 four
+times, and at 13 cards it is almost back to the unpruned 114 ms.
 
-### 搭子要等的牌還活著才算
+### A 搭子 counts only while the card it waits on is live
 
-剪法 3：同剪法 2，但兩張鬆牌只有在補成一組的那張牌還在 `live` 裡時才算
-搭子；等的牌出完了，兩張都當孤張，可以打。它取代「幾張以下不剪」：該不該
-剪看的是牌還在不在，不是手牌多長。每點的節點與毫秒（`nodes 5 1 20 3`、
-`nodes 200 2 13 3`）：
+Pruning 3: as pruning 2, but two loose cards count as a 搭子 only while the
+card that completes them into a meld is still in `live`; once the cards
+waited on are all out, both are lone cards and may be discarded.  It
+replaces "unpruned at so many cards or fewer": whether to prune depends on
+whether the card is still there, not on how long the hand is.  Nodes and ms
+per point (`nodes 5 1 20 3`, `nodes 200 2 13 3`):
 
-| 張數 | 剪法 2 | 剪法 3 |
+| Cards | Pruning 2 | Pruning 3 |
 | ---: | ---: | ---: |
-| 20 | 33,697／1,241 | 34,717／1,321 |
-| 17 | 6,205／176 | 6,318／181 |
-| 13 | 1,227／28 | 1,260／30 |
-| 10 | 229／4.4 | 229／4.5 |
+| 20 | 33,697 / 1,241 | 34,717 / 1,321 |
+| 17 | 6,205 / 176 | 6,318 / 181 |
+| 13 | 1,227 / 28 | 1,260 / 30 |
+| 10 | 229 / 4.4 | 229 / 4.5 |
 
-多 3% 以內：死掉的搭子不多，放它們回來幾乎不花錢。
+Within 3% more: dead 搭子 are few, and letting them back in costs almost
+nothing.
 
-## 一個決定的圖：批次 1
+## The graph of one decision: batch 1
 
-量測日期：2026-11-18，基準 `7d3157a`。`doc/expectation.md` 批次 1 的核心
-（`src/expect.rs` 的 `Graph`）寫好之後，`examples/nodes.rs` 改用它：上面的
-數字是「打完之後的一手」，這裡是「一次打牌的決定」，根是每一張能打的牌打掉
-之後的手，共用一張圖。張數是打掉之後的。建圖之後照實際的牌堆掃描，
-T =（牌堆 − 廢牌）× 1.3。牌桌模型的四個常數是暫定的（h 0.015、L −12、
-e 0.45、將帥 0.25），批次 2 才量；它們只影響下面「剪了改變多少」的值，
-不影響大小與時間。批次 2 之後 `nodes` 用量到的 `Outlook::default()`
-（`research/outlook.md`）；要重現下面的值用 `c0aea83`。
+Measured 2026-11-18, base `7d3157a`.  Once the core of batch 1 of
+`doc/expectation.md` (`Graph` in `src/expect.rs`) was written,
+`examples/nodes.rs` switched to it: the numbers above are for "a hand after
+its discard", these are for "one decision to discard", whose roots are the
+hands left by discarding each card that can be discarded, sharing one graph.
+The card counts are after the discard.  Once built, the graph is swept by
+the actual pile, T = (pile − dead cards) × 1.3.  The four constants of the
+table model are provisional (h 0.015, L −12, e 0.45, generals 0.25) and are
+measured only in batch 2; they affect only the values under "how much
+pruning changes" below, not the sizes or the times.  Since batch 2 `nodes`
+uses the measured `Outlook::default()` (`research/outlook.md`); to reproduce
+the values below use `c0aea83`.
 
-上面兩節的參數（`確定`那一欄、第五個參數 N）隨舊的普查一起拿掉了；要重現
-它們用 `7d3157a` 的 `examples/nodes.rs`。邊數現在含走到「不會胡了」那個
-節點的邊，所以比上面的略多。
+The parameters of the two sections above (the "certain" column, the fifth
+argument N) went away with the old census; to reproduce them use
+`examples/nodes.rs` at `7d3157a`.  The edges now include those that lead to
+the "can no longer win" node, so there are slightly more than above.
 
-200 局，seed 2，打掉之後 13 張以下，不剪棄牌（`nodes 200 2 13 0`）：
+200 rounds, seed 2, 13 cards or fewer after the discard, no discards pruned
+(`nodes 200 2 13 0`):
 
-| 張數 | 決定 | 根 | 節點 | 邊 | 最多節點 | 建圖毫秒 | 掃描毫秒 |
+| Cards | Decisions | Roots | Nodes | Edges | Most nodes | Build ms | Sweep ms |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 13 | 174 | 9.1 | 8,333 | 392,882 | 54,828 | 121.5 | 10.7 |
 | 12 | 227 | 8.1 | 3,198 | 131,171 | 16,972 | 48.2 | 3.7 |
@@ -157,21 +194,27 @@ e 0.45、將帥 0.25），批次 2 才量；它們只影響下面「剪了改變
 | 10 | 115 | 6.9 | 1,052 | 33,218 | 7,863 | 13.0 | 0.9 |
 | 9 | 128 | 5.9 | 315 | 7,053 | 1,721 | 3.7 | 0.2 |
 | 8 | 100 | 5.6 | 238 | 5,083 | 1,593 | 2.5 | 0.1 |
-| 7 以下 | 121 | 4.1 | 59 | 926 | 399 | 0.6 | 0.0 |
+| 7 or fewer | 121 | 4.1 | 59 | 926 | 399 | 0.6 | 0.0 |
 
-- **閘門過了。** 10 張一個決定 14 毫秒，預先宣告的上限是 50。
-- **掃描比建圖便宜十幾倍**：掃描是建圖的 6% 到 9%。
-  「剩幾次機會的乘數只乘在掃描上」成立。
-- 一個決定有 7 個根，圖卻只比單一手大一倍左右（10 張：1,052 對普查的 607
-  個節點）：根之間共用大部分的子手牌。
+- **The gate is passed.**  A decision at 10 cards takes 14 ms; the limit
+  declared beforehand was 50.
+- **The sweep is over ten times cheaper than the build**: the sweep is 6% to
+  9% of the build.  "The multiplier for the chances left multiplies the
+  sweep only" holds.
+- A decision has 7 roots, yet the graph is only about twice the size of a
+  single hand's (10 cards: 1,052 nodes against the census's 607): the roots
+  share most of their sub-hands.
 
-### 剪了棄牌，選擇變多少
+### How much pruning the discards changes the choice
 
-同樣的決定，剪法 1 到 3 各建一次圖，再建一次不剪的；兩張圖各自選值最高的根。
-「改變」是剪了之後選到的根，照不剪的值比較差的決定；「損失」是它照不剪的值
-少幾分，平均到每個決定；「偏差」是最好的根不剪減剪的值（`nodes 200 2 13 p`）：
+On the same decisions, one graph is built for each of prunings 1 to 3 and
+one more unpruned; each of the two graphs picks its root of highest value.
+"Changed" is the decisions where the root picked under pruning is the worse
+one by the unpruned values; "loss" is how many points it gives up by the
+unpruned values, averaged over every decision; "bias" is the best root's
+unpruned value less its pruned value (`nodes 200 2 13 p`):
 
-| 張數 | 剪法 | 建圖＋掃描毫秒 | 改變 | 損失／決定 | 最大損失 | 偏差 |
+| Cards | Pruning | Build + sweep ms | Changed | Loss a decision | Largest loss | Bias |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 13 | 0 | 132.3 | | | | |
 | 13 | 1 | 104.0 | 2.3% | 0.008 | 1.03 | 0.042 |
@@ -183,28 +226,39 @@ e 0.45、將帥 0.25），批次 2 才量；它們只影響下面「剪了改變
 | 10 | 1 | 12.1 | 0.9% | 0.003 | 0.35 | 0.036 |
 | 10 | 2 | 7.1 | 4.3% | 0.023 | 1.44 | 0.054 |
 | 10 | 3 | 7.4 | 4.3% | 0.023 | 1.44 | 0.054 |
-| 全部 | 1 | 30.2 | 3.2% | 0.010 | 1.03 | 0.048 |
-| 全部 | 2 | 16.5 | 5.5% | 0.020 | 1.44 | 0.074 |
-| 全部 | 3 | 17.3 | 5.3% | 0.019 | 1.44 | 0.073 |
+| All | 1 | 30.2 | 3.2% | 0.010 | 1.03 | 0.048 |
+| All | 2 | 16.5 | 5.5% | 0.020 | 1.44 | 0.074 |
+| All | 3 | 17.3 | 5.3% | 0.019 | 1.44 | 0.073 |
 
-- **10 張的閘門用不著剪。** 不剪 14 毫秒，剪法 2 省下 7 毫秒，換來 4% 的
-  決定選錯、每個決定 0.02 分；設閘門的 Monte Carlo 一局才贏 +0.070。
-- 剪枝是拿來開更寬的閘門的（應用 D）：剪法 2 的 13 張（54 毫秒）和不剪的
-  12 張（52 毫秒）一樣貴。那時要付的是每個決定約 0.02 分，A/B 才說得出
-  值不值。
-- 剪法 3 只在 13 張比剪法 2 少選錯一點，其餘相同。
-- 6 張以下沒有一個決定改變：那裡剪法幾乎剪不到東西。
+- **The gate at 10 cards needs no pruning.**  Unpruned takes 14 ms and
+  pruning 2 saves 7 ms, in exchange for 4% of decisions picked wrong and
+  0.02 points a decision; the gated Monte Carlo wins only +0.070 a deal.
+- Pruning is for opening a wider gate (application D): 13 cards under
+  pruning 2 (54 ms) cost the same as 12 cards unpruned (52 ms).  The price
+  then is about 0.02 points a decision, and only an A/B can say whether it
+  is worth it.
+- Pruning 3 picks wrong a little less often than pruning 2 only at 13 cards;
+  otherwise they are the same.
+- At 6 cards or fewer not one decision changes: there the prunings find
+  almost nothing to prune.
 
-## 為什麼估錯
+## Why the estimate was wrong
 
-路線三把「到得了的子手牌」想成幾千個，但每一步有約 28 種牌、每種牌一到三個
-牌組、之後十幾張可打，深度到 7；天花板只剪掉做不成的手，剛發的手幾乎什麼
-都還做得成。節點數每少三張手牌約除以 5 到 8，所以 20 張與 12 張差三個數量級。
+Route 3 pictured the "reachable sub-hands" as a few thousand, but each step
+has about 28 kinds of card, one to three melds for each kind and a dozen or
+more cards to discard after, to a depth of 7; the ceiling prunes only the
+hands that cannot be made, and a freshly dealt hand can still make almost
+anything.  The node count divides by about 5 to 8 for every three cards
+fewer in hand, so 20 cards and 12 cards are three orders of magnitude apart.
 
-## 沒算進去的事
+## What is not counted
 
-- `live` 在根固定，所以同一張牌可以被要超過它剩下的張數；每個節點的邊也不管
-  輪不輪得到自己吃。兩者都讓數字偏大，但動態規劃的狀態就是這樣定的，要把
-  它們算進去狀態只會更多。
-- 剩幾次機會那一維沒數，它是個乘數（約 60），不在節點裡。
-- 決定點含同一手過牌多次的重複；動態規劃每次 `live` 不同，也得重算。
+- `live` is fixed at the root, so the same card can be asked for more times
+  than it has copies left; nor do a node's edges care whether the seat is in
+  turn to eat.  Both make the numbers too large, but that is how the DP's
+  state is defined, and counting them in would only make more states.
+- The dimension of the chances left is not counted; it is a multiplier
+  (about 60), not part of the nodes.
+- The decision points include the repeats of one hand passing several
+  times; for the DP `live` differs each time, so it has to compute again
+  too.

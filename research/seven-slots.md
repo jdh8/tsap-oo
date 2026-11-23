@@ -1,71 +1,84 @@
-# 七個位置：胡牌的手的胡從哪裡來
+# Seven slots: where a winning hand's 胡 come from
 
-量測日期：2026-11-18。問題：胡牌的手一定是 21 張，看成 7 個三張的位置，每個
-位置基準 1 胡，門檻的另外 3 胡從哪些牌組來？`doc/hu-ceiling.md` 的天花板
-建在這條帳上，這裡是帳、它的驗證與統計。不改打法，基準為 `6d5a2a8`。
+Measured 2026-11-18.  The question: a winning hand is always 21 cards; seen
+as 7 slots of three cards at a base of 1 胡 each, which melds do the other 3
+胡 of the threshold come from?  The ceiling of `doc/hu-ceiling.md` is built
+on this arithmetic; here are the arithmetic, its verification and the
+statistics.  No change to play; the base is `6d5a2a8`.
 
-## 結論
+## Answer
 
-- **胡 = 7 + 2k + 將士象數 + 2 ×（暗刻 + 三色兵卒 + 四色兵卒 + 槓）+ 加成**，
-  k =（單張 − 對子）÷ 3，加成是四色兵卒 +1、明槓 +2、暗槓 +4。單張是落單的
-  將帥，加上每個四張組多出的那一張。`HeuristicBot` 四家自對局 20,000 局的
-  19,404 手胡牌逐手成立，k 也逐手是整數。
-- **k 幾乎都是 0 或 +1。** 56.4% 的胡牌單張與對子一樣多，35.2% 多三個。
-  k = +1 的胡牌有四分之一（全部的 9.1%）少了那 2 胡就不到十胡。
-- **胡牌的手平均有 2.76 張落單的將帥、2.12 個對子。** 將帥有 0.70 張是摸來的，
-  對子有 1.13 個是吃來的。
-- **吃對子是最常見的負項。** 對子平均每手拉低 1.41 胡，每個 −⅔；將帥每手
-  加 1.84，是最大的正項，其次是三色兵卒 1.23、明槓 1.02、將士象 0.94。
+- **胡 = 7 + 2k + the number of 將士象 + 2 × (concealed triplets + soldiers
+  of three colours + soldiers of four colours + kongs) + bonus**,
+  k = (singles − pairs) ÷ 3, the bonus being +1 for soldiers of four
+  colours, +2 for an exposed kong and +4 for a concealed quad.  The singles
+  are the lone generals (將帥), plus the extra card of each four-card meld.
+  It holds hand by hand on the 19,404 wins of 20,000 rounds of self-play by
+  four `HeuristicBot`s, and k is a whole number on every one of them.
+- **k is almost always 0 or +1.**  56.4% of wins have as many singles as
+  pairs, 35.2% three more.  A quarter of the wins with k = +1 (9.1% of all)
+  would be short of ten 胡 without those 2 胡.
+- **A winning hand holds 2.76 lone generals and 2.12 pairs on average.**
+  0.70 of the generals were drawn, and 1.13 of the pairs were eaten.
+- **Eating a pair is the commonest negative term.**  Pairs pull a hand down
+  by 1.41 胡 on average, −⅔ each; generals add 1.84 a hand, the largest
+  positive term, followed by soldiers of three colours 1.23, exposed kongs
+  1.02 and 將士象 0.94.
 
-## 帳
+## The arithmetic
 
-一個 s 張、值 v 胡的牌組，比它的張數該有的 s ÷ 3 胡多出 v − s ÷ 3。21 張的
-胡因此是 7 加上每個牌組多出的：
+A meld of s cards worth v 胡 has v − s ÷ 3 more than the s ÷ 3 胡 its cards
+are due.  The 胡 of 21 cards are therefore 7 plus the excess of each meld:
 
-| 牌組 | 張數 | 胡 | 多出 | 拆成 |
+| Meld | Cards | 胡 | Excess | Splits into |
 | --- | ---: | ---: | ---: | --- |
-| 對子 | 2 | 0 | −⅔ | 一個負的單張 |
-| 車馬炮、碰 | 3 | 1 | 0 | 基準的位置 |
-| 將帥 | 1 | 1 | +⅔ | 一個單張 |
-| 將士象 | 3 | 2 | +1 | 位置 +1 |
-| 三色兵卒、暗刻 | 3 | 3 | +2 | 位置 +2 |
-| 四色兵卒 | 4 | 5 | +3⅔ | 位置 +2，單張，加成 +1 |
-| 明槓 | 4 | 6 | +4⅔ | 位置 +2，單張，加成 +2 |
-| 暗槓 | 4 | 8 | +6⅔ | 位置 +2，單張，加成 +4 |
+| Pair | 2 | 0 | −⅔ | a negative single |
+| 車馬炮, pong | 3 | 1 | 0 | a base slot |
+| General | 1 | 1 | +⅔ | a single |
+| 將士象 | 3 | 2 | +1 | a slot +1 |
+| Soldiers of three colours, concealed triplet | 3 | 3 | +2 | a slot +2 |
+| Soldiers of four colours | 4 | 5 | +3⅔ | a slot +2, a single, bonus +1 |
+| Exposed kong | 4 | 6 | +4⅔ | a slot +2, a single, bonus +2 |
+| Concealed quad | 4 | 8 | +6⅔ | a slot +2, a single, bonus +4 |
 
-單張與對子各 ±⅔，合起來是 ⅔ ×（單張 − 對子）。四張組是一個位置加一張
-單張，所以 21 = 3 × 位置數 + 單張 + 2 × 對子，單張 + 2 × 對子是 3 的倍數，
-即單張 ≡ 對子（mod 3）：差是 3k，⅔ 乘上去是 2k。
+Singles and pairs are ±⅔ each, ⅔ × (singles − pairs) together.  A four-card
+meld is one slot plus one single, so 21 = 3 × slots + singles + 2 × pairs;
+singles + 2 × pairs is a multiple of 3, that is, singles ≡ pairs (mod 3):
+the difference is 3k, and ⅔ times it is 2k.
 
-## 驗證
+## Verification
 
-`examples/census.rs` 對每手胡牌：亮出的牌組與胡的那一張照明牌計胡，其餘照
-暗牌計胡；斷言張數是 21、胡數等於 `Round::result` 的胡數、恆等式成立、
-單張 − 對子是 3 的倍數。20,000 局全數通過。各類多出的胡合計每手 5.23，
-所以胡牌平均 12.23 胡，與下面胡數分布的平均相同。
+For every win, `examples/census.rs` scores the exposed melds and the winning
+card as exposed and the rest as concealed, and asserts that there are 21
+cards, that the 胡 equal those of `Round::result`, that the identity holds
+and that singles − pairs is a multiple of 3.  All 20,000 rounds pass.  The
+excess 胡 of every kind come to 5.23 a hand, so a win averages 12.23 胡, the
+same as the mean of the distribution of 胡 below.
 
-## 統計
+## Statistics
 
-`HeuristicBot` 四家自對局，20,000 局，seed 1795000000，莊家照 `Game::settle`
-輪轉，19,404 局有人胡。「暗」是最後的排法裡照暗牌計胡的個數，所以將帥的
-「總數 − 暗」是摸來的，對子的是吃來的。
+Self-play by four `HeuristicBot`s, 20,000 rounds, seed 1795000000, the
+dealer rotating as `Game::settle` has it; 19,404 rounds had a winner.
+"Concealed" is the number scored as concealed in the final layout, so for
+generals "total − concealed" is the ones drawn, and for pairs the ones
+eaten.
 
-| 牌組 | 每個多出 | 有的胡牌 | 每手幾個 | 其中暗 | 每手多出的胡 |
+| Meld | Excess each | Wins with one | Number a hand | Of them concealed | Excess 胡 a hand |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 對子 | −0.67 | 92.87% | 2.118 | 0.991 | −1.412 |
+| Pair | −0.67 | 92.87% | 2.118 | 0.991 | −1.412 |
 | 車馬炮 | 0 | 62.55% | 0.866 | 0.448 | 0 |
-| 碰 | 0 | 76.78% | 1.300 | 0 | 0 |
-| 將帥 | +0.67 | 95.42% | 2.758 | 2.063 | +1.839 |
+| Pong | 0 | 76.78% | 1.300 | 0 | 0 |
+| General | +0.67 | 95.42% | 2.758 | 2.063 | +1.839 |
 | 將士象 | +1.00 | 67.53% | 0.939 | 0.531 | +0.939 |
-| 三色兵卒 | +2.00 | 54.91% | 0.614 | 0.282 | +1.228 |
-| 暗刻 | +2.00 | 33.93% | 0.389 | 0.389 | +0.778 |
-| 四色兵卒 | +3.67 | 16.93% | 0.171 | 0.054 | +0.626 |
-| 明槓 | +4.67 | 20.80% | 0.218 | 0 | +1.019 |
-| 暗槓 | +6.67 | 3.12% | 0.031 | 0.031 | +0.208 |
+| Soldiers of three colours | +2.00 | 54.91% | 0.614 | 0.282 | +1.228 |
+| Concealed triplet | +2.00 | 33.93% | 0.389 | 0.389 | +0.778 |
+| Soldiers of four colours | +3.67 | 16.93% | 0.171 | 0.054 | +0.626 |
+| Exposed kong | +4.67 | 20.80% | 0.218 | 0 | +1.019 |
+| Concealed quad | +6.67 | 3.12% | 0.031 | 0.031 | +0.208 |
 
-依 k：
+By k:
 
-| k | 胡牌 | 少了 2k 就不到十胡 |
+| k | Wins | Short of ten 胡 without the 2k |
 | ---: | ---: | ---: |
 | −2 | 0.01% | 0 |
 | −1 | 5.54% | 0 |
@@ -74,54 +87,58 @@
 | +2 | 2.82% | 0.72% |
 | +3 | 0.04% | 0.01% |
 
-胡數：
+The number of 胡:
 
 | 胡 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21+ |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 胡牌 | 22.70% | 24.53% | 16.42% | 13.69% | 7.87% | 6.26% | 3.63% | 2.26% | 1.17% | 0.75% | 0.40% | 0.33% |
+| Wins | 22.70% | 24.53% | 16.42% | 13.69% | 7.87% | 6.26% | 3.63% | 2.26% | 1.17% | 0.75% | 0.40% | 0.33% |
 
-最常見的配方（只列比基準多胡的牌組）：
+The commonest recipes (listing only the melds worth more 胡 than the base):
 
-| 胡牌 | 配方 |
+| Wins | Recipe |
 | ---: | --- |
-| 13.08% | 將士象 + 三色兵卒 |
-| 6.38% | 將士象 × 2 + 三色兵卒 |
-| 5.17% | 將士象 + 三色兵卒 + 暗刻 |
-| 5.17% | 將士象 + 暗刻 |
-| 4.80% | 三色兵卒 + 暗刻 |
-| 4.38% | 將士象 + 四色兵卒 |
-| 3.95% | 三色兵卒 |
-| 3.53% | 四色兵卒 |
-| 3.35% | 將士象 + 明槓 |
-| 3.00% | 明槓 |
+| 13.08% | 將士象 + soldiers of three colours |
+| 6.38% | 將士象 × 2 + soldiers of three colours |
+| 5.17% | 將士象 + soldiers of three colours + concealed triplet |
+| 5.17% | 將士象 + concealed triplet |
+| 4.80% | soldiers of three colours + concealed triplet |
+| 4.38% | 將士象 + soldiers of four colours |
+| 3.95% | soldiers of three colours |
+| 3.53% | soldiers of four colours |
+| 3.35% | 將士象 + exposed kong |
+| 3.00% | exposed kong |
 
-非莊家發到的 20 張，依將帥張數與依「三張組比 1 胡多出的胡」（`Solver` 排出
-胡最多的形），各自的胡牌率：
+The 20 cards dealt to a seat other than the dealer, by the number of
+generals and by "the 胡 its three-card melds have over 1 胡 each" (the shape
+of most 胡 that `Solver` lays out), with the win rate of each:
 
-| 將帥 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+| Generals | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 手數 | 3.15% | 13.76% | 25.10% | 26.67% | 18.65% | 8.84% | 2.92% | 0.77% | 0.15% |
-| 胡牌率 | 11.02% | 15.37% | 19.49% | 22.89% | 26.59% | 29.70% | 30.80% | 32.90% | 36.67% |
+| Hands | 3.15% | 13.76% | 25.10% | 26.67% | 18.65% | 8.84% | 2.92% | 0.77% | 0.15% |
+| Win rate | 11.02% | 15.37% | 19.49% | 22.89% | 26.59% | 29.70% | 30.80% | 32.90% | 36.67% |
 
-| 多出的胡 | 0 | 1 | 2 | 3 | 4 | 5 | 6+ |
+| Excess 胡 | 0 | 1 | 2 | 3 | 4 | 5 | 6+ |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 手數 | 13.51% | 15.42% | 27.09% | 16.90% | 15.14% | 5.63% | 6.31% |
-| 胡牌率 | 9.20% | 13.77% | 20.99% | 27.02% | 29.31% | 34.26% | 35.89% |
+| Hands | 13.51% | 15.42% | 27.09% | 16.90% | 15.14% | 5.63% | 6.31% |
+| Win rate | 9.20% | 13.77% | 20.99% | 27.02% | 29.31% | 34.26% | 35.89% |
 
-（單張，對子）的完整分布由程式印出，最多的是 (2, 2) 21.51%、(3, 3) 18.29%、
-(4, 1) 14.49%、(5, 2) 11.53%、(1, 1) 8.25%。
+The program prints the full distribution of (singles, pairs); the most
+frequent are (2, 2) 21.51%, (3, 3) 18.29%, (4, 1) 14.49%, (5, 2) 11.53% and
+(1, 1) 8.25%.
 
-## 工具
+## Tool
 
 ```sh
 cargo run --release --example census -- 20000 1795000000
 ```
 
-約四分鐘。輸出逐字對得上 `doc/hu-ceiling.md` 引用的數字。
+About four minutes.  The output matches the numbers `doc/hu-ceiling.md`
+quotes digit for digit.
 
-## 限制
+## Caveats
 
-- **統計來自 `HeuristicBot` 自己的胡牌。** 將帥的張數、吃對子的次數都帶著這個
-  bot 的習慣；恆等式則不依賴 bot。
-- **排法是 `Round::result` 給的那一種。** 同一手牌另有排法時，k 與各項會換，
-  胡數不會。
+- **The statistics come from `HeuristicBot`'s own wins.**  The number of
+  generals and the number of pairs eaten both carry this bot's habits; the
+  identity does not depend on the bot.
+- **The layout is the one `Round::result` gives.**  When the same hand has
+  another layout, k and the terms change; the 胡 do not.

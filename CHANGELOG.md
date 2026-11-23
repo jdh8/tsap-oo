@@ -64,14 +64,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Tables of two and three have their own `Outlook`, measured under
   `Rules::dead` from 10,000 rounds each of `HeuristicBot` self-play (seeds
-  210 and 310, `research/outlook.md`, 空位的手牌算廢牌): at two a card
+  210 and 310, `research/outlook.md`, "Empty seats' hands are dead"): at two a card
   comes to the seat to eat 0.74 of the time and at three 0.42, against 0.28
   at four.  `Outlook::new` picks it by `Rules::players`,
   `examples/outlook.rs` takes `PLAYERS`, and `ab/` takes `FOUR` to keep the
   table of four in the candidate.  `eval::DRAWS` is the 25 draws a round
   starts with.  Which table plays by its own is under Changed.  The tables
   measured before `Rules::dead`, over rounds of 65 and 45 draws, and their
-  A/Bs are in `research/outlook.md`, 兩、三人桌, and no longer hold.
+  A/Bs are in `research/outlook.md`, "Tables of two and three", and no
+  longer hold.
 
 - `Outlook::new` picks the table model by `Rules::threshold`: at 八胡 one
   measured from 10,000 rounds of `HeuristicBot` self-play at eight to win,
@@ -199,6 +200,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- This repository is English throughout.  The design docs in `doc/` and the
+  measurements in `research/` were Chinese and are translated in place:
+  every number, table, command, seed base and SHA is as it was, and the
+  section titles other files and comments cite are now the English ones.
+  `research/overspend.py` prints English labels, and the groups 甲, 乙 and
+  丙 of `doc/hu-ceiling.md` and `research/hu-ceiling-trace.patch` are A, B
+  and C.  Card faces and the game's own terms (胡, 將士象, 搭子) stay in
+  Chinese, and so does the page in `web/`.  Research into what the rules
+  are from source to source moved to `../tsap-oo-book/research/`, in
+  Chinese: `generals-triplets-and-kongs.md`,
+  `soldier-pairs-and-triplets.md` and, as `small-tables.md`, the
+  per-source table of two- and three-player rules from
+  `research/prior-art.md`.  No change to play: only comments changed in
+  `src/`.
+
 - `Graph` weighs each public card to come by its rank's rate
   (`Outlook::drawn` for a segment's draw, `Outlook::discarded` for the
   other seats' discards, by phase, 士象 and 車馬炮 pooled) where it took
@@ -239,7 +255,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the pile, so the longer pile only kept a smaller table from ever
   exhausting: 0.0% of rounds at three and at two against 3.2% at four, and
   3.5% and 3.8% with 25 to draw (2,000 rounds a row, `length 2000 7` of
-  `research/dead-tail.patch` on `107032c`; `doc/variants.md`, 小桌的廢牌).
+  `research/dead-tail.patch` on `107032c`; `doc/variants.md`, "The dead cards of a small table").
   The web and desktop clients show the table's dead cards.  Play at four is
   unchanged: against `107032c`, `RESHUFFLE=8`, no deal parts in 20,000 of
   `HeuristicBot` (seed base 1798500000), 20,000 of `ExpectBot` on the web's
@@ -263,7 +279,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   four-player tables read 3.06 points low a leaf at two players and 0.96 at
   three (300 rounds each, seed bases 1800000000 and 1800100000).  A/Bs
   against `07d5602` (the dead hands alone, not on the branch),
-  `RESHUFFLE=8`, deal counts declared first (`doc/eval.md`, 兩、三人桌的表):
+  `RESHUFFLE=8`, deal counts declared first (`doc/eval.md`, "Tables for two and three players"):
 
   - The four-player tables past the gate at a smaller table, against
     playing as `HeuristicBot` there, web settings: at two −0.184 ± 0.045
@@ -362,11 +378,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   candidate passes.
 - `HeuristicBot`, and so the web hint, no longer eats a pair that drops
   `ceiling(generals = 0)` below the threshold (`doc/hu-ceiling.md`,
-  batch 3): groups 甲 and 乙 of batch 2.  A pair eat whose ceiling still
+  batch 3): groups A and B of batch 2.  A pair eat whose ceiling still
   reaches the threshold stands.  `ab/run.sh 800000` against `5b62dc6`
   (seed base 1794947206, `RESHUFFLE=8`), 59,885 deals part, all of them
   the control eating a pair: +0.053 ± 0.002 points a deal, 95% CI
-  [+0.049, +0.056], a win.  乙 gives +0.0353 [+0.0323, +0.0383], 甲
+  [+0.049, +0.056], a win.  B gives +0.0353 [+0.0323, +0.0383], A
   +0.0173 [+0.0162, +0.0184].
 
 ### Fixed
@@ -478,9 +494,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   batch 2): `HeuristicBot::claims` dropping a pair eat that lowers
   `ceiling(generals = 0)`.  `ab/run.sh 800000` against `168e1e4` (seed base
   1794940763, `RESHUFFLE=8`), 357,189 deals part: −2.173 ± 0.008 a deal,
-  95% CI [−2.189, −2.156], a loss.  By the groups declared beforehand, 丙
-  (ceiling still reaches the threshold) −2.213 [−2.229, −2.196]; 乙 +0.0254
-  [+0.0228, +0.0279]; 甲 +0.0143 [+0.0133, +0.0154].  Since 甲 and 乙 lie
+  95% CI [−2.189, −2.156], a loss.  By the groups declared beforehand, C
+  (ceiling still reaches the threshold) −2.213 [−2.229, −2.196]; B +0.0254
+  [+0.0228, +0.0279]; A +0.0143 [+0.0133, +0.0154].  Since A and B lie
   above 0, batch 3 blocks only those.  The probe and its trace are kept as
   `research/hu-ceiling-probe.patch` and `research/hu-ceiling-trace.patch`.
 

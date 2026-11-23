@@ -1,82 +1,103 @@
-# 用資料擬合評分常數：每一項值幾分
+# Fitting the grade's constants to data: what each term is worth in points
 
-量測日期：2026-11-16。問題：`HeuristicBot` 的評分是幾個手調常數的加權和
-（`SCALE`、`WEIGHT`、`OWN`、`WAIT`）。用自對局的結果去擬合，這些權重該是
-多少？照擬合出來的權重打，會不會比較強？bot 的基準為 `10a046f`；
-`HeuristicBot::terms` 與 `fit` example 是這次新增的，不改變打法
-（`ab/run.sh 20000`，seed base 1794823476，20,000 局中 0 局不同）。
+Measured 2026-11-16.  The question: `HeuristicBot`'s grade is a weighted sum
+with a few hand-tuned constants (`SCALE`, `WEIGHT`, `OWN`, `WAIT`).  Fitted
+to the results of self-play, what should these weights be?  Does playing by
+the fitted weights make it stronger?  The bot's base is `10a046f`;
+`HeuristicBot::terms` and the `fit` example are new here and do not change
+play (`ab/run.sh 20000`, seed base 1794823476, 0 of 20,000 deals differ).
 
-## 結論
+## Answer
 
-**擬合出來的權重和手調的差很多，照著打卻沒有變強。調常數這條路沒有可見的
-空間，bot 沒有改動。**
+**The fitted weights are far from the hand-tuned ones, yet playing by them
+is no stronger.  Tuning constants has no visible room left; the bot is
+unchanged.**
 
-- **手上的 1 胡約值 1.4 分。** 兩種擬合給出 1.38 ± 0.03 與 1.42 ± 0.05。
-  這是 `doc/stronger-bot.md` 要的匯率。
-- **兩種擬合互相吻合，都和手調的權重差很多。** 以評分的單位計，手上的 1 胡算 32：散牌
-  −45 到 −51（手調 −128），離門檻的差距 −11 到 −18（手調 −64），搭子 2.0 到
-  2.8（手調 1），聽牌張數 24 到 26（手調 8）。
-- **照擬合的權重打，沒有一次贏。** 三次 A/B 各 200,000 局：兩次不明，一次
-  輸。換掉全部權重的那一次有 30% 的牌局打法不同，得分差仍是 −0.005 ±
-  0.034；只在選擇附近擬合的權重則是 −0.070 ± 0.025。
-- **bot 選的棄牌平均比其他選擇好。** 評分落後 16 以內的其他選擇平均少
-  0.46 分，落後越多少得越多。評分相同的選擇則沒有差別（+0.09 ± 0.12）。
-- **評分在選擇附近比較陡。** 落後 64 以內時，每落後 32 約少 2 分；落後
-  256 以上時，每 32 不到 1 分。線性擬合把這個彎曲讀成「散牌的權重太重」，
-  但那些選擇本來就不會被選，改它不影響打法的好壞。
+- **1 胡 in hand is worth about 1.4 points.**  The two fits give 1.38 ± 0.03
+  and 1.42 ± 0.05.  This is the exchange rate `doc/stronger-bot.md` asks
+  for.
+- **The two fits agree with each other, and both are far from the hand-tuned
+  weights.**  In the grade's units, where 1 胡 in hand counts 32: a loose
+  card −45 to −51 (hand-tuned −128), the gap to the threshold −11 to −18
+  (hand-tuned −64), a 搭子 2.0 to 2.8 (hand-tuned 1), the cards waited on 24
+  to 26 (hand-tuned 8).
+- **Playing by the fitted weights never won.**  Three A/Bs of 200,000 deals
+  each: two insufficient data, one loss.  The one that replaced every weight
+  played differently in 30% of deals, and its score difference was still
+  −0.005 ± 0.034; the weights fitted only near the choice gave −0.070 ±
+  0.025.
+- **The discard the bot picks is better than the other choices on average.**
+  The other choices graded within 16 behind it score 0.46 points less on
+  average, and the further behind, the more they lose.  Choices of the same
+  grade make no difference (+0.09 ± 0.12).
+- **The grade is steeper near the choice.**  Within 64 behind, each 32
+  behind costs about 2 points; at 256 or more behind, each 32 costs less
+  than 1 point.  A linear fit reads this bend as "loose cards weigh too
+  much", but those choices would never be picked anyway, and changing it
+  does not make play better or worse.
 
-## 評分的各項
+## The terms of the grade
 
-`HeuristicBot` 把手牌排兩次（一次求最多胡數，一次求最少散牌），取評分高的
-那一種。評分是下列各項乘上權重的和，`HeuristicBot::terms` 回傳各項的值：
+`HeuristicBot` lays the hand out twice (once for the most 胡, once for the
+fewest loose cards) and takes the layout of the higher grade.  The grade is
+the sum of the terms below, each times its weight; `HeuristicBot::terms`
+returns the value of each term:
 
-| 項 | 意思 | 手調權重 |
+| Term | Meaning | Hand-tuned weight |
 | --- | --- | ---: |
-| `hu` | 牌組的胡數 | 32 |
-| `loose` | 散牌張數 | −128 |
-| `short` | 離門檻還差幾個半胡，已扣掉搭子可望補上的 | −64 |
-| `own` | 各張散牌還沒出現的同張牌數 | 2 |
-| `kept` | 搭子：吃成後的胡數 × 還沒出現的補牌張數（最多四張） | 1 |
-| `lonely` | 孤張：吃成後的胡數 × 4 | −1 |
-| `waits` | 還沒出現、能讓這手牌胡的牌數 | 8 |
+| `hu` | The 胡 of the melds | 32 |
+| `loose` | The number of loose cards | −128 |
+| `short` | How many half-胡 short of the threshold, less what the 搭子 may yet supply | −64 |
+| `own` | For each loose card, the copies of it not yet seen | 2 |
+| `kept` | 搭子: the 胡 once eaten × the completing cards not yet seen (four at most) | 1 |
+| `lonely` | Lone cards: the 胡 once eaten × 4 | −1 |
+| `waits` | The cards not yet seen that this hand wins on | 8 |
 
-吃碰時另外把亮出牌組的胡數以 32 計入。
+At a claim, the 胡 of the exposed melds are counted in as well, at 32.
 
-## 量測方法
+## How it was measured
 
-四家 `HeuristicBot` 以 `Rules::new()` 對局 60,000 局，seed base 20261119，
-莊家輪流。做兩種最小平方擬合：
+Four `HeuristicBot`s play 60,000 rounds under `Rules::new()`, seed base
+20261119, the dealer rotating.  Two least-squares fits are made:
 
-1. **手牌。** 每一次棄牌時，記下四家各自的手牌（出牌者扣掉打出的那張）的
-   各項，對上這一家該局最後的得分。另外放進四個 bot 不看、但影響得分的
-   控制變數：牌堆剩餘張數、這一家沒看過的牌數、另外三家最少的暗牌張數、
-   另外三家亮出的胡數合計。不放控制變數時，`own` 會變成「牌局還早」的替身
-   （係數從 −2 變成 +20）。
-2. **選擇。** 每八次棄牌取一次，把出牌者每一張可以打的牌都試一遍，各自用
-   同一個牌堆、四家照 `HeuristicBot` 打到結束。以「這個選擇的得分 − bot
-   實際選擇的得分」對「兩者各項的差」做擬合，沒有常數項。同一個決策的各個
-   選擇共用的東西（牌局進度、對手的手牌）全部消掉。
+1. **Hands.**  At every discard, record the terms of each of the four seats'
+   hands (the discarder's less the card discarded), against that seat's
+   final score for the round.  Four control variables that the bot does not
+   look at, but that affect the score, go in as well: the cards left in the
+   pile, the cards this seat has not seen, the fewest concealed cards among
+   the other three seats, and the total 胡 exposed by the other three seats.
+   Without the control variables, `own` turns into a stand-in for "the round
+   is still young" (its coefficient goes from −2 to +20).
+2. **Choices.**  At one discard in eight, try every card the discarder may
+   discard, each on the same pile, with the four seats playing as
+   `HeuristicBot` to the end.  Fit "this choice's score − the score of the
+   bot's actual choice" to "the difference between the two in each term",
+   with no constant term.  Everything the choices of one decision share (the
+   stage of the round, the opponents' hands) cancels out.
 
-標準誤取自 16 個 shard 各自擬合的離散程度：每一局只落在一個 shard，局與局
-獨立。
+The standard errors come from the spread of the fits of 16 shards, each
+fitted by itself: every round falls in one shard only, and rounds are
+independent of each other.
 
-重現（bot 須為 `10a046f` 的打法；16 核約半小時）：
+To reproduce (the bot must play as at `10a046f`; about half an hour on 16
+cores):
 
 ```sh
 cargo run --release --example fit -- 60000 20261119
 ```
 
-## 數據
+## Data
 
-「分」是該項加 1 時得分的變化；「以 32 計」把同一列換算成 `hu` = 32 的單位，
-可以直接和手調權重比。
+"Points" is the change in score when the term goes up by 1; "at 32" converts
+the same row to units where `hu` = 32, to compare directly with the
+hand-tuned weights.
 
-### 手牌擬合，整局（3,471,684 筆）
+### The hand fit, whole round (3,471,684 records)
 
-| 項 | 手調 | 分 | ± | 以 32 計 | ± |
+| Term | Hand-tuned | Points | ± | At 32 | ± |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 常數 | | −17.948 | 0.272 | | |
-| 亮出的胡數 | 32 | 0.987 | 0.026 | 22.95 | 0.59 |
+| Constant | | −17.948 | 0.272 | | |
+| Exposed 胡 | 32 | 0.987 | 0.026 | 22.95 | 0.59 |
 | `hu` | 32 | 1.377 | 0.032 | 32.00 | 0.73 |
 | `loose` | −128 | −2.192 | 0.048 | −50.95 | 1.12 |
 | `short` | −64 | −0.775 | 0.025 | −18.01 | 0.58 |
@@ -84,18 +105,18 @@ cargo run --release --example fit -- 60000 20261119
 | `kept` | 1 | 0.087 | 0.004 | 2.03 | 0.08 |
 | `lonely` | −1 | −0.055 | 0.005 | −1.28 | 0.12 |
 | `waits` | 8 | 1.111 | 0.008 | 25.83 | 0.18 |
-| 牌堆張數 | | 0.005 | 0.009 | | |
-| 沒看過的牌數 | | 0.241 | 0.008 | | |
-| 對手最少暗牌 | | 0.146 | 0.021 | | |
-| 對手亮出的胡數 | | −0.297 | 0.008 | | |
+| Cards in the pile | | 0.005 | 0.009 | | |
+| Cards not seen | | 0.241 | 0.008 | | |
+| Fewest concealed cards of an opponent | | 0.146 | 0.021 | | |
+| Opponents' exposed 胡 | | −0.297 | 0.008 | | |
 
-### 手牌擬合，依牌堆剩餘張數（以 32 計）
+### The hand fit, by cards left in the pile (at 32)
 
-| 項 | 手調 | 23 張以上 | 14–22 張 | 13 張以下 |
+| Term | Hand-tuned | 23 cards or more | 14–22 cards | 13 cards or fewer |
 | --- | ---: | ---: | ---: | ---: |
-| 筆數 | | 2,809,328 | 597,808 | 64,548 |
-| `hu` 值幾分 | | 1.365 ± 0.034 | 1.384 ± 0.042 | 1.010 ± 0.102 |
-| 亮出的胡數 | 32 | 23.03 ± 0.71 | 24.48 ± 0.94 | 25.96 ± 3.03 |
+| Records | | 2,809,328 | 597,808 | 64,548 |
+| Points `hu` is worth | | 1.365 ± 0.034 | 1.384 ± 0.042 | 1.010 ± 0.102 |
+| Exposed 胡 | 32 | 23.03 ± 0.71 | 24.48 ± 0.94 | 25.96 ± 3.03 |
 | `loose` | −128 | −54.56 ± 1.29 | −37.63 ± 1.29 | −26.99 ± 3.84 |
 | `short` | −64 | −18.66 ± 0.64 | −16.52 ± 0.77 | −11.12 ± 2.33 |
 | `own` | 2 | −1.60 ± 0.42 | −0.19 ± 0.33 | 1.47 ± 1.94 |
@@ -103,14 +124,15 @@ cargo run --release --example fit -- 60000 20261119
 | `lonely` | −1 | −1.30 ± 0.12 | −2.35 ± 0.23 | −2.45 ± 0.57 |
 | `waits` | 8 | 25.96 ± 0.26 | 28.60 ± 0.15 | 34.64 ± 1.24 |
 
-八成的樣本落在牌堆 23 張以上：一局平均約 14.5 次棄牌，而吃碰之後不摸牌
-就出牌，牌堆不會跟著減少。
+80% of the samples fall at 23 cards or more in the pile: a round averages
+about 14.5 discards, and after a claim the seat discards without drawing, so
+the pile does not go down with them.
 
-### 選擇擬合
+### The choice fit
 
-| 項 | 手調 | 全部選擇：分 | ± | 以 32 計 | ± | 落後 64 以內：分 | ± |
+| Term | Hand-tuned | All choices: points | ± | At 32 | ± | Within 64 behind: points | ± |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 筆數 | | 949,096 | | | | 273,302 | |
+| Records | | 949,096 | | | | 273,302 | |
 | `hu` | 32 | 1.423 | 0.046 | 32.00 | 1.04 | −0.140 | 0.300 |
 | `loose` | −128 | −1.985 | 0.068 | −44.65 | 1.53 | −2.998 | 0.677 |
 | `short` | −64 | −0.468 | 0.029 | −10.52 | 0.65 | −0.821 | 0.350 |
@@ -119,94 +141,120 @@ cargo run --release --example fit -- 60000 20261119
 | `lonely` | −1 | −0.016 | 0.007 | −0.36 | 0.16 | −0.019 | 0.014 |
 | `waits` | 8 | 1.060 | 0.021 | 23.83 | 0.48 | 1.684 | 0.114 |
 
-落後 64 以內的選擇幾乎不改變 `hu`，所以那一欄的 `hu` 定不出來，也就不能
-換算成以 32 計。改以 `loose` = −128 為單位，`kept` 是 8.4、`waits` 是 72、
-`short` 是 −35、`own` 是 2.3、`lonely` 是 −0.8。
+Choices within 64 behind hardly change `hu`, so the `hu` of that column
+cannot be pinned down, and the column cannot be converted to 32 either.  In
+units where `loose` = −128 instead, `kept` is 8.4, `waits` is 72, `short` is
+−35, `own` is 2.3 and `lonely` is −0.8.
 
-### 其他選擇比 bot 的選擇差多少
+### How much worse the other choices are than the bot's
 
-| 評分落後 | 選擇數 | 得分差（分） | ± |
+| Grade behind | Choices | Score difference (points) | ± |
 | --- | ---: | ---: | ---: |
 | 0 | 23,906 | +0.086 | 0.116 |
-| 0 到 16 | 174,606 | −0.463 | 0.084 |
-| 16 到 64 | 74,790 | −2.604 | 0.126 |
-| 64 到 256 | 317,996 | −3.118 | 0.058 |
-| 256 以上 | 357,798 | −8.709 | 0.082 |
+| 0 to 16 | 174,606 | −0.463 | 0.084 |
+| 16 to 64 | 74,790 | −2.604 | 0.126 |
+| 64 to 256 | 317,996 | −3.118 | 0.058 |
+| 256 or more | 357,798 | −8.709 | 0.082 |
 
-## 用在 bot 上的結果
+## Results in the bot
 
-三次都以 `10a046f` 為對照，各 200,000 局，局數在跑之前定下，seed base 各自
-取當時的時鐘。
+All three take `10a046f` as the control, 200,000 deals each, the deal count
+set before the run and each seed base the clock at that moment.
 
-| 做法 | seed base | 不同的局數 | 得分差（分／局） | 95% CI | 結論 |
+| Trial | seed base | Deals that differ | Score difference (points a deal) | 95% CI | Verdict |
 | --- | ---: | ---: | ---: | --- | --- |
-| 手牌擬合的全部權重 | 1794819512 | 59,981 | −0.005 ± 0.034 | [−0.071, +0.060] | 不明 |
-| 只把 `WAIT` 從 8 改成 24 | 1794820392 | 2,221 | +0.002 ± 0.007 | [−0.012, +0.017] | 不明 |
-| 選擇擬合（落後 64 以內）：`kept` 的權重 ×8、`WAIT` 72 | 1794822233 | 35,378 | −0.070 ± 0.025 | [−0.120, −0.021] | loss |
+| Every weight of the hand fit | 1794819512 | 59,981 | −0.005 ± 0.034 | [−0.071, +0.060] | insufficient data |
+| Only `WAIT` changed from 8 to 24 | 1794820392 | 2,221 | +0.002 ± 0.007 | [−0.012, +0.017] | insufficient data |
+| The choice fit (within 64 behind): the weight of `kept` ×8, `WAIT` 72 | 1794822233 | 35,378 | −0.070 ± 0.025 | [−0.120, −0.021] | loss |
 
-第一種做法的權重（以 32 計）：`hu` 32、`loose` −49、`short` −17、`own` −2、
-`kept` 2、`lonely` −1、`waits` 25，亮出的胡數 23。取自同一份擬合跑 200,000 局
-的結果，和上表在誤差內相同。
+The weights of the first trial (at 32): `hu` 32, `loose` −49, `short` −17,
+`own` −2, `kept` 2, `lonely` −1, `waits` 25, exposed 胡 23.  They come from
+the same fit run over 200,000 rounds, and equal the table above within the
+errors.
 
-第三種做法取自選擇擬合右邊那一欄，以 `loose` = −128 換算後與手調明顯不同的
-兩項。
+The third trial takes, from the right-hand column of the choice fit, the two
+terms that differ clearly from the hand-tuned ones once converted at
+`loose` = −128.
 
-### 第三種做法輸在哪裡
+### Where the third trial loses
 
-重跑同一批牌局的前 60,000 局（seed base 1794822233），依候選 bot 與對照第一次
-做出不同決定的地方分類。這 60,000 局合計 −8,815 分。「放銃」含自己摸出的牌
-讓別家胡。
+The first 60,000 of the same deals were run again (seed base 1794822233) and
+sorted by where the candidate bot and the control first decide differently.
+These 60,000 deals come to −8,815 points in all.  "Deals in" includes
+another seat winning on a card the seat itself drew.
 
-| 第一個分歧 | 局數 | 得分差合計 | 每局 | ± |
+| First split | Deals | Total score difference | A deal | ± |
 | --- | ---: | ---: | ---: | ---: |
-| 棄牌：聽牌張數不同 | 285 | +224 | +0.79 | 1.69 |
-| 棄牌：散牌數或胡數不同 | 4,178 | −2,496 | −0.60 | 0.26 |
-| 棄牌：只有 `kept`、`own`、`lonely` 不同 | 2,781 | −344 | −0.12 | 0.39 |
-| 吃碰：候選吃碰，對照不要 | 4,324 | −3,205 | −0.74 | 0.31 |
-| 吃碰：候選不要，對照吃碰 | 6,708 | −3,027 | −0.45 | 0.26 |
-| 吃碰：吃成不同的牌組 | 1,197 | +33 | +0.03 | 0.49 |
+| Discard: the cards waited on differ | 285 | +224 | +0.79 | 1.69 |
+| Discard: the loose cards or the 胡 differ | 4,178 | −2,496 | −0.60 | 0.26 |
+| Discard: only `kept`, `own`, `lonely` differ | 2,781 | −344 | −0.12 | 0.39 |
+| Claim: the candidate claims, the control declines | 4,324 | −3,205 | −0.74 | 0.31 |
+| Claim: the candidate declines, the control claims | 6,708 | −3,027 | −0.45 | 0.26 |
+| Claim: a different meld eaten | 1,197 | +33 | +0.03 | 0.49 |
 
-| 候選那一家的結果 | 對照 | 候選 |
+| Outcome for the candidate's seat | Control | Candidate |
 | --- | ---: | ---: |
-| 自己胡 | 4,029 | 3,851 |
-| 放銃 | 4,220 | 4,174 |
-| 別家胡，不是自己放銃 | 10,417 | 10,672 |
-| 流局或相公 | 807 | 776 |
+| Wins itself | 4,029 | 3,851 |
+| Deals in | 4,220 | 4,174 |
+| Another seat wins, not dealt in by this seat | 10,417 | 10,672 |
+| Exhausted round or 相公 | 807 | 776 |
 
-擬合用的資料是「牌組相同、只差在留哪張散牌」的棄牌，權重用在那裡沒有可見的
-差別（−0.12 ± 0.39）。輸的是它沒看過的決定：為了留搭子而拆牌組，以及吃碰
-與不吃碰之間的取捨。搭子的權重放大八倍之後，這些決定跟著改，自己胡的次數
-少了 4%。
+The data the fit used are discards "with the same melds, differing only in
+which loose card is kept", and there the weights make no visible difference
+(−0.12 ± 0.39).  What loses is the decisions it never saw: breaking a meld
+to keep a 搭子, and the choice between claiming and not claiming.  With the
+weight of a 搭子 made eight times as large, these decisions change with it,
+and the seat's own wins fall by 4%.
 
-## 怎麼讀
+## How to read it
 
-- **匯率是 1 胡約 1.4 分。** 贏家向三家各收自己的胡數，所以胡的那一刻 1 胡
-  值 3 分；手上的 1 胡還沒兌現，折下來是 1.4 分。牌堆剩 13 張以下時降到
-  1.0 分。
-- **路線一當初把防守估得太貴，不是太便宜。** 「放銃賠 12 分」換成評分是
-  8.5 × 32，不是當時用的 12 × 32。那次實驗輸在躲掉的銃多半換別人放，把懲罰
-  調小只會更接近不改。
-- **權重差兩三倍，強度看不出差別。** 評分只用來在同一手牌的幾個選擇之間
-  排序。大多數決策裡，最好的選擇在兩組權重下是同一個；第一次實驗裡打法
-  不同的那 30% 牌局，兩邊互有輸贏。
-- **擬合說「散牌太貴」，其實是評分的彎曲。** 「其他選擇」那張表裡，落後
-  16 到 64 少 2.6 分，落後 256 以上才少 8.7 分。線性模型只能用一條斜率
-  去配，於是把大差距的項（散牌、門檻）壓低，把小差距的項（搭子、聽牌）
-  抬高。
-- **bot 的排序在細處也是對的。** 落後不到 16 的選擇平均就少 0.46 分。要
-  贏過它，得找出「哪些」落後的選擇其實比較好，而這七項的線性組合找不到。
-- **在一種決定上擬合的權重，不能搬到另一種決定上。** 評分的同一組權重同時
-  管棄牌、拆牌組與吃碰。只看相近棄牌擬合出來的搭子權重，用在吃碰上就輸了。
+- **The exchange rate is about 1.4 points for 1 胡.**  The winner collects
+  its 胡 from each of the three seats, so at the moment of winning 1 胡 is
+  worth 3 points; 1 胡 in hand is not yet cashed, and discounts to 1.4
+  points.  With 13 cards or fewer left in the pile it falls to 1.0 points.
+- **Route 1 priced defence too dear at the time, not too cheap.**  "Dealing
+  in costs 12 points" is 8.5 × 32 in the grade, not the 12 × 32 used then.
+  That experiment lost because the deal-ins it dodged were mostly dealt by
+  someone else instead; a smaller penalty would only come closer to no
+  change.
+- **Weights two or three times apart show no difference in strength.**  The
+  grade only serves to order the few choices of one hand.  In most
+  decisions the best choice is the same under both sets of weights; in the
+  30% of deals of the first experiment where play differed, each side won
+  some and lost some.
+- **The fit says "loose cards are too dear"; it is really the bend of the
+  grade.**  In the "other choices" table, 16 to 64 behind loses 2.6 points,
+  and only 256 or more behind loses 8.7.  A linear model has a single slope
+  to fit with, so it pushes down the terms of large gaps (loose cards, the
+  threshold) and lifts those of small gaps (搭子, waiting).
+- **The bot's ordering is right in the fine detail too.**  Choices less than
+  16 behind already score 0.46 points less on average.  To beat it one has
+  to find "which" of the choices behind are in fact better, and a linear
+  combination of these seven terms cannot.
+- **Weights fitted on one kind of decision do not carry over to another.**
+  The grade's one set of weights governs discards, breaking melds and claims
+  alike.  The weight of a 搭子 fitted on close discards alone loses when
+  used on claims.
 
-## 限制
+## Caveats
 
-- **對手是同一個 bot。** 得分與選擇的好壞都是對 `HeuristicBot` 量的。
-- **線性模型。** 項與項之間的交互作用（例如聽牌時散牌的價值）沒有放進去。
-- **選擇擬合每個選擇只打一次。** 所以它量得到平均，量不到「這一個決策裡
-  哪個選擇最好」；也只看棄牌，沒有看吃碰。
-- **第一次 A/B 的標準誤是 0.034。** 30% 的牌局不同，雜訊跟著變大；要把它
-  壓到 0.01 需要約 230 萬局。±0.07 分以內的差別這次看不到。
-- **分類用的是前 60,000 局。** 這一段的得分差（每局 −0.147）比全部 200,000
-  局的 −0.070 低，各類的正負在誤差內，只有「拆牌組」與兩類吃碰明顯為負。
-- **隨局勢變的權重沒有試。** 依牌堆分段的擬合顯示散牌越到後面越便宜、
-  聽牌越貴，但整組權重換掉都看不出差別，分段的版本需要更多局才分得出來。
+- **The opponents are the same bot.**  Both the scores and how good a choice
+  is were measured against `HeuristicBot`.
+- **A linear model.**  Interactions between terms (for example what a loose
+  card is worth while waiting) are not in it.
+- **The choice fit plays each choice out once.**  So it can measure the
+  average, but not "which choice is best in this one decision"; it also
+  looks at discards only, not at claims.
+- **The standard error of the first A/B is 0.034.**  30% of deals differ,
+  and the noise grows with them; bringing it down to 0.01 would take about
+  2.3 million deals.  A difference within ±0.07 points cannot be seen this
+  time.
+- **The sorting uses the first 60,000 deals.**  The score difference of this
+  stretch (−0.147 a deal) is lower than the −0.070 of all 200,000 deals; the
+  signs of the classes are within the errors, and only "breaking melds" and
+  the two classes of claims are clearly negative.
+- **Weights that change with the state of the round were not tried.**  The
+  fit by stretches of the pile shows loose cards getting cheaper and waiting
+  dearer the later it gets, but replacing the whole set of weights already
+  shows no difference, and a version by stretches would need more deals to
+  tell apart.

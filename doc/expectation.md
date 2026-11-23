@@ -1,199 +1,257 @@
-# 單人期望值的動態規劃：設計
+# Dynamic programming for the single-player expectation: design
 
-寫於 2026-11-18，基準 `7034b41`。這份文件接手 `doc/stronger-bot.md` 路線三：
-核心是一個算「這一手牌還值幾分」的動態規劃，只在手牌短的時候開；應用一個
-一個掛上去，各自有閘門。批次 1 的核心在 `src/expect.rs`；下面的成本除了
-註明「量過」的都是估計。
+Written 2026-11-18, base `7034b41`.  This document takes over route 3 of
+`doc/stronger-bot.md`: the core is a dynamic programming that reckons how
+many points a hand is still worth, switched on only when the hand is short;
+applications hang on it one by one, each with its own gate.  The core of
+batch 1 is in `src/expect.rs`; the costs below are estimates except where
+marked "measured".
 
-## 要回答的問題
+## The questions to answer
 
-暗牌 10 張以下時，`MonteCarloBot` 用 128 個樣本搜尋，每個決定 0.9 秒，
-贏 `HeuristicBot` +0.070 ± 0.026 分／局（`research/gated-monte-carlo.md`）。
-同一個區段，一手牌到得了的子手牌只有幾百到幾千個（`research/dp-nodes.md`）。
-把它們全部算完的動態規劃：
+With 10 concealed cards or fewer, `MonteCarloBot` searches with 128 samples
+at 0.9 seconds a decision and beats `HeuristicBot` by +0.070 ± 0.026 points
+a deal (`research/gated-monte-carlo.md`).  In the same range a hand can
+reach only a few hundred to a few thousand sub-hands
+(`research/dp-nodes.md`).  For a dynamic programming that works through all
+of them:
 
-1. 每個決定要幾毫秒？
-2. 贏不贏 `HeuristicBot`？贏的話，和 +0.070 比起來如何？
-3. 核心算出來的東西，還有哪些地方用得上？
+1. How many milliseconds does a decision take?
+2. Does it beat `HeuristicBot`?  If so, how does it compare with +0.070?
+3. Where else can what the core computes be used?
 
-## 進度
+## Progress
 
-每一批大約是一個 session。做完一批就更新這張表。
+Each batch is about one session.  Update this table when a batch is done.
 
-| 批次 | 產出 | 改變打法 | 閘門 | 狀態 |
+| Batch | Output | Changes play | Gate | Status |
 | --- | --- | --- | --- | --- |
-| 0 | 這份文件 | 否 | 無 | 完成 |
-| 1 | 核心：圖、掃描、測試、計時 | 否，要量到零分歧 | 測試全過；10 張平均 50 毫秒以內 | 完成：14 毫秒 |
-| 2 | 牌桌模型的四個常數，從自對局量 | 否 | 預測的胡牌率對得上實際的（見「校準」） | 完成：偏高，由 h 解釋 |
-| 3 | `ExpectBot`，10 張的閘門，A/B | 候選 | win 才 commit | 完成：win，+0.076 |
-| 4 | 應用，見下表 | 各自 | 批次 3 是 win | 進行中：B 完成，win，+0.047；C 的提示換成 `ExpectBot`，閘門內標點數；D 本機開到 14 張，win，+0.132；D2 停掉 |
+| 0 | This document | No | None | Done |
+| 1 | The core: graph, sweep, tests, timing | No, and zero deals that part must be measured | All tests pass; 10 cards average within 50 ms | Done: 14 ms |
+| 2 | The table model's four constants, measured from self-play | No | The predicted win rate matches the actual (see "Calibration") | Done: high, explained by h |
+| 3 | `ExpectBot`, a 10-card gate, A/B | Candidate | Commit only on a win | Done: win, +0.076 |
+| 4 | Applications, see the table below | Each its own | Batch 3 is a win | In progress: B done, win, +0.047; C's hint changed to `ExpectBot`, marking points inside the gate; D, the desktop opened to 14 cards, win, +0.132; D2 stopped |
 
-批次 1 的 50 毫秒是預先宣告的：普查 10 張是 11 毫秒，核心若慢過它五倍，
-表示下面的成本估計錯了，要先弄清楚再往下做。
+Batch 1's 50 ms was declared beforehand: the census takes 11 ms at 10 cards,
+and a core more than five times slower would mean the cost estimates below
+are wrong and must be understood before going on.
 
-批次 1 量到（`research/dp-nodes.md`「一個決定的圖」，200 局，seed 2）：
-打掉之後 10 張的一個打牌決定，從每一張能打的牌建一張共用的圖，建圖 13.0
-毫秒、掃描 0.9 毫秒；12 張 52 毫秒，13 張 132 毫秒。閘門過了，所以四個常數
-可以開始量。`ab/run.sh 200000`（seed base 1794971744，對照 `7d3157a`）讀到
-0 局分歧：沒有 bot 呼叫這個模組。
+Batch 1 measured (`research/dp-nodes.md`, "The graph of one decision", 200
+rounds, seed 2): for a discard decision that leaves 10 cards, one shared
+graph built from every card that may be discarded takes 13.0 ms to build and
+0.9 ms to sweep; 12 cards take 52 ms and 13 cards 132 ms.  The gate is
+passed, so measuring the four constants can begin.  `ab/run.sh 200000` (seed
+base 1794971744, control `7d3157a`) reads 0 deals that part: no bot calls
+this module.
 
-批次 2 量到（`research/outlook.md`，`HeuristicBot` 自對局，常數 10,000 局
-seed 20，校準 10,000 局 seed 21）：h 與每摸一張的公開牌數都隨牌堆變很多
-（h 0.018 到 0.12，牌數 3.2 到 1.3），所以兩者都成了依還能摸幾張的表；
-e 0.277、L −12.3、將帥 0.216。預測的胡牌率十組裡九組偏高，整體 0.382 對
-0.291，形狀是單調的。一次改一個常數（seed 23），h × 1.5 讓整體變成 0.306
-對 0.290、低的四組進區間，e 與牌數都只動一點：偏差有方向，由 h 解釋，閘門
-過了。`Outlook::default()` 仍是量到的值；h 的倍數是批次 3 的一個問題。`ab/run.sh 200000`
-（seed base 1794984588，對照 `c0aea83`）讀到 0 局分歧。
+Batch 2 measured (`research/outlook.md`, `HeuristicBot` self-play, constants
+over 10,000 rounds at seed 20, calibration over 10,000 rounds at seed 21): h
+and the public cards a draw both change a lot with the pile (h 0.018 to
+0.12, the cards 3.2 to 1.3), so both became tables by draws left; e 0.277,
+L −12.3, generals (將帥) 0.216.  The predicted win rate is high in nine bins
+of ten, 0.382 against 0.291 overall, and its shape is monotonic.  Changing
+one constant at a time (seed 23), h × 1.5 brings the whole to 0.306 against
+0.290 and the four low bins inside their intervals, while e and the cards
+each move it only a little: the bias has a direction and h explains it, so
+the gate is passed.  `Outlook::default()` is still the measured values; the
+multiplier of h is a question for batch 3.  `ab/run.sh 200000` (seed base
+1794984588, control `c0aea83`) reads 0 deals that part.
 
-批次 3 量到（對照 `b920a26`，`RESHUFFLE=8`，各 100,000 局，宣告見「A」）：
-量到的 h 是 +0.071 ± 0.008 分／局，95% CI [+0.055, +0.087]，7,526 局分歧；
-h × 1.5 是 +0.076 ± 0.008，[+0.060, +0.093]，7,631 局分歧。兩組都是 win，
-兩者差 0.005，差的標準誤約 0.011，在誤差內。照宣告用點估計高的那一個：
-`ExpectBot::new` 的 h 是量到的 × 1.5（`END_SCALE`）。和設閘門的 Monte Carlo
-的 +0.070 ± 0.026 一樣大，每個決定卻是十幾毫秒對 0.9 秒。
+Batch 3 measured (control `b920a26`, `RESHUFFLE=8`, 100,000 deals each,
+declared under "A"): the measured h is +0.071 ± 0.008 points a deal, 95% CI
+[+0.055, +0.087], 7,526 deals part; h × 1.5 is +0.076 ± 0.008,
+[+0.060, +0.093], 7,631 deals part.  Both are wins; they differ by 0.005,
+and the standard error of the difference is near 0.011, so it is within the
+error.  As declared, the one with the higher point estimate is used: the h
+of `ExpectBot::new` is the measured one × 1.5 (`END_SCALE`).  That is as
+large as the gated Monte Carlo's +0.070 ± 0.026, yet a decision takes a
+dozen or so milliseconds against 0.9 seconds.
 
-## 模型
+## The model
 
-### 為什麼單人算得動
+### Why single-player is tractable
 
-摸到的牌不進手：它翻開給大家看，沒人要就進棄牌堆。暗牌只在吃、碰、槓時
-變，每次少三張或四張（含打掉的一張）。所以從我的位置看，一局是一串公開的
-牌，每一張我只有三種回應：胡（強制）、拿下來再打一張、放過。
+A drawn card does not enter the hand: it is turned face up for everyone, and
+goes to the discards if nobody wants it.  The concealed cards change only on
+an eat, a pong or a kong, by three or four fewer each time (counting the
+card then discarded).  So from my seat a round is a string of public cards,
+and to each I have only three responses: win (compulsory), take it and
+discard a card, or pass.
 
-暗牌張數加亮出的張數永遠是 20（輪到自己打牌時是 21），所以狀態只要兩項：
+The concealed cards plus the exposed cards always number 20 (21 when it is
+my turn to discard), so the state needs only two things:
 
-**狀態 s =（暗牌，亮出的牌組合計幾胡）**
+**State s = (the concealed cards, the total 胡 of the exposed melds)**
 
-同一手暗牌可以從不同的牌組走到，胡數不同，所以暗牌本身不夠；亮出的張數由
-暗牌張數決定，不必另外記。這就是 `examples/nodes.rs` 普查的節點。
+The same concealed cards can be reached through different melds with
+different 胡, so the concealed cards alone are not enough; the count of
+exposed cards follows from the count of concealed ones and need not be kept.
+These are the nodes that `examples/nodes.rs` takes a census of.
 
-### 每一張公開的牌我能做什麼
+### What I can do with each public card
 
-| 牌的來源 | 胡、槓、碰 | 吃 |
+| Where the card comes from | Win, kong, pong | Eat |
 | --- | --- | --- |
-| 我摸的 | 可以 | 可以；將帥必須吃 |
-| 上家摸的 | 可以 | 上家不吃才輪到我；將帥不行 |
-| 上家打的 | 可以 | 可以；將帥沒有人打 |
-| 另外兩家摸的、打的 | 可以 | 不行 |
+| My draw | Yes | Yes; a general must be eaten |
+| The previous seat's draw | Yes | Only if the previous seat does not eat it; not a general |
+| The previous seat's discard | Yes | Yes; nobody discards a general |
+| The other two seats' draws and discards | Yes | No |
 
-胡與槓是強制的，`Round::resolve` 在問任何人之前就處理掉。碰不會有人搶：
-一種牌只有四張。吃會被別家的碰蓋過，上家摸的牌上家先吃。
+Winning and konging are compulsory, and `Round::resolve` deals with them
+before anyone is asked.  Nobody contests a pong: there are only four of a
+card.  An eat is overridden by another seat's pong, and the previous seat
+eats its own draw first.
 
-### 遞迴
+### The recursion
 
-t 是這一局還會出現幾張公開的牌，V(s, t) 是這個狀態值幾分：
+t is how many public cards are still to come this round, and V(s, t) how
+many points this state is worth:
 
-**V(s, t) = h · L +（1 − h）· Σ p(c) ·［e(c) · 能吃時最好的回應 +（1 − e(c)）· 不能吃時最好的回應］**
+**V(s, t) = h · L + (1 − h) · Σ p(c) · [e(c) · the best response when I may eat + (1 − e(c)) · the best response when I may not]**
 
 **V(s, 0) = 0**
 
-- **p(c)** 是下一張公開的牌是 c 的機率：c 在 `live` 裡的張數除以 `live` 的
-  總張數。`live` 是我沒看過的牌，算法與 `HeuristicBot::start` 相同，在根
-  節點固定。
-- **e(c)** 是這張牌輪得到我吃的機率。將帥只有自己摸到才吃得到，另一個值。
-- **h** 是這張牌出現之前、別家先結束這一局的機率，**L** 是那時我付的分
-  （負的）。兩者都可以隨 t 與別家的暗牌張數變。
-- **回應**，依序：
-  1. 能胡：3 × 胡數，到此為止。判定與 `Round::win` 相同。
-  2. 手上有三張：槓，強制。
-  3. 否則在「放過」、「碰」與（能吃時）每一種吃法之間取最大。自己摸到的
-     將帥不能放過。
-  4. 拿下來之後打哪一張也取最大：max V(s′ − d, t − 1)，d 不能是剛拿的那張
-     與將帥（`discardable`）。沒有牌可打是相公，−3 × 門檻。
-  5. 放過是 V(s, t − 1)。
-- **剪枝。** `ceiling(generals = 1)` 到不了門檻的狀態不展開，全部併成一個
-  「不會胡了」的節點 D：D(t) = h · L +（1 − h）· D(t − 1)。
+- **p(c)** is the probability that the next public card is c: the copies of
+  c in `live` over the total of `live`.  `live` is the cards I have not
+  seen, reckoned as in `HeuristicBot::start` and fixed at the root.
+- **e(c)** is the probability that the card comes to me to eat.  A general
+  can be eaten only when I draw it myself, which is another value.
+- **h** is the probability that another seat ends the round before this card
+  appears, and **L** the points I then pay (negative).  Both may vary with t
+  and with the other seats' counts of concealed cards.
+- **The response**, in order:
+  1. I can win: 3 × the 胡, and it ends there.  The test is that of
+     `Round::win`.
+  2. I hold three of it: kong, compulsory.
+  3. Otherwise the maximum over passing, ponging and (when I may eat) every
+     way of eating.  A general I draw myself cannot be passed.
+  4. Which card to discard after taking it is a maximum too:
+     max V(s′ − d, t − 1), where d may be neither the card just taken nor a
+     general (`discardable`).  Having no card to discard is a 相公,
+     −3 × the threshold.
+  5. Passing is V(s, t − 1).
+- **Pruning.**  States whose `ceiling(generals = 1)` falls short of the
+  threshold are not expanded but all merged into one node D that "will not
+  win any more": D(t) = h · L + (1 − h) · D(t − 1).
 
-報酬照 `Game::settle`：我胡，三家各付我胡數；別家胡，我付他的胡數，不管是
-誰放的；流局是 0。所以單位是分，和 A/B 量的是同一個東西。
+The payoff follows `Game::settle`: when I win, each of the three seats pays
+me my 胡; when another seat wins, I pay its 胡, whoever dealt in; an
+exhausted round is 0.  So the unit is points, the same thing the A/B
+measures.
 
-### 圖只建一次
+### The graph is built only once
 
-每一條邊都剛好用掉一張公開的牌，所以 V(·, t) 只看 V(·, t − 1)：
+Every edge uses up exactly one public card, so V(·, t) looks only at
+V(·, t − 1):
 
-1. **建圖**，每個決定一次。從根廣度優先，把節點編號，邊存成扁平的陣列：
-   節點 →（牌 c，胡的分數或槓）→ 碰的子節點、吃的子節點。子節點是
-   「拿下來再打一張」之後的狀態。
-2. **掃描**，t 從 1 到 T。每一輪把整個邊陣列走一遍，只有加法、乘法與取
-   最大，兩個長度等於節點數的陣列輪流當 t 與 t − 1。
+1. **Build the graph**, once a decision.  Breadth first from the roots,
+   numbering the nodes and storing the edges in flat arrays:
+   node → (card c, the points of a win or a kong) → the children by pong,
+   the children by eat.  A child is the state after taking the card and
+   discarding one.
+2. **Sweep**, t from 1 to T.  Each pass walks the whole edge array once with
+   nothing but additions, multiplications and maxima, two arrays as long as
+   the node count taking turns as t and t − 1.
 
-貴的是建圖（`ceiling`、`locked_completions`、雜湊表），普查量到的就是它。
-掃描是 邊數 × T 次浮點運算，T 至多幾十：
+The dear part is building the graph (`ceiling`, `locked_completions`, the
+hash table), and that is what the census measured.  The sweep is
+edges × T floating-point operations, with T a few dozen at most:
 
-| 暗牌 | 節點（量過） | 邊（量過） | 建圖（量過，普查） | 掃描，T = 25（估計） |
+| Concealed cards | Nodes (measured) | Edges (measured) | Build (measured, census) | Sweep, T = 25 (an estimate) |
 | ---: | ---: | ---: | ---: | ---: |
-| 10 | 6 × 10² | 1.5 × 10⁴ | 11 毫秒 | 4 × 10⁵ 次運算 |
-| 12 | 2.0 × 10³ | 5.8 × 10⁴ | 41 毫秒 | 1.5 × 10⁶ 次 |
-| 13 | 5.4 × 10³ | 2.1 × 10⁵ | 114 毫秒 | 5 × 10⁶ 次 |
-| 20 | 7.0 × 10⁵ | 5.8 × 10⁷ | 22 秒 | 用不起 |
+| 10 | 6 × 10² | 1.5 × 10⁴ | 11 ms | 4 × 10⁵ operations |
+| 12 | 2.0 × 10³ | 5.8 × 10⁴ | 41 ms | 1.5 × 10⁶ operations |
+| 13 | 5.4 × 10³ | 2.1 × 10⁵ | 114 ms | 5 × 10⁶ operations |
+| 20 | 7.0 × 10⁵ | 5.8 × 10⁷ | 22 s | Unaffordable |
 
-所以 `research/dp-nodes.md` 說的「剩幾次機會是個約 60 的乘數」只乘在掃描
-上，不乘在建圖上。批次 1 量過：掃描是建圖的 6% 到 9%。
+So what `research/dp-nodes.md` calls "the chances left are a multiplier of
+about 60" multiplies only the sweep, not the build.  Batch 1 measured it:
+the sweep is 6% to 9% of the build.
 
-### 根節點
+### The root
 
-根用的是實際的局面，不是模型：`ClaimOptions` 已經說了這張牌我能不能吃、
-能不能碰，`View::locked` 說了哪一張不能打。
+The root uses the actual position, not the model: `ClaimOptions` already
+says whether I may eat or pong this card, and `View::locked` which card may
+not be discarded.
 
-- **打牌：** 每一張能打的牌 d，值是 V(手 − d, T)。
-- **吃碰：** 放過是 V(手, T)；每一種吃碰是它之後最好的那一張棄牌的值。
-- **T** 由牌堆算：還能摸的張數是 `pile_len − Rules::dead()`，每一段（一次摸牌
-  與它之前的棄牌）的公開牌數照表加起來，減掉正在決定的那一張。
+- **Discarding:** each card d that may be discarded is worth V(hand − d, T).
+- **Eating and ponging:** passing is V(hand, T); each eat or pong is worth
+  the value of the best discard after it.
+- **T** is reckoned from the pile: the draws left are
+  `pile_len − Rules::dead()`, and the public cards of each segment (a draw
+  and the discards before it) are added up from the table, less the card
+  being decided on.
 
-### 牌桌模型：四個常數
+### The table model: four constants
 
-別家的一切都收在這裡。全部從 `HeuristicBot` 自對局量，用固定的 seed，
-不在 A/B 的牌上調；量的工具是一個 example，數字進 `research/`。
+Everything about the other seats is folded in here.  All of it is measured
+from `HeuristicBot` self-play on fixed seeds, never tuned on the deals of an
+A/B; the tool that measures is an example, and the numbers go into
+`research/`.
 
-| 常數 | 意思 | 第一版 | 量到的（批次 2） |
+| Constant | Meaning | First version | Measured (batch 2) |
 | --- | --- | --- | --- |
-| h | 每張公開的牌之前，別家結束這一局的機率 | 依「還能摸幾張」分段的表 | 表，0.018 到 0.12 |
-| L | 別家胡時我付的分 | 一個數：別家胡牌的平均胡數，取負 | −12.3 |
-| e | 公開的牌輪得到我吃的機率 | 兩個數：將帥、其他 | 0.216、0.277 |
-| 每摸一張的公開牌數 | T 的換算 | 一個數 | 也成了表，3.2 到 1.3 |
+| h | The probability, before each public card, that another seat ends the round | A table in segments by draws left | A table, 0.018 to 0.12 |
+| L | The points I pay when another seat wins | One number: the mean 胡 of the other seats' wins, negated | −12.3 |
+| e | The probability that a public card comes to me to eat | Two numbers: generals, the rest | 0.216, 0.277 |
+| Public cards a draw | The conversion to T | One number | Also became a table, 3.2 to 1.3 |
 
-`research/safe-cards.md` 量到別家的暗牌張數把被胡的機率拉開兩百倍，所以
-h 之後最該加的維度是別家最短的暗牌張數（`View::concealed_len`）。第一版
-先不加：加之前要有校準的數字說它差在這裡。
+`research/safe-cards.md` measured that the other seats' counts of concealed
+cards spread the chance of being won on two hundredfold, so the dimension h
+should gain next is the fewest concealed cards another seat holds
+(`View::concealed_len`).  The first version leaves it out: before it is
+added, calibration numbers must say that this is where the model is off.
 
-### 知道是近似的地方
+### Known approximations
 
-- **`live` 固定在根。** 同一張牌可以被要超過它剩下的張數，別家拿走的牌也
-  不會從機率裡扣掉。把 `live` 放進狀態，節點數會多幾個數量級。
-- **別家的棄牌當成均勻。** 摸的牌對我來說確實是均勻的；打出來的牌是別家
-  不要的，偏向他們用不上的牌。
-- **輪次攤平。** e 是平均值；實際上我吃碰之後下一張是下家摸的，要過兩張
-  才輪到我能吃的牌。精確的做法是把「下一張是誰的」放進時間那一維，掃描
-  貴四倍，建圖不變。
-- **我的棄牌沒有後果。** 打出去的牌可能放銃，也可能被吃碰而多出公開的牌。
-  放銃的危險度兩次實驗都沒有讓 bot 變強（`stronger-bot.md` 路線一），
-  第一版不算。
-- **`generals = 1` 的剪枝。** 要從外面來兩張將帥才到得了門檻的手被當成
-  不會胡。
-- **只看這一局。** 胡的人下一局當莊，不算。
+- **`live` is fixed at the root.**  A card can be wanted more times than it
+  has copies left, and the cards the other seats take are not deducted from
+  the probabilities.  Putting `live` in the state would multiply the nodes
+  by several orders of magnitude.
+- **The other seats' discards are taken as uniform.**  Drawn cards really
+  are uniform to me; discarded cards are what the other seats do not want,
+  skewed towards cards they have no use for.
+- **Turn order is flattened.**  e is an average; in fact after I eat or pong
+  the next card is the next seat's draw, and two cards go by before one I
+  may eat.  The exact way is to put "whose card is next" into the time
+  dimension, which makes the sweep four times as dear and leaves the build
+  as it is.
+- **My discards have no consequences.**  A discard may deal in, or may be
+  eaten or ponged and so add public cards.  The danger of dealing in did not
+  make the bot stronger in two experiments (`stronger-bot.md`, route 1), and
+  the first version leaves it out.
+- **Pruning at `generals = 1`.**  A hand that needs two generals from
+  outside to reach the threshold is taken as never winning.
+- **This round only.**  That the winner deals the next round is not counted.
 
-每一項都是一個之後可以各自 A/B 的候選，不是第一版的工作。
+Each of these is a candidate for an A/B of its own later, not work for the
+first version.
 
-## 校準
+## Calibration
 
-模型有四個常數與六個近似，A/B 只會說「贏了」或「沒贏」，不會說哪裡錯。
-所以批次 2 另外量一件不必 A/B 的事：
+The model has four constants and six approximations, and an A/B will only
+say "won" or "did not win", not where it is wrong.  So batch 2 also measures
+something that needs no A/B:
 
-- 自對局裡每個暗牌 10 張以下的決定點，記下 DP 預測的胡牌機率（同一次掃描，
-  報酬換成「胡是 1、其餘是 0」）與這一手最後有沒有胡。
-- 依預測值分十組，比較每一組的預測與實際的胡牌率。
+- At every decision point of self-play with 10 concealed cards or fewer,
+  record the chance to win the DP predicts (the same sweep, with the payoff
+  changed to 1 for a win and 0 otherwise) and whether the hand won in the
+  end.
+- Split them into ten bins by predicted value, and compare each bin's
+  predicted and actual win rates.
 
-閘門：十組都在各自的 95% 區間內，或者偏差是同一個方向而且能由某一個常數
-解釋。偏差大而且沒有方向，就先修模型，不跑批次 3。
+The gate: all ten bins lie inside their own 95% intervals, or the bias runs
+one way and one constant can explain it.  If the bias is large and has no
+direction, fix the model first and do not run batch 3.
 
-預測的機率是照 DP 自己的打法算的，量的是 `HeuristicBot` 的手，所以實際值
-會略低；要看的是形狀，不是絕對值。
+The predicted chance is reckoned by the DP's own play, while the hands
+measured are `HeuristicBot`'s, so the actual values will be a little lower;
+what to look at is the shape, not the absolute values.
 
-## 程式的形狀
+## The shape of the code
 
-一個模組 `src/expect.rs`。`Outlook`、`Graph` 與 `Payoff` 批次 1 已經寫了，
-`ExpectBot` 還是提議：
+One module, `src/expect.rs`.  `Outlook`, `Graph` and `Payoff` were written
+in batch 1; `ExpectBot` is still a proposal:
 
 ```rust
 /// The table as one seat models it: h and the public cards a draw, both by
@@ -226,253 +284,326 @@ impl ExpectBot {
 impl Strategy for ExpectBot { /* the first of each */ }
 ```
 
-- 每摸一張的公開牌數批次 2 量出來隨牌堆從 3.2 降到 1.3，所以它和 h 一樣
-  成了 `Outlook` 裡的表，`values` 收還能摸幾張，自己排出每一張牌的 h。
-- `Prune` 有兩項：天花板用幾張外來的將帥（`None` 不剪），以及
-  `research/dp-nodes.md` 的四種棄牌剪法（`Discards`）。預設是 1 張將帥、
-  不剪棄牌：10 張的閘門用不著剪，剪了每個決定約少 0.02 分。
-- `claims` 與 `discards` 的形狀照 `HeuristicBot` 的同名函式，最好的排第一，
-  所以網頁的提示換一個型別就能用，分數的單位從評分變成分。
-- 閘門照 `MonteCarloBot::gated` 的第一個條件：棄牌之後的暗牌張數。閘門外
-  回傳 `HeuristicBot` 的選擇。
-- `examples/nodes.rs` 的普查改用 `Graph::new`，同一份程式數節點也建圖。
-- `Graph` 不跨決定重用。上一個決定的圖包含這一個決定的大部分節點，但
-  `live` 變了，剪枝與機率都要重算；建圖只要十幾毫秒，不值得。
+- Batch 2 measured the public cards a draw falling with the pile from 3.2 to
+  1.3, so like h they became a table in `Outlook`; `values` takes the draws
+  left and lays out each card's h itself.
+- `Prune` has two fields: how many generals from outside the ceiling uses
+  (`None` does not prune), and the four ways of pruning discards from
+  `research/dp-nodes.md` (`Discards`).  The default is 1 general and no
+  pruning of discards: the 10-card gate has no need to prune, and pruning
+  costs about 0.02 points a decision.
+- `claims` and `discards` take the shape of `HeuristicBot`'s functions of
+  the same names, the best first, so the web page's hint works by swapping
+  one type, and the unit of its numbers goes from grade to points.
+- The gate follows the first condition of `MonteCarloBot::gated`: the count
+  of concealed cards after the discard.  Past the gate it returns
+  `HeuristicBot`'s choice.
+- The census in `examples/nodes.rs` now uses `Graph::new`, so the same code
+  counts the nodes and builds the graph.
+- A `Graph` is not reused across decisions.  The graph of the last decision
+  holds most of this decision's nodes, but `live` has changed, and both the
+  pruning and the probabilities must be redone; a build takes only a dozen
+  or so milliseconds, so it is not worth it.
 
-### 測試
+### Tests
 
-`src/expect.rs` 的測試，批次 1：
+The tests in `src/expect.rs`, batch 1:
 
-- **算得出來的手。** 聽一種牌、`live` 裡有 k 張、總共 n 張、h = 0：
-  V = 3 × 胡數 ×（1 −（1 − k∕n）ᵗ）。
-- **對暴力解。** 6 張以下的手，不建圖、直接照遞迴展開，吃碰由
-  `round.rs` 的 `options` 判定；兩者相差 10⁻⁹ 以內（加法的順序不同，不是
-  逐位相同）。
-- **單調。** h = 0、沒有三張、不吃將帥時，胡牌機率隨 t 不減，而且在 0 與 1
-  之間。「`live` 多一張要的牌時 V 不減」拿掉了：多一張要的牌也讓別的牌的
-  機率變小，它不是定理。
-- **剪枝無損。** 天花板取 `live` 裡全部將帥的張數時，剪與不剪的胡牌機率
-  相同。要不吃將帥：`live` 固定在根，一張將帥可以被吃好幾次，天花板只算
-  一次。
-- **合法**，批次 3。 `tests/round.rs` 的四人對局裡放一家 `ExpectBot`，打完不犯規。
+- **A hand that can be worked out.**  Waiting on one card, with k copies in
+  `live` out of n in all and h = 0: V = 3 × 胡 × (1 − (1 − k∕n)ᵗ).
+- **Against brute force.**  Hands of 6 cards or fewer, expanded straight
+  from the recursion with no graph, the eats and pongs decided by `options`
+  of `round.rs`; the two agree within 10⁻⁹ (the additions come in another
+  order, so not bit for bit).
+- **Monotonic.**  With h = 0, no triplet and no general eaten, the chance to
+  win does not fall as t grows, and lies between 0 and 1.  "V does not fall
+  when `live` has one more wanted card" was removed: one more wanted card
+  also lowers the probability of the other cards, so it is no theorem.
+- **Pruning is lossless.**  When the ceiling takes the count of all the
+  generals in `live`, the chance to win is the same pruned and unpruned.
+  Generals must not be eaten for this: `live` is fixed at the root, so one
+  general can be eaten several times, and the ceiling counts it once.
+- **Legal**, batch 3.  One `ExpectBot` seated in the four-player rounds of
+  `tests/round.rs` plays them out without breaking a rule.
 
-## 應用
+## Applications
 
-核心給的是兩樣東西：每個選擇值幾分，以及同一張圖在別的報酬下的值（胡牌
-機率、期望胡數）。下面每一項是一個應用，各自有閘門；改變 bot 打法的都要
-照 `CLAUDE.md` 的鐵則跑 A/B，局數與 seed base 在跑之前定下。
+The core gives two things: how many points each choice is worth, and the
+values of the same graph under other payoffs (the chance to win, the
+expected 胡).  Each item below is an application with its own gate; any that
+changes how a bot plays must run the A/B by the iron rules of `CLAUDE.md`,
+with the deal count and the seed base fixed before the run.
 
-| | 應用 | 用到核心的什麼 | 改變打法 | 開始的條件 | 狀態 |
+| | Application | What it uses of the core | Changes play | Condition to start | Status |
 | --- | --- | --- | --- | --- | --- |
-| A | `ExpectBot`，10 張的閘門 | 選擇的分 | 候選 | 批次 2 過 | 完成：win（批次 3） |
-| B | 本機介面的對手換成 `ExpectBot` | A | 是 | A 是 win | 完成：win（批次 4） |
-| C | 網頁的提示與對手 | A，編成 wasm | 是 | A 是 win；wasm 的計時 | 未開始 |
-| D | 本機的閘門開到 14 張 | A | 候選 | A 是 win | 完成：win，+0.132 |
-| D2 | 15 到 17 張，圖裡用 `Discards::Live` | A、`Prune` | 候選 | D 是 win | 停掉：太慢，不必量勝負 |
-| E | 提示顯示胡牌機率與期望胡數 | 別的報酬 | 否 | 批次 2 的校準過 | 未開始 |
-| F | `hu-ceiling.md` 批次 4 剩下的兩項 | A | 候選 | A 是 win | 未開始 |
-| G | 對手推論的接口 | p(c)、h 換成推論出來的 | 候選 | 路線一有推論可接 | 未開始 |
-| H | Monte Carlo 的 playout 與葉節點 | 選擇的分 | 候選 | A 是 win | 未開始 |
-| I | 給長手牌當標註，訓練閘門外的 eval | 節點的值 | 否 | D 是 win | 設計：[`eval.md`](eval.md) |
+| A | `ExpectBot`, a 10-card gate | The points of a choice | Candidate | Batch 2 passes | Done: win (batch 3) |
+| B | The desktop app's opponents changed to `ExpectBot` | A | Yes | A is a win | Done: win (batch 4) |
+| C | The web page's hint and opponents | A, compiled to wasm | Yes | A is a win; timing in wasm | Not started |
+| D | The desktop's gate opened to 14 cards | A | Candidate | A is a win | Done: win, +0.132 |
+| D2 | 15 to 17 cards, with `Discards::Live` in the graph | A, `Prune` | Candidate | D is a win | Stopped: too slow, no need to measure whether it wins |
+| E | The hint shows the chance to win and the expected 胡 | Other payoffs | No | Batch 2's calibration passes | Not started |
+| F | The two items left of batch 4 of `hu-ceiling.md` | A | Candidate | A is a win | Not started |
+| G | The socket for opponent inference | p(c) and h replaced by inferred ones | Candidate | Route 1 has an inference to plug in | Not started |
+| H | Monte Carlo's playouts and leaves | The points of a choice | Candidate | A is a win | Not started |
+| I | Labels for long hands, to train an eval past the gate | The values of nodes | No | D is a win | Design: [`eval.md`](eval.md) |
 
-### A：`ExpectBot` 對 `HeuristicBot`
+### A: `ExpectBot` against `HeuristicBot`
 
-批次 3。`ab/src/main.rs` 的候選換成 `ExpectBot`，閘門 10 張。它每個決定是
-毫秒的量級，所以用預設的 `RESHUFFLE=8`；設閘門的 Monte Carlo 只能用
-`RESHUFFLE=0`，40,000 局的標準誤是 0.026。對照是 `main` HEAD 的
-`HeuristicBot`。局數等批次 1 的計時出來再定，寫在這裡之後才跑。
+Batch 3.  The candidate in `ab/src/main.rs` becomes `ExpectBot` with a
+10-card gate.  Its decisions take milliseconds, so it uses the default
+`RESHUFFLE=8`; the gated Monte Carlo could only use `RESHUFFLE=0`, with a
+standard error of 0.026 over 40,000 deals.  The control is the
+`HeuristicBot` of `main` HEAD.  The deal count is fixed once batch 1's
+timing is in, and the run starts only after it is written here.
 
-批次 3 的宣告（2026-11-18，跑之前寫下）：對照 `b920a26`，`RESHUFFLE=8`，
-閘門 10 張，兩組各 100,000 局。量 h 的兩個版本，各自是一次實驗：
+Batch 3's declaration (2026-11-18, written down before the run): control
+`b920a26`, `RESHUFFLE=8`, a 10-card gate, two arms of 100,000 deals each.
+Two versions of h are measured, each an experiment of its own:
 
-- **甲：量到的 h**（`EXPECT=1`），seed base 1794988309。
-- **乙：h × 1.5**（`EXPECT=1.5`），seed base 1795088309。
+- **Arm 1: the measured h** (`EXPECT=1`), seed base 1794988309.
+- **Arm 2: h × 1.5** (`EXPECT=1.5`), seed base 1795088309.
 
-局數由試跑定：400 局（seed base 1，不算數）5 秒、8% 分歧、標準誤 0.18，
-所以 100,000 局約 20 分鐘、標準誤約 0.011。兩組的結論各自照鐵則讀，不拿
-兩組裡比較好的那一組當結論；兩組都是 win 時，用點估計高的那一個，並寫明
-兩者的差是否在誤差內。
+The deal count comes from a trial run: 400 deals (seed base 1, not counted)
+took 5 seconds with 8% parting and a standard error of 0.18, so 100,000
+deals take about 20 minutes with a standard error near 0.011.  Each arm's
+verdict is read by the iron rules on its own, and the better of the two arms
+is not taken as the verdict; when both are wins, the one with the higher
+point estimate is used, with a note of whether the difference between them
+is within the error.
 
-讀法：
+How to read it:
 
-- **win：** commit，B 到 I 可以開始。點估計拿來和 +0.070 比，但兩個區間
-  多半重疊，不能說誰強。
-- **loss：** 先追分歧最大的幾局，再對照校準的偏差。loss 而校準是準的，
-  表示問題在「單人」這個假設本身，B 到 H 都停。
-- **不明：** 加局數；它便宜。
+- **Win:** commit, and B to I may start.  The point estimate is compared
+  with +0.070, but the two intervals will most likely overlap, so neither
+  can be called the stronger.
+- **Loss:** first trace the deals that moved the most, then check against
+  the calibration's bias.  A loss with an accurate calibration means the
+  problem is the single-player assumption itself, and B to H all stop.
+- **Insufficient data:** add deals; they are cheap.
 
-### B：本機介面的對手
+### B: the desktop app's opponents
 
-`web/src/lib.rs` 的 `Core::new` 在 `searching` 時給對手
-`MonteCarloBot::gated(10, None)`。A 是 win 之後換成 `ExpectBot`：每個搜尋
-的決定從 0.9 秒降到幾十毫秒。它換掉的是另一個贏過 `HeuristicBot` 的 bot，
-所以另外記一筆 `ExpectBot` 對設閘門的 Monte Carlo 的 A/B（`RESHUFFLE=0`，
-因為對照那一邊每一步都是搜尋）；結論不明時照速度選 `ExpectBot`，並在
-`CHANGELOG.md` 寫明它沒有被證明比較強。
+`Core::new` in `web/src/lib.rs` gives the opponents
+`MonteCarloBot::gated(10, None)` when `searching`.  Once A is a win they
+become `ExpectBot`: each searched decision falls from 0.9 seconds to tens of
+milliseconds.  What it replaces is another bot that beats `HeuristicBot`, so
+an A/B of `ExpectBot` against the gated Monte Carlo is recorded as well
+(`RESHUFFLE=0`, since every move on the control's side is a search); on
+insufficient data `ExpectBot` is chosen for its speed, and `CHANGELOG.md`
+states that it has not been shown to be stronger.
 
-批次 4 的宣告（2026-11-18，跑之前寫下）：對照 `e123ba4`，`RESHUFFLE=0`，
-兩邊都是閘門 10 張。座位 1 在對照那一邊是 128 樣本的 `MonteCarloBot`
-（`BASELINE_SAMPLES=128`），在候選那一邊是 `ExpectBot::new`（`EXPECT=1.5`），
-另外三家都是 `HeuristicBot`。100,000 局，seed base 1794990944。
+Batch 4's declaration (2026-11-18, written down before the run): control
+`e123ba4`, `RESHUFFLE=0`, a 10-card gate on both sides.  Seat 1 is a
+128-sample `MonteCarloBot` on the control's side (`BASELINE_SAMPLES=128`)
+and `ExpectBot::new` on the candidate's (`EXPECT=1.5`); the other three
+seats are all `HeuristicBot`.  100,000 deals, seed base 1794990944.
 
-局數由試跑定：800 局（seed base 1，不算數）3 分鐘、30 CPU 分鐘、36 局分歧、
-標準誤 0.197，所以 100,000 局的標準誤約 0.018；機器上另有一個 `../pons` 的
-A/B 在跑，約 4 小時。
+The deal count comes from a trial run: 800 deals (seed base 1, not counted)
+took 3 minutes and 30 CPU minutes, with 36 deals parting and a standard
+error of 0.197, so the standard error of 100,000 deals is near 0.018; with
+an A/B of `../pons` also running on the machine, about 4 hours.
 
-讀法：win 或不明，本機介面的對手換成 `ExpectBot`（`web/src/lib.rs` 已改好、
-測試過，等結論才 commit）；不明時照上面寫明沒有被證明比較強。loss 時先追
-分歧最大的幾局，對手留在 Monte Carlo。
+How to read it: on a win or insufficient data, the desktop app's opponents
+become `ExpectBot` (`web/src/lib.rs` is already changed and tested, and is
+committed only once the verdict is in); on insufficient data, state as above
+that it has not been shown to be stronger.  On a loss, first trace the deals
+that moved the most, and the opponents stay on Monte Carlo.
 
-批次 4 的結果：100,000 局裡 4,336 局分歧，座位 1 胡牌率對照 24.51%、候選
-24.61%；候選減對照每局 +0.047 ± 0.019 分，95% 信賴區間 [+0.011, +0.084]，
-win。本機介面的對手換成 `ExpectBot`，每個搜尋的決定 14 毫秒，不再是 0.9 秒。
+Batch 4's result: 4,336 of the 100,000 deals part, and seat 1's win rate is
+24.51% for the control and 24.61% for the candidate; candidate minus control
+is +0.047 ± 0.019 points a deal, 95% confidence interval [+0.011, +0.084], a
+win.  The desktop app's opponents are now `ExpectBot`, at 14 ms a searched
+decision instead of 0.9 seconds.
 
-### C：網頁
+### C: the web page
 
-網頁維持 `HeuristicBot` 的理由是設閘門的 Monte Carlo 原生也要 0.9 秒。
-`ExpectBot` 若原生是十幾毫秒，wasm 慢幾倍也還在一個畫面更新之內。條件是
-A 的 win 加上 wasm 裡實際的計時；提示就是 bot，所以 A 的 A/B 同時是提示的
-A/B。
+The web page stayed on `HeuristicBot` because the gated Monte Carlo takes
+0.9 seconds even natively.  If `ExpectBot` takes a dozen or so milliseconds
+natively, wasm being several times slower is still within one frame.  The
+condition is A's win plus an actual timing in wasm; the hint is the bot, so
+A's A/B is the hint's A/B as well.
 
-C 的計時（2026-11-18，`examples/expect_time.rs`）：座位 1 是 `ExpectBot::new`，
-另外三家 `HeuristicBot`，計它每一次 `claims` 與 `discards` 的時間，也就是提示
-會做的那一個呼叫。單執行緒，所以同一份程式能編成 `wasm32-wasip1`，用
-`research/wasi.mjs` 在 node 的 WASI 底下跑；node 的 wasm 引擎就是 Chrome 的
-V8。原生是 `-Ctarget-cpu=native`，wasm 沒有開 SIMD，和 `web/` 的建置一樣。
-2,000 局，seed base 1000；`SmallRng` 在 32 位元上是另一個產生器，所以兩邊發的
-牌不同，決定數也不同。單位是毫秒：
+C's timing (2026-11-18, `examples/expect_time.rs`): seat 1 is
+`ExpectBot::new` and the other three `HeuristicBot`, and each of its
+`claims` and `discards` is timed, the very call the hint would make.  It is
+single-threaded, so the same code compiles to `wasm32-wasip1` and runs under
+node's WASI with `research/wasi.mjs`; node's wasm engine is Chrome's V8.
+Native is `-Ctarget-cpu=native`; wasm has no SIMD turned on, like the build
+of `web/`.  2,000 rounds, seed base 1000; `SmallRng` is another generator on
+32 bits, so the two sides deal different cards and have different decision
+counts.  The unit is milliseconds:
 
-| | 決定數 | 平均 | p50 | p95 | p99 | 最大 |
+| | Decisions | Mean | p50 | p95 | p99 | Max |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 原生，10 張以內 | 1,679 | 3.75 | 1.60 | 15.6 | 29.5 | 64.0 |
-| wasm，10 張以內 | 1,628 | 6.62 | 3.03 | 25.4 | 47.8 | 84.4 |
-| 原生，超過 10 張 | 14,375 | 1.38 | 0.27 | 5.63 | 9.17 | 76.4 |
-| wasm，超過 10 張 | 14,604 | 2.35 | 0.46 | 9.82 | 15.7 | 255 |
+| Native, 10 cards or fewer | 1,679 | 3.75 | 1.60 | 15.6 | 29.5 | 64.0 |
+| wasm, 10 cards or fewer | 1,628 | 6.62 | 3.03 | 25.4 | 47.8 | 84.4 |
+| Native, more than 10 cards | 14,375 | 1.38 | 0.27 | 5.63 | 9.17 | 76.4 |
+| wasm, more than 10 cards | 14,604 | 2.35 | 0.46 | 9.82 | 15.7 | 255 |
 
-wasm 比原生慢 1.7 倍左右。閘門內平均 6.6 毫秒，在一個畫面（16.7 毫秒）之內；
-p95 25 毫秒、最慢 84 毫秒，超過一個畫面，但都在 0.1 秒以內。超過 10 張時走的
-是 `HeuristicBot` 的分數，也就是現在的提示，它最慢的 255 毫秒是現有的成本，
-不是 `ExpectBot` 帶進來的。計時這個條件過了。
+wasm is about 1.7 times slower than native.  Inside the gate the mean is
+6.6 ms, within one frame (16.7 ms); the p95 is 25 ms and the slowest 84 ms,
+more than a frame but all within 0.1 seconds.  With more than 10 cards it
+goes by `HeuristicBot`'s grades, that is, the present hint, whose slowest
+255 ms is a cost already there, not one `ExpectBot` brings in.  The timing
+condition is passed.
 
-### D：更寬的閘門
+### D: a wider gate
 
-10 張的閘門放行 9.7% 的決定。12 張的建圖是 41 毫秒、13 張 114 毫秒，A/B
-還跑得動。每一個張數是一次獨立的 A/B，對照是當時的 `main`。
+The 10-card gate lets through 9.7% of the decisions.  The build takes 41 ms
+at 12 cards and 114 ms at 13, which an A/B can still run.  Each card count
+is a separate A/B, its control the `main` of the time.
 
-D 的計時（2026-11-18，`expect_time 300 1000 14`，原生，單位毫秒）：閘門 14
-張放行 39% 的決定（976／2,477），閘門內平均 76 毫秒。
+D's timing (2026-11-18, `expect_time 300 1000 14`, native, in milliseconds):
+a 14-card gate lets through 39% of the decisions (976/2,477), at a mean of
+76 ms inside the gate.
 
-| 張數 | 決定數 | 平均 | p50 | p95 | p99 | 最大 |
+| Cards | Decisions | Mean | p50 | p95 | p99 | Max |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 11 | 136 | 20.2 | 11.8 | 69.9 | 121 | 195 |
 | 12 | 144 | 35.4 | 22.1 | 123 | 174 | 186 |
 | 13 | 148 | 96.6 | 53.9 | 325 | 555 | 647 |
 | 14 | 277 | 186 | 108 | 650 | 980 | 1,410 |
 
-14 張最慢 1.4 秒，平均是設閘門的 Monte Carlo（0.9 秒）的五分之一，本機用得
-起；wasm 再慢 1.7 倍，網頁留在 10 張。
+14 cards take 1.4 seconds at the slowest and on average a fifth of the gated
+Monte Carlo (0.9 seconds), which the desktop can afford; wasm is another 1.7
+times slower, so the web page stays at 10 cards.
 
-D 的宣告（2026-11-18，跑之前寫下）：本機的閘門從 10 張開到 14 張，一次
-實驗。對照 `e1d0c7d`，`RESHUFFLE=8`。座位 1 在對照那一邊是它自己的
-`ExpectBot::new`（閘門 10 張，`BASELINE_EXPECT=1`），在候選那一邊是閘門 14 張
-的同一個 bot（`EXPECT=1.5 GATE_CARDS=14`），另外三家都是 `HeuristicBot`。
-100,000 局，seed base 1795214506：時鐘加 200,000，避開批次 3、4 用過的局。
+D's declaration (2026-11-18, written down before the run): the desktop's
+gate opened from 10 cards to 14, one experiment.  Control `e1d0c7d`,
+`RESHUFFLE=8`.  Seat 1 is the control's own `ExpectBot::new` on the
+control's side (a 10-card gate, `BASELINE_EXPECT=1`) and the same bot with a
+14-card gate on the candidate's (`EXPECT=1.5 GATE_CARDS=14`); the other
+three seats are all `HeuristicBot`.  100,000 deals, seed base 1795214506:
+the clock plus 200,000, to stay clear of the deals batches 3 and 4 used.
 
-局數由試跑定：400 局（seed base 1，不算數）1 分鐘、31% 分歧、標準誤 0.260，
-所以 100,000 局約 3.5 小時、標準誤約 0.016。
+The deal count comes from a trial run: 400 deals (seed base 1, not counted)
+took 1 minute with 31% parting and a standard error of 0.260, so 100,000
+deals take about 3.5 hours with a standard error near 0.016.
 
-讀法：win，本機的對手與提示開到 14 張（`web/src/lib.rs` 的 `gate` 已改好、
-測試過，等結論才 commit）；不明或 loss，本機留在 10 張，loss 時先追分歧最大
-的幾局。
+How to read it: on a win, the desktop's opponents and hint open to 14 cards
+(`gate` in `web/src/lib.rs` is already changed and tested, and is committed
+only once the verdict is in); on insufficient data or a loss, the desktop
+stays at 10 cards, and on a loss the deals that moved the most are traced
+first.
 
-D 的結果：100,000 局裡 27,472 局分歧，座位 1 胡牌率對照 24.63%、候選
-24.98%；候選減對照每局 +0.132 ± 0.014 分，95% 信賴區間 [+0.105, +0.159]，
-win。本機的對手與提示開到 14 張；網頁留在 10 張。10 張對 `HeuristicBot` 是
-+0.076，所以 11 到 14 張這一段給的比 10 張以下那一段還多。
+D's result: 27,472 of the 100,000 deals part, and seat 1's win rate is
+24.63% for the control and 24.98% for the candidate; candidate minus control
+is +0.132 ± 0.014 points a deal, 95% confidence interval [+0.105, +0.159], a
+win.  The desktop's opponents and hint open to 14 cards; the web page stays
+at 10.  10 cards against `HeuristicBot` is +0.076, so the stretch from 11 to
+14 cards gives more than the one of 10 cards or fewer.
 
-### D2：15 到 17 張，圖裡不拆牌組與活的搭子
+### D2: 15 to 17 cards, with melds and live 搭子 left whole in the graph
 
-停掉了，理由是速度，不是勝負。
+Stopped, for speed, not for whether it wins.
 
-14 張以上不剪就太貴（17 張的一手 1.6 秒，`research/dp-nodes.md`），所以試了
-第二道閘門：超過 14 張、在 17 張以內的決定，圖裡的節點只試 `Discards::Live`
-的棄牌，也就是不拆兩個排法都當成牌組的牌，也不拆等的牌還活著的搭子。根
-不剪：眼前這一手每一張棄牌、每一種吃碰都照算，所以 bot 現在仍然可以拆，
-只是假設自己以後不拆。
+Past 14 cards it is too dear unpruned (1.6 seconds for a hand of 17,
+`research/dp-nodes.md`), so a second gate was tried: for decisions with more
+than 14 cards and up to 17, the nodes in the graph try only the discards of
+`Discards::Live`, that is, they break up neither the cards that both layouts
+take as melds nor a 搭子 whose awaited cards are still live.  The root is
+not pruned: every discard and every eat or pong of the move at hand is still
+reckoned, so the bot may still break them up now, and only assumes that it
+will not later.
 
-計時（2026-11-19，原生，300 局，seed base 1000，單位毫秒）：兩道閘門合起來
-放行 71% 的決定（1,746／2,452），閘門內平均 196 毫秒。
+Timing (2026-11-19, native, 300 rounds, seed base 1000, in milliseconds):
+the two gates together let through 71% of the decisions (1,746/2,452), at a
+mean of 196 ms inside the gates.
 
-| 張數 | 剪法 | 決定數 | 平均 | p50 | p95 | p99 | 最大 |
+| Cards | Pruning | Decisions | Mean | p50 | p95 | p99 | Max |
 | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 14 | 不剪 | 254 | 172 | 106 | 569 | 954 | 1,360 |
+| 14 | None | 254 | 172 | 106 | 569 | 954 | 1,360 |
 | 15 | `Live` | 229 | 110 | 59.9 | 346 | 859 | 1,030 |
 | 16 | `Live` | 92 | 211 | 123 | 725 | 1,497 | 1,497 |
 | 17 | `Live` | 451 | 513 | 282 | 1,733 | 3,445 | 6,539 |
 
-17 張有 1% 的決定超過 3.4 秒，最慢 6.5 秒。這在本機太慢，所以不必知道它贏
-不贏：對閘門 14 張的 A/B 宣告了 20,000 局（試跑 400 局是 43% 分歧、每局
-6.8 CPU 秒，是 D 的 6 倍），開跑不久就中止，沒有印出任何數字，沒有結論。
+At 17 cards 1% of the decisions take more than 3.4 seconds, and the slowest
+6.5 seconds.  That is too slow on the desktop, so there is no need to know
+whether it wins: the A/B against the 14-card gate was declared at 20,000
+deals (a trial run of 400 deals had 43% parting and 6.8 CPU seconds a deal,
+6 times D's), was stopped soon after it started, printed no number, and has
+no verdict.
 
-程式沒有留下。要重現：`ExpectBot::values` 建圖時，超過閘門的手改用
-`Prune { discards: Discards::Live, ..Prune::default() }`。
+The code was not kept.  To reproduce it: when `ExpectBot::values` builds the
+graph, a hand past the gate uses
+`Prune { discards: Discards::Live, ..Prune::default() }` instead.
 
-### E：胡牌機率與期望胡數
+### E: the chance to win and the expected 胡
 
-固定 A 選出來的打法，把報酬換成「胡是 1」再掃一次，得到胡牌機率；換成
-胡數，得到期望胡數。這不改打法，只是提示多兩個數字，但要先有批次 2 的
-校準：顯示一個不準的機率比不顯示糟。它也是書裡第一個能畫成圖的東西：
-一手牌的值怎麼隨剩下的牌變。
+Holding the play A chose fixed, sweep once more with the payoff changed to 1
+for a win, and the chance to win comes out; change it to the 胡, and the
+expected 胡.  This changes no play and only gives the hint two more numbers,
+but it needs batch 2's calibration first: showing a probability that is off
+is worse than showing none.  It is also the first thing in the book that can
+be drawn as a chart: how a hand's value changes with the cards left.
 
-### F：天花板剩下的用途
+### F: the uses left for the ceiling
 
-`hu-ceiling.md` 批次 4 還沒做的兩項，「讓天花板掉到門檻以下的那一張不打」
-與 `dead`，在閘門裡都是 DP 的特例：那樣的子節點就是 D。A 是 win 之後，
-這兩項只需要在閘門外各自做。
+The two items of batch 4 of `hu-ceiling.md` not yet done, "do not discard
+the card that drops the ceiling below the threshold" and `dead`, are both
+special cases of the DP inside the gate: such a child is just D.  Once A is
+a win, these two need doing only past the gate, each on its own.
 
-### G：對手推論
+### G: opponent inference
 
-模型裡別家只出現在 p(c)、h 與 e。路線一推論出「我要的牌還在不在」之後，
-接法是把均勻的 p(c) 換成推論的；別家的進度接 h。核心不必改，`Outlook`
-多幾個欄位。
+In the model the other seats appear only in p(c), h and e.  Once route 1
+infers whether the cards I want are still there, it plugs in by replacing
+the uniform p(c) with the inferred one; the other seats' progress plugs into
+h.  The core need not change, and `Outlook` gains a few fields.
 
-### H：Monte Carlo
+### H: Monte Carlo
 
-兩種接法，都還只是想法：playout 的策略從 `HeuristicBot` 換成 `ExpectBot`；
-或者 playout 打到暗牌 10 張以下就停，用 DP 的值當結果。前者每個 playout
-貴幾十倍，後者便宜。
+Two ways to plug in, both still only ideas: the playout policy changes from
+`HeuristicBot` to `ExpectBot`; or a playout stops once it reaches 10
+concealed cards or fewer and takes the DP's value as its result.  The former
+makes each playout tens of times dearer; the latter is cheap.
 
-### I：標註
+### I: labels
 
-路線四要大量「這個局面值幾分」的標註。閘門裡 DP 的值沒有取樣雜訊，可以
-當短手牌的標註；20 張的手仍然要 Monte Carlo。
+Route 4 needs a great many labels of how many points a position is worth.
+Inside the gate the DP's values have no sampling noise and can label short
+hands; a hand of 20 cards still needs Monte Carlo.
 
-2026-11-19 的補充。長手牌的圖線上用不起，離線建得起（17 張 1.6 秒，20 張
-剪過棄牌 5 秒），所以長手牌的標註也可以來自 DP。拿它訓練一個微秒量級的
-eval、閘門外只展開一兩層的設計在 [`eval.md`](eval.md)。
+Added 2026-11-19.  The graph of a long hand is unaffordable online but can
+be built offline (1.6 seconds at 17 cards, 5 seconds at 20 with the discards
+pruned), so the labels of long hands can come from the DP too.  The design
+that trains an eval of microseconds on them and expands only a layer or two
+past the gate is in [`eval.md`](eval.md).
 
-### 加一個應用
+### Adding an application
 
-在上面的表加一列，再加一節，寫四件事：用到核心的哪個輸出、改不改打法、
-開始的條件、怎麼量。需要核心多給一種輸出時，先看能不能寫成另一種報酬
-（`Payoff`）；能的話核心不必動。
+Add a row to the table above and then a section that says four things: which
+output of the core it uses, whether it changes play, the condition to start,
+and how to measure it.  When the core has to give another kind of output,
+first see whether it can be written as another payoff (`Payoff`); if so the
+core need not change.
 
-## 不做的事
+## Non-goals
 
-- **20 張的手。** 7 × 10⁵ 個節點、22 秒，量過了。閘門外是 `HeuristicBot`。
-- **把 `live` 或輪次放進狀態。** 第一版不做；校準或 A/B 指出它是瓶頸再做。
-- **跨決定的快取。** 見上。
-- **多人的賽局樹。** 這是單人的期望值；別家是四個常數。
+- **Hands of 20 cards.**  7 × 10⁵ nodes and 22 seconds, measured.  Past the
+  gate it is `HeuristicBot`.
+- **Putting `live` or the turn order in the state.**  Not in the first
+  version; only once calibration or an A/B shows it is the bottleneck.
+- **A cache across decisions.**  See above.
+- **A multiplayer game tree.**  This is the single-player expectation; the
+  other seats are four constants.
 
-## 未決問題
+## Open questions
 
-- ~~掃描真的比建圖便宜嗎？~~ 是，十幾倍（批次 1）。
-- ~~四個常數夠不夠？校準的偏差落在哪一個？~~ 預測一律偏高，h × 1.5 吃掉
-  大部分（批次 2）。h 為什麼量起來偏低，或者它在替哪一個近似補，還不知道；
-  依別家最短暗牌張數分的 h 是第一個要試的。
-- ~~`ExpectBot` 用量到的 h，還是 h × 1.5？~~ 兩者都贏，差在誤差內；用 h × 1.5（批次 3）。
-- ~~沒有取樣雜訊、之後照最佳打，值不值 Monte Carlo 的 +0.070 以上？~~
-  一樣大：+0.076 ± 0.008 對 +0.070 ± 0.026，區間重疊，不能說誰強；單人的
-  假設沒有把它吃掉（批次 3）。兩者正面對決是應用 B 的 A/B。
-- 閘門該開在幾張？（應用 D）
-- 別家的棄牌當成均勻，偏多少？這是對手推論的第一個題目。（應用 G）
+- ~~Is the sweep really cheaper than the build?~~  Yes, more than ten times
+  (batch 1).
+- ~~Are four constants enough?  Which one does the calibration's bias fall
+  on?~~  The predictions are high throughout, and h × 1.5 takes up most of
+  it (batch 2).  Why h measures low, or which approximation it is making up
+  for, is not yet known; h split by the fewest concealed cards another seat
+  holds is the first thing to try.
+- ~~Does `ExpectBot` use the measured h, or h × 1.5?~~  Both win, and they
+  differ within the error; h × 1.5 is used (batch 3).
+- ~~Are no sampling noise and optimal play from then on worth more than
+  Monte Carlo's +0.070?~~  As large: +0.076 ± 0.008 against +0.070 ± 0.026,
+  the intervals overlap, and neither can be called the stronger; the
+  single-player assumption did not eat it up (batch 3).  The two head to
+  head is the A/B of application B.
+- At how many cards should the gate open?  (Application D)
+- How far off is taking the other seats' discards as uniform?  This is the
+  first problem for opponent inference.  (Application G)

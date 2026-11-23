@@ -1,56 +1,75 @@
-# 兩人桌：同樣的改動，在兩人桌上看得比較清楚嗎？
+# A table of two: do the same changes show more clearly there?
 
-量測日期：2026-11-16；Monte Carlo 的重跑與 Peeker 是 2026-11-17。問題：四人桌上做對的事不一定被獎勵。如果把同一套
-規則改成兩人，A/B 會不會用更少的牌局分出好壞？這裡拿兩個四人桌上已知有效
-的 `HeuristicBot` 改動，在兩人桌上各重量一次，再把 `MonteCarloBot` 對
-`HeuristicBot` 也重量一次，隔天用新的 seed base 重跑，並量了偷看手牌的
-Peeker。函式庫與 bot 都沒有改動；兩人桌只存在於量測用的
-暫存副本。
+Measured 2026-11-16; the Monte Carlo rerun and the Peeker 2026-11-17.  The
+question: at a table of four, doing the right thing is not always rewarded.
+If the same rules are played by two, does an A/B tell good from bad in fewer
+deals?  Two changes to `HeuristicBot` known to work at four are each
+measured again here at a table of two, then `MonteCarloBot` against
+`HeuristicBot` as well, rerun the next day on a fresh seed base, along with
+the Peeker, which peeks at the hands.  Neither the library nor the bots were
+changed; the table of two exists only in scratch copies made for the
+measurement.
 
-## 結論
+## Answer
 
-**引擎改一個常數就能打兩人桌。兩個手牌效率的改動在兩人桌上沒有比較容易
-看出來：一個比較難，一個稍微容易。Monte Carlo 第一次量到的正信賴區間
-重跑後沒有重現，結論不明。偷看對手手牌的 Peeker 贏 2.8 分／局：資訊值錢，
-同一份資訊下多算不值錢。**
+**The engine plays a table of two with one constant changed.  The two
+hand-efficiency changes are no easier to see at two: one is harder, one
+slightly easier.  The positive confidence interval Monte Carlo first
+measured did not repeat on the rerun: insufficient data.  The Peeker, which
+peeks at the opponent's hand, wins 2.8 points a deal: information pays, and
+more computing on the same information does not.**
 
-- **兩人桌是現成的。** 把 `Seat::COUNT` 從 4 改成 2，函式庫不必再改就能
-  發牌、打完、結算；規則照舊（每人 20 張、莊家 21 張、6 張廢牌、十胡）。
-  這與 Board Game Arena 的兩人桌相同：它的規則不隨人數變
-  （[`prior-art.md`](prior-art.md) C 節）。
-- **一局便宜四成。** 同一個 bot，兩人桌一局的計算量是四人桌的 0.57 到
-  0.61 倍。
-- **兩人桌幾乎不流局。** 20,000 局流局 1 局，四人桌 599 局。贏家平均胡數
-  幾乎相同（12.13 對 12.20）。
-- **有差別的那些局，訊號對雜訊的比沒有變好。** 每一局打法不同的牌，得分差
-  的平均除以標準差：「保留聽牌的手」從四人的 0.18 掉到兩人的 0.10；「不吃
-  進已完整的牌組」是 0.12 對 0.13。
-- **同樣 200,000 局的 z 值**：前者 10.7 → 6.3，後者 16.1 → 19.3。換算成
-  要達到同樣把握所需的計算量，前者在兩人桌要 1.8 倍，後者只要 0.4 倍。
-- **`MonteCarloBot` 128 樣本在兩人桌第一次是 +0.347 ± 0.175 分／局**，
-  95% CI [+0.005, +0.689]，3,200 局。**用新的 seed base 重跑是 +0.050 ±
-  0.172**，95% CI [−0.287, +0.388]，結論不明。第一次的 z 約 2.0 沒有站住。
-  四人桌同樣的局數是 +0.148 ± 0.276，同樣不明。
-- **Peeker 在兩人桌是 +2.824 ± 0.192 分／局**，95% CI [+2.449, +3.200]，
-  3,200 局，win；胡牌率從 49.31% 到 60.88%。它是看得到對手手牌、只對牌堆
-  抽樣的 `MonteCarloBot`。減掉重跑的 Monte Carlo 是 +2.77 ± 0.26：這是對手
-  推論在兩人桌的上限。
+- **A table of two is ready-made.**  Change `Seat::COUNT` from 4 to 2 and
+  the library deals, plays out and settles with no further change; the rules
+  are as before (20 cards each, 21 to the dealer, 6 dead cards, ten 胡).
+  This is the same as Board Game Arena's table of two: its rules do not
+  change with the number of players ([`prior-art.md`](prior-art.md), section
+  C).
+- **A round is four tenths cheaper.**  For the same bot, a round at two
+  takes 0.57 to 0.61 times the compute of a round at four.
+- **A table of two is almost never exhausted.**  1 round in 20,000 was
+  exhausted, against 599 at four.  The winner's mean 胡 is almost the same
+  (12.13 against 12.20).
+- **In the deals that differ, the ratio of signal to noise is no better.**
+  Over the deals where play differs, the mean of the score difference
+  divided by its standard deviation: "keep a waiting hand" falls from 0.18
+  at four to 0.10 at two; "do not eat into a whole meld" is 0.12 against
+  0.13.
+- **z at the same 200,000 deals**: 10.7 → 6.3 for the former, 16.1 → 19.3
+  for the latter.  Converted into the compute needed for the same
+  confidence, the former needs 1.8 times as much at two and the latter only
+  0.4 times.
+- **`MonteCarloBot` at 128 samples was +0.347 ± 0.175 points a deal at two
+  the first time**, 95% CI [+0.005, +0.689], 3,200 deals.  **The rerun on a
+  fresh seed base is +0.050 ± 0.172**, 95% CI [−0.287, +0.388], insufficient
+  data.  The first run's z of about 2.0 did not hold.  The same deal count
+  at four gave +0.148 ± 0.276, insufficient data as well.
+- **The Peeker at two is +2.824 ± 0.192 points a deal**, 95% CI [+2.449,
+  +3.200], 3,200 deals, win; the win rate goes from 49.31% to 60.88%.  It is
+  a `MonteCarloBot` that sees the opponent's hand and samples only the pile.
+  Less the Monte Carlo rerun that is +2.77 ± 0.26: the upper bound of
+  opponent inference at a table of two.
 
-這兩個 `HeuristicBot` 的改動都是「自己的手牌怎麼打比較快」。跟對手互動的決定（餵牌、防守）
-沒有量：四人桌上唯一試過的版本沒有留在版本庫裡，沒辦法重放。
+Both of these `HeuristicBot` changes are about "how to play one's own hand
+faster".  Decisions that interact with the opponent (feeding, defence) were
+not measured: the only version tried at four was not kept in the repository
+and cannot be replayed.
 
-## 方法
+## Method
 
-兩人桌的規則就是把四人桌的座位數改成 2：
+The rules of a table of two are those of four with the seat count set to 2:
 
-- 每人 20 張，莊家 21 張，牌堆 71 張，其中 6 張廢牌。
-- 上家與下家是同一個人，所以對手打出或摸出的每一張牌都能吃。
-- 贏家向唯一的對手收自己的胡數。
+- 20 cards each, 21 to the dealer, a pile of 71 cards, 6 of them dead.
+- The previous seat and the next are the same person, so every card the
+  opponent discards or draws can be eaten.
+- The winner collects their 胡 from the only opponent.
 
-A/B 用的是 `ab/` 原本的程式：候選坐第 2 家、對照坐第 1 家，與兩家都是對照的
-同一副牌相比，莊家輪流。每一組的候選與對照都取自版本庫裡的兩個版本，各改
-同一個常數。局數在跑之前定為 200,000，與四人桌當時的局數相同；seed base
-取當時的時鐘。
+The A/B is `ab/`'s program as it was: the candidate in the second seat and
+the control in the first, compared with the same deal with the control in
+both seats, the dealer rotating.  The candidate and the control of each pair
+are two versions from the repository, each with the same constant changed.
+The deal count was fixed before the run at 200,000, the same as at four at
+the time; the seed base is the clock at the time.
 
 ```sh
 S=$(mktemp -d)
@@ -70,186 +89,226 @@ done
 "$S/B/ab/target/release/tsap-oo-ab" 1794830528 200000
 ```
 
-四人桌的對照數字：A 組取自 `CHANGELOG.md`（seed base 1794772616），沒有
-重跑；B 組用原本的 seed base 1794765506 重放一次，得分差與當時記錄的逐位
-相同，並補上當時沒記的「不同的局數」。重放的做法是上面的指令去掉兩行改
-座位數的 `sed`。
+The four-player numbers to compare with: pair A is from `CHANGELOG.md` (seed
+base 1794772616) and was not rerun; pair B was replayed once on its original
+seed base 1794765506, the score difference matching the record of the time
+digit for digit, which also supplied the "deals that differ" not recorded
+then.  The replay is the commands above without the two `sed` lines that
+change the seat count.
 
-Monte Carlo 那一次，候選與對照都是 `3aa5b0c`，照上面的方式各改成兩人桌，
-候選換成 128 樣本的 `MonteCarloBot`。局數在跑之前定為 3,200，與四人桌
-那次（`CHANGELOG.md`，`SAMPLES=128 ab/run.sh 3200`，對照 `6428dab`）相同：
+For the Monte Carlo run, candidate and control are both `3aa5b0c`, each
+turned into a table of two as above, with the candidate a `MonteCarloBot` of
+128 samples.  The deal count was fixed before the run at 3,200, the same as
+the run at four (`CHANGELOG.md`, `SAMPLES=128 ab/run.sh 3200`, control
+`6428dab`):
 
 ```sh
 SAMPLES=128 "$S/M/ab/target/release/tsap-oo-ab" 1794830779 3200
 ```
 
-重跑與 Peeker 用 `e40cca4`，各自一個新的 seed base，局數同樣在跑之前定為
-3,200。重跑的候選與對照都是 `e40cca4`。Peeker 的候選是 `e40cca4` 加上
-`View::peek` 與 `ab/src/peeker.rs` 的工作目錄（後來提交為 `a86b4f2`），
-對照是 `e40cca4`；`RESHUFFLE=0`，不從分歧點重洗。兩個暫存副本照上面的方式
-改成兩人桌：
+The rerun and the Peeker use `e40cca4`, each on a fresh seed base, the deal
+count again fixed before the run at 3,200.  The rerun's candidate and
+control are both `e40cca4`.  The Peeker's candidate is the working tree of
+`e40cca4` plus `View::peek` and `ab/src/peeker.rs` (later committed as
+`a86b4f2`), and its control `e40cca4`; `RESHUFFLE=0`, with no reshuffle from
+where the two part.  Both scratch copies were turned into tables of two as
+above:
 
 ```sh
 SAMPLES=128 ab/target/release/tsap-oo-ab 1794846583 3200
 SAMPLES=128 PEEK=1 RESHUFFLE=0 ab/target/release/tsap-oo-ab 1794847090 3200
 ```
 
-基本統計用 `arena` example，`3aa5b0c`，四人桌是版本庫原樣，兩人桌同樣只改
-那個常數：
+The basic statistics use the `arena` example at `3aa5b0c`, the table of four
+as the repository has it and the table of two again with only that constant
+changed:
 
 ```sh
 cargo run --release --example arena -- 20000
 ```
 
-## 數據
+## Data
 
-### 基本統計（`3aa5b0c`，20,000 局，seed 0）
+### Basic statistics (`3aa5b0c`, 20,000 rounds, seed 0)
 
-| | 四人 | 兩人 |
+| | Four | Two |
 | --- | ---: | ---: |
-| 有人胡 | 19,401 | 19,999 |
-| 流局 | 599 | 1 |
+| Won | 19,401 | 19,999 |
+| Exhausted | 599 | 1 |
 | 相公 | 0 | 0 |
-| 各家胡的局數 | 4,856／4,932／4,848／4,765 | 9,938／10,061 |
-| 贏家平均胡數 | 12.20 | 12.13 |
+| Rounds won by each seat | 4,856 / 4,932 / 4,848 / 4,765 | 9,938 / 10,061 |
+| Winner's mean 胡 | 12.20 | 12.13 |
 
-### 兩個已知有效的改動（各 200,000 局）
+### Two changes known to work (200,000 deals each)
 
-A 是「保留聽牌的手」（`3526146` 對 `a74b951`），B 是「不吃進已完整的牌組，
-下家只在勝過摸牌 3 胡時才吃」（`1b644f2` 對 `6fc8f21`）。
+A is "keep a waiting hand" (`3526146` against `a74b951`); B is "do not eat
+into a whole meld, and the next seat eats only when that beats the draw by 3
+胡" (`1b644f2` against `6fc8f21`).
 
-| | A 四人 | A 兩人 | B 四人 | B 兩人 |
+| | A, four | A, two | B, four | B, two |
 | --- | ---: | ---: | ---: | ---: |
 | seed base | 1794772616 | 1794830208 | 1794765506 | 1794830528 |
-| 不同的局數 | 3,551 | 3,901 | 16,804 | 21,854 |
-| 得分差（分／局） | +0.111 ± 0.010 | +0.030 ± 0.005 | +0.283 ± 0.018 | +0.222 ± 0.011 |
+| Deals that differ | 3,551 | 3,901 | 16,804 | 21,854 |
+| Score difference (points a deal) | +0.111 ± 0.010 | +0.030 ± 0.005 | +0.283 ± 0.018 | +0.222 ± 0.011 |
 | 95% CI | [+0.091, +0.132] | [+0.021, +0.040] | [+0.249, +0.318] | [+0.199, +0.244] |
-| 結論 | win | win | win | win |
-| 胡牌率，對照 → 候選 | 24.24% → 24.52% | 49.97% → 50.15% | 24.50% → 25.05% | 50.04% → 50.98% |
-| z（得分差 ÷ 標準誤） | 10.7 | 6.3 | 16.1 | 19.3 |
+| Verdict | win | win | win | win |
+| Win rate, control → candidate | 24.24% → 24.52% | 49.97% → 50.15% | 24.50% → 25.05% | 50.04% → 50.98% |
+| z (score difference ÷ standard error) | 10.7 | 6.3 | 16.1 | 19.3 |
 
-z 與下表的數字由印出來的信賴區間兩端反推，印出來只有三位小數，所以是
-近似值。
+z and the numbers of the next table are worked back from the two ends of the
+printed confidence interval, which is printed to three decimals only, so
+they are approximate.
 
-### 只看打法不同的那些局
+### Only the deals where play differs
 
-打法相同的局，得分差剛好是 0，所有的訊號與雜訊都在不同的那些局裡。
+A deal where play is the same has a score difference of exactly 0; all the
+signal and all the noise are in the deals that differ.
 
-| | A 四人 | A 兩人 | B 四人 | B 兩人 |
+| | A, four | A, two | B, four | B, two |
 | --- | ---: | ---: | ---: | ---: |
-| 得分差的平均（分） | 6.3 | 1.6 | 3.4 | 2.0 |
-| 得分差的標準差（分） | 35 | 15.5 | 27 | 15.6 |
-| 平均 ÷ 標準差 | 0.18 | 0.10 | 0.12 | 0.13 |
+| Mean of the score difference (points) | 6.3 | 1.6 | 3.4 | 2.0 |
+| Standard deviation of the score difference (points) | 35 | 15.5 | 27 | 15.6 |
+| Mean ÷ standard deviation | 0.18 | 0.10 | 0.12 | 0.13 |
 
-兩人桌的分數本來就小：贏家只向一家收。所以要比的是最後一列。
+Scores at a table of two are smaller to begin with: the winner collects from
+one seat only.  So the row to compare is the last.
 
-### 成本
+### Cost
 
-以 A/B 程式用掉的 CPU 時間除以打的局數（每副牌打兩局），16 個執行緒：
+The CPU time the A/B program used, divided by the rounds played (two rounds
+a deal), on 16 threads:
 
-| | 四人 | 兩人 | 兩人 ÷ 四人 |
+| | Four | Two | Two ÷ four |
 | --- | ---: | ---: | ---: |
-| A（`3526146` 的 bot），每局 | 18.9 ms | 11.5 ms | 0.61 |
-| B（`1b644f2` 的 bot），每局 | 3.3 ms | 1.9 ms | 0.57 |
+| A (the bot of `3526146`), a round | 18.9 ms | 11.5 ms | 0.61 |
+| B (the bot of `1b644f2`), a round | 3.3 ms | 1.9 ms | 0.57 |
 
-四人 A 的時間取自另一次 20,000 局的計時（seed base 7），其餘取自上表的
-200,000 局。
+The time of A at four is from a separate timing of 20,000 deals (seed base
+7); the rest are from the 200,000 deals of the tables above.
 
-要達到同樣的 z，所需局數與 z 的平方成反比：
+For the same z, the deals needed are in inverse proportion to the square of
+z:
 
-| | 兩人桌所需的局數 | 兩人桌所需的計算量 |
+| | Deals needed at two | Compute needed at two |
 | --- | ---: | ---: |
-| A | 四人的 2.9 倍 | 四人的 1.8 倍 |
-| B | 四人的 0.70 倍 | 四人的 0.40 倍 |
+| A | 2.9 times four's | 1.8 times four's |
+| B | 0.70 times four's | 0.40 times four's |
 
-### `MonteCarloBot` 128 樣本對 `HeuristicBot`（各 3,200 局）
+### `MonteCarloBot` at 128 samples against `HeuristicBot` (3,200 deals each)
 
-| | 四人 | 兩人 |
+| | Four | Two |
 | --- | ---: | ---: |
-| 候選與對照的版本 | 對照 `6428dab` | `3aa5b0c` |
+| Versions of candidate and control | control `6428dab` | `3aa5b0c` |
 | seed base | 1794777431 | 1794830779 |
-| 不同的局數 | 1,082 | 1,251 |
-| 得分差（分／局） | +0.148 ± 0.276 | +0.347 ± 0.175 |
+| Deals that differ | 1,082 | 1,251 |
+| Score difference (points a deal) | +0.148 ± 0.276 | +0.347 ± 0.175 |
 | 95% CI | [−0.392, +0.689] | [+0.005, +0.689] |
-| 結論 | 不明 | win |
-| 胡牌率，對照 → 候選 | 24.47% → 24.97% | 49.44% → 50.41% |
+| Verdict | insufficient data | win |
+| Win rate, control → candidate | 24.47% → 24.97% | 49.44% → 50.41% |
 | z | 0.5 | 2.0 |
-| 不同的局裡，得分差的平均（分） | 0.44 | 0.89 |
-| 不同的局裡，得分差的標準差（分） | 27 | 15.8 |
-| 不同的局裡，平均 ÷ 標準差 | 0.02 | 0.06 |
+| In the deals that differ, mean of the score difference (points) | 0.44 | 0.89 |
+| In the deals that differ, standard deviation of the score difference (points) | 27 | 15.8 |
+| In the deals that differ, mean ÷ standard deviation | 0.02 | 0.06 |
 
-四人的數字取自 `CHANGELOG.md`，沒有重跑。`6428dab` 之後動到 `src/` 的三次
-提交，各以 20,000 局確認過 `HeuristicBot` 的打法不變；`MonteCarloBot` 沒有
-另外確認。
+The four-player numbers are from `CHANGELOG.md` and were not rerun.  The
+three commits that touched `src/` after `6428dab` were each confirmed over
+20,000 deals to leave `HeuristicBot`'s play unchanged; `MonteCarloBot` was
+not confirmed separately.
 
-兩人桌這一次用了 973 CPU 分鐘，每副牌約 18 CPU 秒，16 個執行緒 71 分鐘。
+This run at a table of two took 973 CPU minutes, about 18 CPU seconds a
+deal, 71 minutes on 16 threads.
 
-### 重跑與 Peeker（兩人桌，各 3,200 局，對照 `e40cca4`）
+### The rerun and the Peeker (table of two, 3,200 deals each, control `e40cca4`)
 
-| | Monte Carlo 第一次 | Monte Carlo 重跑 | Peeker |
+| | Monte Carlo, first run | Monte Carlo, rerun | Peeker |
 | --- | ---: | ---: | ---: |
-| 候選的版本 | `3aa5b0c` | `e40cca4` | `e40cca4` 加 Peeker |
-| 對照的版本 | `3aa5b0c` | `e40cca4` | `e40cca4` |
+| Candidate's version | `3aa5b0c` | `e40cca4` | `e40cca4` plus the Peeker |
+| Control's version | `3aa5b0c` | `e40cca4` | `e40cca4` |
 | seed base | 1794830779 | 1794846583 | 1794847090 |
-| 不同的局數 | 1,251 | 1,202 | 1,616 |
-| 得分差（分／局） | +0.347 ± 0.175 | +0.050 ± 0.172 | +2.824 ± 0.192 |
+| Deals that differ | 1,251 | 1,202 | 1,616 |
+| Score difference (points a deal) | +0.347 ± 0.175 | +0.050 ± 0.172 | +2.824 ± 0.192 |
 | 95% CI | [+0.005, +0.689] | [−0.287, +0.388] | [+2.449, +3.200] |
-| 結論 | win | 不明 | win |
-| 胡牌率，對照 → 候選 | 49.44% → 50.41% | 51.47% → 51.47% | 49.31% → 60.88% |
+| Verdict | win | insufficient data | win |
+| Win rate, control → candidate | 49.44% → 50.41% | 51.47% → 51.47% | 49.31% → 60.88% |
 | z | 2.0 | 0.3 | 14.7 |
-| 不同的局裡，得分差的平均（分） | 0.89 | 0.13 | 5.6 |
-| 不同的局裡，得分差的標準差（分） | 15.8 | 15.9 | 14.8 |
-| 不同的局裡，平均 ÷ 標準差 | 0.06 | 0.01 | 0.38 |
+| In the deals that differ, mean of the score difference (points) | 0.89 | 0.13 | 5.6 |
+| In the deals that differ, standard deviation of the score difference (points) | 15.8 | 15.9 | 14.8 |
+| In the deals that differ, mean ÷ standard deviation | 0.06 | 0.01 | 0.38 |
 
-- **Peeker 減 Monte Carlo 重跑**：+2.774 ± 0.258，95% CI [+2.27, +3.28]。
-  兩次的 seed base 不同，所以是不成對的差，標準誤是兩者的平方和開根號。
-- **兩次 Monte Carlo 合起來**（依變異數的倒數加權）：+0.196 ± 0.123，95% CI
-  [−0.045, +0.436]。這只是描述，不是判定：第二次是因為第一次的結果才跑的，
-  兩次的版本也不同（中間隔了 `e40cca4`）。
-- **成本**：重跑用了 991 CPU 分鐘，Peeker 971 CPU 分鐘，每副牌都約 18 CPU
-  秒。Peeker 獨占機器，16 個執行緒 73 分鐘；重跑與別的 A/B 共用 CPU，花了
-  122 分鐘，這個時間不能當基準。
+- **The Peeker less the Monte Carlo rerun**: +2.774 ± 0.258, 95% CI [+2.27,
+  +3.28].  The two runs have different seed bases, so the difference is
+  unpaired, and its standard error is the root of the sum of the two
+  squares.
+- **The two Monte Carlo runs together** (weighted by the inverse of the
+  variance): +0.196 ± 0.123, 95% CI [−0.045, +0.436].  This only describes;
+  it is not a verdict: the second run was made because of the first's
+  result, and the two also differ in version (`e40cca4` lies between).
+- **Cost**: the rerun took 991 CPU minutes and the Peeker 971, each about 18
+  CPU seconds a deal.  The Peeker had the machine to itself, 73 minutes on
+  16 threads; the rerun shared the CPU with another A/B and took 122
+  minutes, a time that cannot serve as a baseline.
 
-## 判讀
+## Reading
 
-- **Monte Carlo 在兩人桌沒有比較看得出來。** 第一次的 z 是 2.0，重跑是
-  0.3，與四人桌的 0.5 沒有分別。兩次都容得下 +0.3 分上下的真值，也容得下
-  0；3,200 局分不出來。`../gin-rummy-engine` 裡同樣架構的 Monte Carlo 明顯
-  贏過貪心 bot，這裡沒有量到同樣的事。
-- **值錢的是資訊，不是多算。** Peeker 與 `MonteCarloBot` 是同一套搜尋、同樣
-  128 個樣本，只差在對手的手牌是真的還是均勻猜的。一個贏 2.8 分，另一個
-  量不到。不同的局裡，Peeker 的平均 ÷ 標準差是 0.38，這份文件裡其他改動都在
-  0.01 到 0.18。
-- **2.8 分是上限，不是預估。** 對手推論只能從公開的牌猜手牌，猜不到全對；
-  Peeker 也順便消掉了搜尋在每個發牌裡各自做決定的毛病。推論拿得到其中多少
-  沒有量，四人桌的上限也沒有量。
-- **雜訊的來源是發牌，不是人數。** 兩邊一旦打得不一樣，之後摸到什麼牌就
-  決定了大部分的得分差。這在兩人桌與四人桌都一樣：平均 ÷ 標準差都在 0.10
-  到 0.18 之間。文獻裡兩人麻將與兩人撲克的評估同樣被發牌的運氣淹沒
-  （[`prior-art.md`](prior-art.md) D 節）。
-- **改動值多少，隨桌子而變。** 「保留聽牌的手」在四人桌每一局有差別的牌值
-  6.3 分，約是一次輸贏（贏 3 × 12 分，輸 12 分，相差約 49 分）的 13%；在
-  兩人桌值 1.6 分，約是一次輸贏（相差約 24 分）的 6%。一個可能的原因是
-  四人桌有三家在打牌給聽牌的手胡，兩人桌只有一家；這是推測，沒有量。
-- **所以在一種桌子上量到的大小不能直接搬到另一種。** 兩個改動在兩種桌子上
-  都是贏，方向相同；以每局的分數計，四人桌是兩人桌的 3.7 倍（A）與 1.3 倍
-  （B）。
+- **Monte Carlo shows no more clearly at a table of two.**  The first run's
+  z is 2.0 and the rerun's 0.3, no different from the 0.5 at four.  Both
+  runs leave room for a true value around +0.3 points, and for 0; 3,200
+  deals cannot tell them apart.  In `../gin-rummy-engine` a Monte Carlo of
+  the same build clearly beats the greedy bot; nothing of the kind was
+  measured here.
+- **What pays is information, not more computing.**  The Peeker and
+  `MonteCarloBot` are the same search with the same 128 samples, differing
+  only in whether the opponent's hand is the real one or a uniform guess.
+  One wins 2.8 points; the other cannot be measured.  In the deals that
+  differ the Peeker's mean ÷ standard deviation is 0.38, where every other
+  change in this document lies between 0.01 and 0.18.
+- **2.8 points is an upper bound, not a forecast.**  Opponent inference can
+  only guess the hand from the public cards and cannot get it all right; the
+  Peeker also happens to remove the search's fault of deciding separately in
+  each sampled deal.  How much of it inference can get was not measured, nor
+  was the upper bound at four.
+- **The noise comes from the deal, not the number of players.**  Once the
+  two sides play differently, the cards drawn afterwards decide most of the
+  score difference.  This is the same at two and at four: mean ÷ standard
+  deviation lies between 0.10 and 0.18 at both.  In the literature, the
+  evaluation of two-player mahjong and two-player poker is likewise drowned
+  by the luck of the deal ([`prior-art.md`](prior-art.md), section D).
+- **What a change is worth varies with the table.**  At four, "keep a
+  waiting hand" is worth 6.3 points on each deal that differs, about 13% of
+  one win or loss (win 3 × 12 points, lose 12 points, about 49 points
+  apart); at two it is worth 1.6 points, about 6% of one win or loss (about
+  24 points apart).  One possible cause is that at four three seats are
+  discarding cards for the waiting hand to win on, and at two only one; this
+  is a guess and was not measured.
+- **So a size measured at one kind of table cannot be carried straight to
+  the other.**  Both changes win at both tables, in the same direction; in
+  points a deal, four is 3.7 times two (A) and 1.3 times (B).
 
-## 限制
+## Caveats
 
-- **Monte Carlo 的兩次結果不一致：一次贏、下界 +0.005，一次不明。** 兩個
-  區間重疊，沒有互相矛盾，但不能拿第一次當依據。要定出它的大小，得把標準誤
-  壓到 0.05 上下，約 40,000 局、200 CPU 小時。第一次跑的時候另有一個 32 局
-  的計時在同一台機器上跑了 1 分 41 秒，只影響時間，不影響結果。
-- **Peeker 只量了兩人桌、一次。** 它的區間離 0 有十幾個標準誤，不靠重跑；
-  但四人桌上三家的手牌值多少是另一個數字。
-- **只有兩個改動，而且都是自己手牌的效率。** 作者的理由是兩人零和裡對錯
-  比較常被獎懲，這最可能出現在跟對手互動的決定上：兩人桌上對手能吃我打的
-  每一張牌，它胡的每一局都由我付。這一類決定這裡沒有量。
-- **兩人桌沒有跑測試。** `tests/round.rs` 寫死了四家，函式庫的一個單元測試
-  也是。A/B 程式會在非法動作或兩邊不同步時中止，八十萬局沒有發生；除此
-  之外，`CLAUDE.md` 列的不變量在兩人桌上沒有驗證過。
-- **`HeuristicBot` 是為四人桌調的。** 它的常數與「下家摸牌前先比一比」的
-  邏輯都在四人桌上量過。兩人桌上它是不是合理的對照，沒有量。
-- **A 四人的計時與 A 兩人不是同一批牌**，B 則是同樣的局數各跑一次。成本的
-  比只當成約略值。
+- **The two Monte Carlo results disagree: one a win with its lower bound at
+  +0.005, one insufficient data.**  The two intervals overlap and do not
+  contradict each other, but the first cannot be relied on.  To pin its size
+  down the standard error has to come down to about 0.05: some 40,000 deals,
+  200 CPU hours.  During the first run a separate 32-deal timing ran on the
+  same machine for 1 minute 41 seconds, which affects only the time, not the
+  result.
+- **The Peeker was measured only at a table of two, once.**  Its interval is
+  more than ten standard errors from 0 and does not depend on a rerun; but
+  what the hands of three seats are worth at four is another number.
+- **Only two changes, and both about the efficiency of one's own hand.**
+  The author's reasoning is that in a two-player zero-sum game right and
+  wrong are rewarded and punished more often, which is most likely to show
+  in decisions that interact with the opponent: at a table of two the
+  opponent can eat every card I discard, and I pay for every round it wins.
+  Decisions of this kind were not measured here.
+- **No tests were run at a table of two.**  `tests/round.rs` hard-codes four
+  seats, and so does one unit test of the library.  The A/B program aborts
+  on an illegal move or when the two sides fall out of step, which did not
+  happen in 800,000 rounds; beyond that, the invariants `CLAUDE.md` lists
+  were not verified at a table of two.
+- **`HeuristicBot` is tuned for four.**  Its constants and its "compare
+  first before the next seat draws" logic were all measured at four.
+  Whether it is a reasonable control at two was not measured.
+- **The timings of A at four and A at two are not on the same deals**, while
+  B ran the same deal count once each.  The cost ratio is only approximate.

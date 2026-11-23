@@ -1,165 +1,211 @@
-# 閘門外的 eval：淺層的動態規劃加葉節點的值：設計
+# The eval beyond the gate: a shallow DP with values at the leaves: design
 
-寫於 2026-11-19，基準 `b22f1f0`。這份文件接手 `doc/expectation.md` 的應用 I
-（給長手牌當標註）與 `doc/stronger-bot.md` 路線四（蒸餾成快速模型），老師從
-Monte Carlo 換成單人動態規劃。程式還沒寫；下面的成本除了註明「量過」的都是
-估計。
+Written 2026-11-19, base `b22f1f0`.  This document takes over application I
+of `doc/expectation.md` (labels for long hands) and route 4 of
+`doc/stronger-bot.md` (distilling into a fast model), with the teacher changed
+from Monte Carlo to the single-player dynamic programming.  No code is written
+yet; the costs below are estimates except where marked "measured".
 
-## 要回答的問題
+## The questions to answer
 
-`ExpectBot` 的閘門在本機是 14 張、網頁是 10 張。14 張的閘門只放行 39% 的
-決定（量過，`expectation.md` 應用 D）；15 到 17 張占 31%，18 張以上占 29%，
-這六成照 `HeuristicBot` 打。精確的圖在那裡太貴：17 張 1.6 秒，20 張 22 秒
-（量過，`research/dp-nodes.md`）。
+`ExpectBot`'s gate is 14 cards on the desktop and 10 on the web.  The 14-card
+gate lets through only 39% of the decisions (measured, `expectation.md`
+application D); 15 to 17 cards are 31% and 18 or more 29%, and that 60% is
+played as `HeuristicBot`.  The exact graph is too dear there: 1.6 seconds at
+17 cards, 22 seconds at 20 (measured, `research/dp-nodes.md`).
 
-提議是西洋棋引擎的形狀：圖只展開一兩層，葉節點的值由一個微秒量級的 eval
-給。eval 的單位是分，學的是精確的 DP 的值。
+The proposal has the shape of a chess engine: the graph is expanded only one
+or two levels, and a leaf's value comes from an eval that takes about a
+microsecond.  The eval's unit is points, and what it learns is the value of
+the exact DP.
 
-1. `HeuristicBot` 在 15 到 20 張的選擇，照精確的值少幾分？這是獎金的上限。
-2. eval 能把精確的值學到多準？
-3. 加一兩層之後，選到的和精確的差多少，一個決定要幾毫秒？
-4. 贏不贏閘門外照 `HeuristicBot` 打的 `ExpectBot`？
+1. How many points do `HeuristicBot`'s choices at 15 to 20 cards give up by
+   the exact values?  This is the upper bound on the prize.
+2. How accurately can the eval learn the exact values?
+3. With one or two levels added, how far is the choice from the exact one,
+   and how many milliseconds does a decision take?
+4. Does it beat the `ExpectBot` that plays as `HeuristicBot` beyond the gate?
 
-## 進度
+## Progress
 
-每一批大約是一個 session。做完一批就更新這張表。
+Each batch is about one session.  Update this table when a batch is done.
 
-| 批次 | 產出 | 改變打法 | 閘門 | 狀態 |
+| Batch | Output | Changes play | Gate | Status |
 | --- | --- | --- | --- | --- |
-| 0 | 這份文件 | 否 | 無 | 完成 |
-| 1 | 獎金：`HeuristicBot` 在各張數照精確的值少幾分；長手牌的校準 | 否 | 15 到 20 張預測的增益 0.05 分／局以上 | 完成：+0.35 ± 0.07；長手牌的胡牌率低估 24% |
-| 2 | 框架：圖的深度上限、葉節點的曲線、依深度的普查、葉節點誤差的敏感度 | 否，要量到零分歧 | 深度 1 在 20 張平均 100 毫秒以內 | 完成：29 毫秒；網頁 k = 1，本機 17 張以下 k = 2；k = 1 容得下 σ 2、偏差 ±1、λ 0.5 |
-| 3 | 標註、樣式表、離線的損失表 | 否 | 新的局上預測的增益 0.05 分／局以上，偏差在批次 2 定的範圍內 | 完成：D = 16，網頁 +0.34 ± 0.06、本機 +0.27 ± 0.06；k = 1 偏差 −0.03、斜率 0.97、殘差 0.65 |
-| 4 | 閘門外改用淺層的圖，網頁與本機各一次 A/B | 候選 | win 才 commit | 完成：網頁 +0.19 ± 0.05、本機 +0.20 ± 0.05，都是 win |
-| 5 | 應用，見下表 | 各自 | 批次 4 有一次 win | 可以開始；A 隨批次 4 完成 |
-| | 兩、三人桌：掃的張數超過表長時退回 `HeuristicBot` | 是 | win 才 commit | 完成：四人桌零分歧；兩、三人桌 +10.4 到 +11.3，都是 win |
+| 0 | This document | No | None | Done |
+| 1 | The prize: how many points `HeuristicBot` gives up by the exact values at each card count; the calibration of long hands | No | A predicted gain at 15 to 20 cards of 0.05 points a deal or more | Done: +0.35 ± 0.07; the win rate of long hands is underestimated by 24% |
+| 2 | The framework: a depth limit on the graph, the leaves' curves, a census by depth, the sensitivity to leaf error | No, to be measured at zero deals that part | Depth 1 within 100 milliseconds on average at 20 cards | Done: 29 milliseconds; web k = 1, desktop k = 2 up to 17 cards; k = 1 tolerates σ 2, bias ±1, λ 0.5 |
+| 3 | Labels, pattern tables, the offline loss table | No | A predicted gain on new rounds of 0.05 points a deal or more, with the bias inside the range batch 2 sets | Done: D = 16, web +0.34 ± 0.06, desktop +0.27 ± 0.06; k = 1 bias −0.03, slope 0.97, residual 0.65 |
+| 4 | The shallow graph beyond the gate, one A/B each for the web and the desktop | Candidate | Commit only on a win | Done: web +0.19 ± 0.05, desktop +0.20 ± 0.05, both wins |
+| 5 | Applications, see the table below | Each its own | One win in batch 4 | May start; A is done with batch 4 |
+| | Tables of two and three: fall back to `HeuristicBot` when the cards swept exceed the length of the table | Yes | Commit only on a win | Done: zero deals part at a table of four; +10.4 to +11.3 at tables of two and three, all wins |
 
-0.05 分／局是這個 repo 裡量得到的改進的下緣：`hu-ceiling.md` 批次 3 是
-+0.053，100,000 局重洗的 A/B 標準誤約 0.014。
+0.05 points a deal is the lower edge of the improvements this repo can
+measure: batch 3 of `hu-ceiling.md` is +0.053, and the standard error of a
+reshuffled A/B of 100,000 deals is about 0.014.
 
-## 形狀
+## Shape
 
-### 淺層的圖
+### The shallow graph
 
-遞迴與 `expectation.md` 相同，不改。根是眼前的決定能留下的每一手（打掉一張，
-或吃碰再打一張）。離根 k 次吃碰的節點不展開，是**葉節點**：掃描到第 t 輪時，
-它的值讀 eval 的曲線 V̂(手, 亮出的胡, t)。
+The recursion is that of `expectation.md`, unchanged.  The roots are every
+hand the decision at hand can leave (discarding a card, or claiming and then
+discarding one).  A node k claims from a root is not expanded and is a
+**leaf**: when the sweep reaches step t, its value is read from the eval's
+curve V̂(hand, exposed 胡, t).
 
-- **k = 0** 是純粹的 eval bot：每個選擇留下的手直接給分，成本與
-  `HeuristicBot` 同一個量級。
-- **k = 1、2** 是多看一兩次吃碰。
-- **天花板的剪枝照舊。** 到不了門檻的手仍然併進「不會胡了」的節點，值是
-  精確的，eval 不必學死手。
-- **閘門內不變。** 手牌在閘門以內時照舊建完整的圖。
+- **k = 0** is a pure eval bot: the hand each choice leaves is valued
+  directly, at a cost of the same order as `HeuristicBot`'s.
+- **k = 1, 2** look one or two claims further.
+- **The ceiling pruning stays.**  A hand that cannot reach the threshold is
+  still merged into the "will not win" node, whose value is exact, so the
+  eval need not learn dead hands.
+- **Nothing changes inside the gate.**  With the hand inside the gate the
+  full graph is built as before.
 
-成本從 `dp-nodes.md` 的邊數推（20 張每個節點約 83 條邊、每個節點 31 微秒，
-17 張約 60 條邊）：
+The costs follow from the edge counts of `dp-nodes.md` (at 20 cards about 83
+edges a node and 31 microseconds a node, at 17 cards about 60 edges):
 
-| k | 葉節點（估計） | 一個決定（估計） | 用得起的地方 |
+| k | Leaves (an estimate) | A decision (an estimate) | Where it is affordable |
 | ---: | ---: | --- | --- |
-| 0 | 10 到 60，就是根 | 0.1 毫秒以內 | 網頁、playout |
-| 1 | 10² 到 10³ | 幾毫秒 | 網頁 |
-| 2 | 10⁴ 到 10⁵ | 0.1 到 0.5 秒 | 本機 |
+| 0 | 10 to 60, the roots themselves | within 0.1 milliseconds | the web, playouts |
+| 1 | 10² to 10³ | a few milliseconds | the web |
+| 2 | 10⁴ to 10⁵ | 0.1 to 0.5 seconds | the desktop |
 
-路線三同類的估計低了兩到三個數量級，所以批次 2 先普查。
+The same kind of estimate for route 3 was two to three orders of magnitude
+low, so batch 2 takes a census first.
 
-### 和西洋棋引擎不一樣的三件事
+### Three differences from a chess engine
 
-- **一層是一次吃碰，不是一張牌。** 放過留在同一個節點、t 少一。所以葉節點
-  要的是一整條依 t 的曲線，t 至多 45（四人桌開局 25 draws，
-  `Outlook::default()` 的各段牌數加起來）。
-- **是期望值，不是 minimax。** 別家仍然是 `Outlook` 的四個常數。
-- **eval 的偏差不會抵消。** 西洋棋每條線都走到葉節點，eval 整體偏高不改變
-  選擇。這裡沒吃滿 k 次的路徑走到流局，拿的是精確的 0；吃滿的拿 eval。
-  eval 偏高 b 分，bot 就多吃碰 b 分的量。`research/fitted-weights.md` 的
-  擬合權重正是輸在吃與不吃之間。所以 eval 的絕對值要校準，而且每個 t 都要。
+- **A level is a claim, not a card.**  A pass stays in the same node with t
+  one less.  So a leaf needs a whole curve over t, t at most 45 (a table of
+  four starts with 25 draws; the cards of each segment of
+  `Outlook::default()` added up).
+- **It is an expectation, not minimax.**  The other seats are still
+  `Outlook`'s four constants.
+- **The eval's bias does not cancel.**  In chess every line runs to a leaf,
+  so an eval that is high across the board changes no choice.  Here a path
+  that has not used up its k claims runs to the exhausted round and takes an
+  exact 0; one that has takes the eval.  If the eval is b points high, the
+  bot claims b points' worth more.  The fitted weights of
+  `research/fitted-weights.md` lost exactly between eating and not eating.
+  So the eval's absolute value must be calibrated, and at every t.
 
-### eval：塊的樣式表
+### The eval: pattern tables of the blocks
 
-牌只在九塊裡互相成組（`src/ceiling.rs` 的 `blocks`）：四色各一塊將士象、各
-一塊車馬炮，兵卒一塊。一塊的**樣式**是每一種牌的（手上幾張，`live` 裡幾張），
-兩者相加至多 4，所以每種牌 15 個值。對稱的樣式併成一個：
+Cards form melds only within nine blocks (`blocks` in `src/ceiling.rs`): a
+將士象 block and a 車馬炮 block for each of the four colours, and one block
+of soldiers.  A block's **pattern** is, for each kind of card, (how many in
+hand, how many in `live`); the two sum to at most 4, so 15 values per kind
+of card.  Symmetric patterns are merged into one:
 
-| 塊 | 幾塊 | 對稱 | 樣式數 |
+| Block | How many | Symmetry | Patterns |
 | --- | ---: | --- | ---: |
-| 車馬炮 | 4，共用一張表 | 三種牌互換 | 680 |
-| 將士象 | 4，共用一張表 | 士象互換 | 1,800 |
-| 兵卒 | 1 | 四色互換 | 3,060 |
+| 車馬炮 | 4, sharing one table | the three kinds of card interchange | 680 |
+| 將士象 | 4, sharing one table | 士 and 象 interchange | 1,800 |
+| Soldiers | 1 | the four colours interchange | 3,060 |
 
-模型是 NNUE 的形狀，小得多：
+The model has the shape of NNUE, and is much smaller:
 
-- **每個樣式一個 D 維的向量**，共 5,540 個。亮出的胡（一胡一個）與 `live`
-  的總張數（每 8 張一個）也各有一個向量。
-- **累加器** a 是九塊的向量加上這兩個全域向量的和。
-- **輸出** V̂(t) = w(t) · relu(a) + b(t)，t = 1 到 45 各一組；V̂(0) 固定是
-  0，和遞迴一樣。
+- **One D-dimensional vector per pattern**, 5,540 in all.  The exposed 胡
+  (one per 胡) and the total count of `live` (one per 8 cards) have a vector
+  each as well.
+- **The accumulator** a is the sum of the nine blocks' vectors and these two
+  global vectors.
+- **The output** is V̂(t) = w(t) · relu(a) + b(t), one set for each t from 1
+  to 45; V̂(0) is fixed at 0, as in the recursion.
 
-「數面子、搭子、單張」是它的特例：D = 1、每個樣式的數字用手填。這裡讓資料
-填，D 從 1 掃到 16。九次查表加 45 次內積，一個葉節點約一微秒（估計）；
-D = 16 的表是 355 KB，量化成 8 位元約 90 KB。
+"Counting melds, 搭子 and lone cards" is a special case of it: D = 1, with
+each pattern's number filled in by hand.  Here the data fill them in, and D
+is swept from 1 to 16.  Nine table lookups and 45 inner products come to
+about a microsecond a leaf (an estimate); the D = 16 table is 355 KB, about
+90 KB quantised to 8 bits.
 
-對稱是遊戲的性質，不是模型的假設：四色的計分相同，士象、車馬炮在牌組裡的
-地位相同。批次 3 用精確的 DP 驗證：把手牌與 `live` 的顏色或牌種照上表互換，
-根的值不變。
+The symmetry is a property of the game, not an assumption of the model: the
+four colours score alike, and 士 and 象, or 車, 馬 and 炮, have the same
+standing in their melds.  Batch 3 verifies it with the exact DP: interchange
+the colours or the kinds of card of the hand and `live` as in the table
+above, and the roots' values do not change.
 
-eval 看不到的東西都固定在訓練時：`Rules`（十胡）與 `Outlook`（h × 1.5）。
-換了任何一個，表要重新訓練。八胡還沒有它的表，閘門外用的是十胡的表；
-量過，分不出好壞（「八胡：十胡的表在閘門外」）。
+Whatever the eval cannot see is fixed at training: `Rules` (十胡) and
+`Outlook` (h × 1.5).  Change either and the tables must be retrained.  八胡
+has no tables of its own yet and uses the ten-胡 tables beyond the gate;
+measured, and it cannot be told better from worse ("八胡: the ten-胡 tables
+beyond the gate").
 
-### 標註
+### Labels
 
-一張精確的圖掃描一次，圖裡每個節點在每個 t 的值都是一筆標註，沒有取樣雜訊。
-路線二對的是一局的得分，標準差 30（`fitted-weights.md`）。
+One sweep of an exact graph makes the value of every node at every t a
+label, with no sampling noise.  Route 2 fitted the score of a round, whose
+standard deviation is 30 (`fitted-weights.md`).
 
-- **取樣照 eval 實際被問的分布。** 葉節點是真實決定點往下一兩層的手，所以
-  每張圖只取離根三層以內的節點，不取圖裡占多數的深層短手。
-- **長手牌的圖離線建。** 17 張以下不剪；18 張以上圖裡用 `Discards::Loose`
-  （20 張約 5 秒，量過），根不剪。`Loose` 在 13 張以下讓 3% 的決定選錯、
-  每個決定少 0.010 分（量過）；18 張以上的代價沒有量過。
-- **標註不進 repo。** 進 repo 的是產生它的 example、seed 與訓練出來的表。
+- **Sample from the distribution the eval is actually asked about.**  A leaf
+  is a hand one or two levels below a real decision point, so each graph
+  gives only the nodes within three levels of a root, not the deep short
+  hands that make up most of the graph.
+- **The graphs of long hands are built offline.**  At 17 cards or fewer
+  nothing is pruned; at 18 cards or more the graph uses `Discards::Loose`
+  inside (about 5 seconds at 20 cards, measured) and the roots are not
+  pruned.  At 13 cards or fewer `Loose` makes 3% of the decisions choose
+  wrongly and costs 0.010 points a decision (measured); its cost at 18 cards
+  or more has not been measured.
+- **The labels do not go into the repo.**  What goes in is the example that
+  makes them, the seed and the trained tables.
 
-## 批次 1：獎金
+## Batch 1: the prize
 
-不寫新的核心，用現有的 `ExpectBot`。座位 1 照本機現在的 bot 打（閘門 14 張），
-另外三家 `HeuristicBot`，和 A/B 的桌子一樣。座位 1 的每一個決定，另外用上面
-「標註」的圖算出每個選擇的值，記下：
+No new core is written; the existing `ExpectBot` is used.  Seat 1 plays as
+the desktop's present bot (a 14-card gate) and the other three seats are
+`HeuristicBot`, the same table as the A/B's.  For each of seat 1's decisions,
+the value of every choice is also computed from the graph of "Labels" above,
+and these are recorded:
 
-- **R(n)：** `HeuristicBot` 的首選比最好的選擇少幾分，依決定之後的暗牌張數
-  n 平均。吃碰與棄牌都算。
-- **N(n)：** 每局有幾個 n 張的決定。
-- **校準：** 同一張圖用 `Payoff::Win` 再掃一次，預測的胡牌率依張數對上這一
-  家實際胡了沒有。`research/outlook.md` 的校準只做到 10 張。
+- **R(n):** how many points `HeuristicBot`'s first choice gives up against
+  the best choice, averaged by the number n of concealed cards after the
+  decision.  Claims and discards both count.
+- **N(n):** how many decisions of n cards a round has.
+- **Calibration:** the same graph is swept once more with `Payoff::Win`, and
+  the predicted win rate is set, by card count, against whether this seat
+  actually won.  The calibration of `research/outlook.md` only goes to 10
+  cards.
 
-匯率從應用 D 來：閘門從 10 張開到 14 張是 +0.132 分／局，模型裡對應的量是
-Σ N(n) · R(n)，n 從 11 到 14。兩者的比是 ρ。
+The exchange rate comes from application D: opening the gate from 10 cards
+to 14 is +0.132 points a deal, and the matching quantity in the model is
+Σ N(n) · R(n), n from 11 to 14.  The ratio of the two is ρ.
 
-**預測的增益 = ρ · Σ N(n) · R(n)，n 從 15 到 20。**
+**Predicted gain = ρ · Σ N(n) · R(n), n from 15 to 20.**
 
-閘門：預測的增益 0.05 分／局以上。不到就停在這裡，寫進 `research/`，bot
-不改。校準只報告：預測的胡牌率在 15 張以上比 10 張以下偏得多很多時，先回
-`expectation.md` 修模型，不往下做。
+Gate: a predicted gain of 0.05 points a deal or more.  Short of that it
+stops here, is written up in `research/`, and the bot is not changed.  The
+calibration is only reported: if the predicted win rate is off by far more
+at 15 cards or more than at 10 or fewer, go back to `expectation.md` and fix
+the model first, and do not go on.
 
-局數與 seed 在跑之前定下。試跑幾局計時與記憶體再定局數：20 張的圖不剪時
-有 1.2 × 10⁸ 條邊（量過），所以 18 張以上才用 `Loose`，執行緒數也要看
-記憶體。
+The round count and the seed are fixed before the run.  A few rounds are
+tried for time and memory before the count is fixed: the 20-card graph
+unpruned has 1.2 × 10⁸ edges (measured), which is why `Loose` is used at 18
+cards or more, and the thread count depends on memory too.
 
-批次 1 的宣告（2026-11-19，跑之前寫下，基準 `9794936`）：`examples/regret.rs`，
-`regret 1000 1795400000`，1,000 局，seed base 1795400000，避開 `ab/` 與
-`expectation.md` 用過的各段 seed。張數照閘門的算法：回應時是手上的張數，
-打牌時是打掉之後的。
+Batch 1's declaration (2026-11-19, written before the run, base `9794936`):
+`examples/regret.rs`, `regret 1000 1795400000`, 1,000 rounds, seed base
+1795400000, clear of the seed ranges `ab/` and `expectation.md` have used.
+Cards are counted the way the gate counts them: those in hand when answering
+an offer, and those left after the discard when discarding.
 
-局數由試跑定：100 局（seed base 1，不算數）在 10 個執行緒上 8 分鐘、每局
-35 CPU 秒、最多 2.6 GB；15 到 20 張預測的增益 0.23 ± 0.10。標準誤的下緣是
-應用 D 的 0.014／0.132 = 11%，1,000 局時兩個 Σ N · R 的相對誤差降到 11% 與
-6%，再多局省不了多少，約 80 分鐘。
+The round count is set by a trial run: 100 rounds (seed base 1, not counted)
+took 8 minutes on 10 threads, 35 CPU seconds a round and 2.6 GB at most; the
+predicted gain at 15 to 20 cards was 0.23 ± 0.10.  The floor of the standard
+error is application D's 0.014 / 0.132 = 11%; at 1,000 rounds the relative
+errors of the two Σ N · R fall to 11% and 6%, and more rounds would save
+little; about 80 minutes.
 
-### 批次 1 的結果
+### Batch 1 results
 
-`regret 1000 1795400000`：7,944 個決定，4,469 秒（10 個執行緒）。R 是每個
-決定少幾分，N 是每局幾個決定，「差」是 `HeuristicBot` 的首選不是最好的
-比例：
+`regret 1000 1795400000`: 7,944 decisions, 4,469 seconds (10 threads).  R is
+the points given up per decision, N the decisions per round, and "Off" the
+share where `HeuristicBot`'s first choice is not the best:
 
-| 張數 | 決定 | N | R | 差 | 最大 | N · R | 預測胡 | 實際胡 | 95% 區間 |
+| Cards | Decisions | N | R | Off | Max | N · R | Predicted win | Actual win | 95% CI |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | 20 | 1,623 | 1.623 | 0.203 | 21.7% | 5.06 | 0.330 | 0.156 | 0.226 | [0.206, 0.246] |
 | 19 | 147 | 0.147 | 0.231 | 21.1% | 6.37 | 0.034 | 0.143 | 0.177 | [0.124, 0.247] |
@@ -171,94 +217,118 @@ eval 看不到的東西都固定在訓練時：`Rules`（十胡）與 `Outlook`�
 | 13 | 407 | 0.407 | 0.110 | 12.3% | 5.81 | 0.045 | 0.263 | 0.258 | [0.218, 0.303] |
 | 12 | 485 | 0.485 | 0.244 | 12.2% | 15.33 | 0.119 | 0.249 | 0.243 | [0.207, 0.283] |
 | 11 | 436 | 0.436 | 0.125 | 11.7% | 7.00 | 0.055 | 0.248 | 0.243 | [0.205, 0.286] |
-| 10 以下 | 855 | 0.855 | 0.124 | 7.9% | 17.74 | 0.106 | 0.312 | 0.282 | |
+| 10 or fewer | 855 | 0.855 | 0.124 | 7.9% | 17.74 | 0.106 | 0.312 | 0.282 | |
 
-依段落，標準誤是逐局的；預測的增益的誤差含應用 D 的 0.014 與兩個和的
-共變：
+By band; the standard errors are per round, and the error of the predicted
+gain includes application D's 0.014 and the covariance of the two sums:
 
-| 張數 | Σ N · R | 標準誤 | 預測的增益 | 標準誤 |
+| Cards | Σ N · R | Standard error | Predicted gain | Standard error |
 | --- | ---: | ---: | ---: | ---: |
-| 11 到 14 | 0.293 | 0.043 | 0.132（應用 D） | 0.014 |
-| 15 到 20 | 0.773 | 0.047 | **0.348** | 0.067 |
-| 15 到 17 | 0.298 | 0.026 | 0.134 | 0.027 |
-| 18 到 20 | 0.476 | 0.037 | 0.214 | 0.043 |
-| 10 以下 | 0.106 | 0.031 | 0.048 | 0.016 |
+| 11 to 14 | 0.293 | 0.043 | 0.132 (application D) | 0.014 |
+| 15 to 20 | 0.773 | 0.047 | **0.348** | 0.067 |
+| 15 to 17 | 0.298 | 0.026 | 0.134 | 0.027 |
+| 18 to 20 | 0.476 | 0.037 | 0.214 | 0.043 |
+| 10 or fewer | 0.106 | 0.031 | 0.048 | 0.016 |
 
-- **閘門過了：** 15 到 20 張預測 +0.35 ± 0.07 分／局，閘門是 0.05。15 到 17
-  張單獨就和應用 D 一樣大；18 到 20 張更多，因為 20 張的決定最多，`HeuristicBot`
-  在那裡五次有一次不是最好的。
-- **匯率對得上一次。** 同一個 ρ 推 10 張以下是 +0.048 ± 0.016，實際量過的
-  是 `ExpectBot` 對 `HeuristicBot` 的 +0.076 ± 0.008（`expectation.md`
-  批次 3），差 1.6 個標準誤。方向是低估，所以 0.35 偏保守。
-- **R 的尾巴很重。** 每一列的最大值是平均的 30 到 100 倍，Σ N · R 大半來自
-  少數幾個大錯；N · R 的標準誤是逐局算的，已經含這件事。
+- **The gate is passed:** 15 to 20 cards predict +0.35 ± 0.07 points a
+  round, against a gate of 0.05.  15 to 17 cards alone are as large as
+  application D; 18 to 20 cards are more, because 20-card decisions are the
+  most numerous and `HeuristicBot` is not the best there one time in five.
+- **The exchange rate checks out once.**  The same ρ gives +0.048 ± 0.016
+  for 10 cards or fewer, and what was actually measured is `ExpectBot`
+  against `HeuristicBot` at +0.076 ± 0.008 (`expectation.md` batch 3), 1.6
+  standard errors apart.  The direction is an underestimate, so 0.35 is on
+  the conservative side.
+- **R has a heavy tail.**  Each row's maximum is 30 to 100 times its mean,
+  and most of Σ N · R comes from a few large mistakes; the standard error of
+  N · R is computed per round and already includes this.
 
-校準，依段落合併：
+Calibration, merged by band:
 
-| 張數 | 決定 | 預測胡 | 實際胡 | 預測／實際 |
+| Cards | Decisions | Predicted win | Actual win | Predicted / actual |
 | --- | ---: | ---: | ---: | ---: |
-| 10 以下 | 855 | 0.312 | 0.282 | 1.11 |
-| 11 到 14 | 2,189 | 0.233 | 0.240 | 0.97 |
-| 15 到 17 | 2,542 | 0.181 | 0.226 | 0.80 |
-| 18 到 20 | 2,358 | 0.163 | 0.228 | 0.71 |
+| 10 or fewer | 855 | 0.312 | 0.282 | 1.11 |
+| 11 to 14 | 2,189 | 0.233 | 0.240 | 0.97 |
+| 15 to 17 | 2,542 | 0.181 | 0.226 | 0.80 |
+| 18 to 20 | 2,358 | 0.163 | 0.228 | 0.71 |
 
-- **長手牌的偏差方向反過來：低估。** 10 張以下高估 11%，15 張以上低估
-  24%，大小約兩倍、方向相反，不算「偏得多很多」，所以照宣告往下做；但這是
-  一個系統性的偏差，不是雜訊。
-- **18 張以上低估得更多**（0.71 對 0.80），而 18 張以上的圖剪了棄牌：
-  `Loose` 讓 DP 假設自己以後打得比較差。h × 1.5 是在 10 張以下的局面調的，
-  套在一整局的 46 張上可能罰得太重，是另一個候選。兩者都還沒量。
-- 同一局的決定彼此相關，區間偏窄。
-- 對 eval 的意思：eval 學的是 DP 的值，這個偏差它照學。葉節點與流局的
-  精確 0 都在同一個模型裡，影響吃碰的是 eval 對 DP 的偏差（批次 2 的
-  敏感度），不是 DP 對實際的。應用 C（提示顯示胡牌機率）在 15 張以上沒過
-  校準，要先修模型。
+- **The bias of long hands runs the other way: an underestimate.**  10 cards
+  or fewer are overestimated by 11% and 15 or more underestimated by 24%,
+  about twice the size and the opposite direction, which is not "off by far
+  more", so the work goes on as declared; but this is a systematic bias, not
+  noise.
+- **18 cards or more are underestimated further** (0.71 against 0.80), and
+  the graphs at 18 cards or more have their discards pruned: `Loose` makes
+  the DP assume it will play worse later.  h × 1.5 was tuned on positions of
+  10 cards or fewer, and applied to the 46 cards of a whole round it may
+  fine too heavily; that is the other candidate.  Neither has been measured.
+- Decisions of the same round are correlated, so the intervals are too
+  narrow.
+- What it means for the eval: the eval learns the DP's value, and learns
+  this bias with it.  The leaves and the exact 0 of an exhausted round are
+  in the same model, so what moves the claims is the eval's bias against the
+  DP (batch 2's sensitivity), not the DP's against reality.  Application C
+  (the hint showing the chance to win) has not passed calibration at 15
+  cards or more, and the model must be fixed first.
 
-## 批次 2：框架
+## Batch 2: the framework
 
-- **`Prune` 加深度上限。** 廣度優先建圖時記下每個節點離根幾次吃碰，到上限
-  的不展開。
-- **`Graph::values` 收葉節點的曲線。** 沒有葉節點時和現在逐位相同。
-- **普查。** `examples/nodes.rs` 在 15 到 20 張的決定上，k = 0、1、2 各建
-  一次：節點、葉節點、建圖與掃描的毫秒。
-- **敏感度。** 在 11 到 14 張的決定上，k = 0、1、2 的葉節點讀精確的值再加
-  誤差，量選到的根照精確的值少幾分。誤差兩種：每個葉節點獨立的雜訊
-  （標準差 0.25、0.5、1、2 分），與全部葉節點共同的偏差（±0.5、±1 分）。
-  真正的 eval 的誤差在相近的手之間是相關的，所以獨立雜訊的那一欄是悲觀的。
+- **`Prune` gains a depth limit.**  The breadth-first build records how many
+  claims each node is from a root, and those at the limit are not expanded.
+- **`Graph::values` takes the leaves' curves.**  With no leaves it is
+  bit-identical to what it is now.
+- **Census.**  `examples/nodes.rs`, on decisions of 15 to 20 cards, builds
+  once each for k = 0, 1, 2: nodes, leaves, and the milliseconds to build
+  and to sweep.
+- **Sensitivity.**  On decisions of 11 to 14 cards, the leaves at k = 0, 1,
+  2 read the exact value plus an error, and the measure is how many points
+  the chosen root gives up by the exact values.  Two kinds of error: noise
+  independent at each leaf (standard deviation 0.25, 0.5, 1, 2 points), and
+  a bias common to all leaves (±0.5, ±1 points).  A real eval's errors are
+  correlated between similar hands, so the independent-noise column is the
+  pessimistic one.
 
-產出是兩個數字，批次 3 的閘門要用：每個平台用得起的 k，以及在那個 k 之下
-每個決定的損失不超過 `HeuristicBot` 的 R(n) 一半時，eval 可以有多大的誤差與
-偏差。
+The output is two numbers that batch 3's gate needs: the k each platform can
+afford, and how much error and bias the eval may have at that k while the
+loss per decision stays within half of `HeuristicBot`'s R(n).
 
-閘門：`ab/run.sh` 讀到 0 局分歧（沒有 bot 用深度上限）。深度 1 在 20 張平均
-超過 100 毫秒，表示上面的估計又錯了，只剩 k = 0 可用；先弄清楚再往下做。
+Gate: `ab/run.sh` reads 0 deals that part (no bot uses the depth limit).  If
+depth 1 averages over 100 milliseconds at 20 cards, the estimate above is
+wrong again and only k = 0 is usable; find out why before going on.
 
-批次 2 的宣告（2026-11-19，跑之前寫下，基準 `93b2d7b`）：
+Batch 2's declaration (2026-11-19, written before the run, base `93b2d7b`):
 
-- **普查：** `nodes 200 1795500000 20 0 k`，k = 0、1、2 各一次，依序跑、單
-  執行緒，同時不跑別的。和 `dp-nodes.md` 一樣是四家 `HeuristicBot` 自對局的
-  每一次打牌；棄牌全試（`Discards::All`）。葉節點的掃描讀 0，eval 的時間
-  不算在內。
-- **敏感度：** `examples/leaves.rs`，`leaves 2000 1795600000`，2,000 局，
-  桌子與批次 1 相同（座位 1 是閘門 14 張的 `ExpectBot`）。誤差在每個 t ≥ 1
-  都是同一個位移（一手牌被看錯，看錯得一致），V̂(0) 仍是 0。試跑時看到兩件
-  事，跑之前補進設計：
-  - **獨立雜訊在 k ≥ 1 不是悲觀的。** 一個根底下有幾百個葉節點，獨立的
-    雜訊在加權平均裡互相抵消；相近的手一起看錯的誤差不會。所以 k ≥ 1 的
-    那一欄是樂觀的，k = 0 的那一欄才是上面說的悲觀。
-  - **加一種誤差：比例。** V̂ = λ V，λ = 0.8、0.5，是擬合不足的 eval 往 0
-    縮的樣子；共同的偏差在 k = 0 只對上剪掉的根才有作用，比例不一樣。
-- 試跑 100 局（seed base 1，不算數）：228 個決定、13 秒（10 個執行緒）；
-  k = 0、1、2 每個決定平均 9、265、1,408 個葉節點。
-- **零分歧：** `SEED_BASE=1795700000 ab/run.sh 20000`，對照 `93b2d7b`，在
-  上面兩個跑完之後。
+- **Census:** `nodes 200 1795500000 20 0 k`, once each for k = 0, 1, 2, run
+  in turn, single-threaded, with nothing else running.  As in `dp-nodes.md`
+  it is every discard of four `HeuristicBot`s in self-play; all discards are
+  tried (`Discards::All`).  The sweep reads 0 at the leaves, and the eval's
+  time is not included.
+- **Sensitivity:** `examples/leaves.rs`, `leaves 2000 1795600000`, 2,000
+  rounds, the same table as batch 1 (seat 1 is the `ExpectBot` with a
+  14-card gate).  The error is the same shift at every t ≥ 1 (a hand is
+  misjudged, and misjudged consistently), and V̂(0) is still 0.  Two things
+  were seen in the trial run and added to the design before the run:
+  - **Independent noise is not pessimistic at k ≥ 1.**  A root has hundreds
+    of leaves below it, and independent noise cancels in the weighted
+    average; an error that misjudges similar hands together does not.  So
+    the k ≥ 1 column is optimistic, and only the k = 0 column is the
+    pessimistic one meant above.
+  - **One more kind of error: scale.**  V̂ = λ V, λ = 0.8, 0.5, is what an
+    underfitted eval shrinking towards 0 looks like; a common bias at k = 0
+    only acts against pruned roots, and a scale is different.
+- Trial run of 100 rounds (seed base 1, not counted): 228 decisions, 13
+  seconds (10 threads); 9, 265 and 1,408 leaves a decision on average at
+  k = 0, 1, 2.
+- **Zero deals part:** `SEED_BASE=1795700000 ab/run.sh 20000`, control
+  `93b2d7b`, after the two above have finished.
 
-### 批次 2 的結果
+### Batch 2 results
 
-**普查**（`nodes 200 1795500000 20 0 k`，2,875 次打牌，原生、單執行緒）。
-每個決定的平均，時間是建圖加掃描的毫秒：
+**Census** (`nodes 200 1795500000 20 0 k`, 2,875 discards, native,
+single-threaded).  Averages per decision; the time is the milliseconds to
+build and sweep:
 
-| 張數 | 決定 | k = 0 葉 | 毫秒 | k = 1 葉 | 毫秒 | 最多節點 | k = 2 葉 | 毫秒 | 最多節點 |
+| Cards | Decisions | k = 0 leaves | ms | k = 1 leaves | ms | Most nodes | k = 2 leaves | ms | Most nodes |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 20 | 200 | 13 | 0.42 | 1,350 | 29.1 | 3,633 | 27,031 | 509 | 113,859 |
 | 19 | 51 | 13 | 0.22 | 1,209 | 17.2 | 2,237 | 20,968 | 313 | 54,409 |
@@ -269,24 +339,32 @@ eval 看不到的東西都固定在訓練時：`Rules`（十胡）與 `Outlook`�
 | 14 | 385 | 9 | 0.11 | 374 | 4.3 | 1,066 | 2,621 | 36 | 11,058 |
 | 11 | 244 | 7 | 0.07 | 161 | 1.6 | 536 | 572 | 7.7 | 3,787 |
 
-- **閘門過了：** 深度 1 在 20 張平均 29 毫秒，閘門是 100。上面「1 是 10² 到
-  10³ 個葉節點、幾毫秒」的估計這次對了；k = 2 的 0.1 到 0.5 秒也對，20 張是
-  上緣。
-- **建圖占九成八。** 掃描在 k = 1 是 0.2 毫秒、k = 2 是 12 毫秒；時間花在
-  每個新節點的 `reach`。eval 照一微秒一個葉節點估，k = 1 再加 1.4 毫秒、
-  k = 2 再加 27 毫秒（20 張）。
-- **本機：** k = 2 到 17 張平均 144 毫秒，在 14 張的 186 毫秒以內；18 張起
-  218、313、509 毫秒，超過。所以本機 **15 到 17 張 k = 2，18 張起 k = 1**。
-- **網頁：** wasm 慢 1.7 倍（`expectation.md` 應用 C），k = 1 在 20 張平均約
-  50 毫秒；最多節點的那一手照節點數推約 130 毫秒，p95 低於最慢的，所以
-  p95 很可能在 0.1 秒以內，批次 4 照應用 C 實測。網頁 **11 到 20 張 k = 1**。
-- 普查只有打牌；吃碰的根多幾個，圖大一些。
+- **The gate is passed:** depth 1 averages 29 milliseconds at 20 cards,
+  against a gate of 100.  The estimate above, "1 is 10² to 10³ leaves, a few
+  milliseconds", was right this time; so was 0.1 to 0.5 seconds for k = 2,
+  with 20 cards at the upper edge.
+- **Building the graph is 98%.**  The sweep is 0.2 milliseconds at k = 1 and
+  12 milliseconds at k = 2; the time goes to the `reach` of each new node.
+  With the eval estimated at a microsecond a leaf, k = 1 adds another 1.4
+  milliseconds and k = 2 another 27 (20 cards).
+- **Desktop:** k = 2 averages 144 milliseconds up to 17 cards, within the
+  186 milliseconds of 14 cards; from 18 cards it is 218, 313 and 509
+  milliseconds, over.  So the desktop has **k = 2 at 15 to 17 cards and
+  k = 1 from 18**.
+- **Web:** wasm is 1.7 times slower (`expectation.md` application C), so
+  k = 1 averages about 50 milliseconds at 20 cards; the move with the most
+  nodes comes to about 130 milliseconds by its node count, and p95 is below
+  the slowest, so p95 is very likely within 0.1 seconds, to be measured in
+  batch 4 as in application C.  The web has **k = 1 at 11 to 20 cards**.
+- The census has discards only; a claim has a few more roots and a somewhat
+  larger graph.
 
-**敏感度**（`leaves 2000 1795600000`，4,653 個決定，245 秒，10 個執行緒）。
-每個決定照精確的值少幾分；「差」是選錯的比例，標準誤是逐決定的。誤差全部
-為 0 時三個深度都選到最好的，程式裡 assert：
+**Sensitivity** (`leaves 2000 1795600000`, 4,653 decisions, 245 seconds, 10
+threads).  Points given up per decision by the exact values; "Off" is the
+share chosen wrongly, and the standard error is per decision.  With every
+error at 0 all three depths choose the best, which the program asserts:
 
-| k | 獨立雜訊 | 共同偏差 | 比例 | 11 | 12 | 13 | 14 | 全部 | 差 | 標準誤 |
+| k | Independent noise | Common bias | Scale | 11 | 12 | 13 | 14 | All | Off | Standard error |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 0 | 0.25 | | | 0.018 | 0.018 | 0.017 | 0.024 | 0.020 | 12.8% | 0.001 |
 | 0 | 0.5 | | | 0.039 | 0.041 | 0.049 | 0.055 | 0.048 | 18.1% | 0.002 |
@@ -294,127 +372,155 @@ eval 看不到的東西都固定在訓練時：`Rules`（十胡）與 `Outlook`�
 | 0 | 2 | | | 0.206 | 0.256 | 0.258 | 0.262 | 0.249 | 28.7% | 0.010 |
 | 0 | | −1 | | 0.006 | 0.014 | 0.007 | 0.013 | 0.011 | 2.0% | 0.001 |
 | 0 | | −0.5 | | 0.002 | 0.003 | 0.002 | 0.003 | 0.003 | 0.9% | 0.000 |
-| 0 | | +0.5、+1 | 0.8、0.5 | 0 | 0 | 0 | 0 | 0 | 0% | 0 |
+| 0 | | +0.5, +1 | 0.8, 0.5 | 0 | 0 | 0 | 0 | 0 | 0% | 0 |
 | 1 | 0.25 | | | 0.000 | 0.001 | 0.001 | 0.001 | 0.001 | 2.7% | 0.000 |
 | 1 | 0.5 | | | 0.001 | 0.003 | 0.003 | 0.003 | 0.003 | 4.9% | 0.000 |
 | 1 | 1 | | | 0.006 | 0.007 | 0.008 | 0.011 | 0.008 | 7.9% | 0.001 |
 | 1 | 2 | | | 0.017 | 0.023 | 0.024 | 0.029 | 0.024 | 11.7% | 0.002 |
-| 1 | | ±0.5、±1 | | ≤ 0.001 | ≤ 0.001 | ≤ 0.001 | ≤ 0.001 | ≤ 0.001 | ≤ 1.0% | |
+| 1 | | ±0.5, ±1 | | ≤ 0.001 | ≤ 0.001 | ≤ 0.001 | ≤ 0.001 | ≤ 0.001 | ≤ 1.0% | |
 | 1 | | | 0.8 | 0.002 | 0.001 | 0.001 | 0.002 | 0.002 | 1.3% | 0.001 |
 | 1 | | | 0.5 | 0.019 | 0.017 | 0.011 | 0.013 | 0.015 | 3.5% | 0.002 |
 | 2 | 2 | | | 0.001 | 0.001 | 0.003 | 0.005 | 0.003 | 4.0% | 0.000 |
-| 2 | | ±0.5、±1 | | ≤ 0.001 | 0 | ≤ 0.001 | ≤ 0.001 | ≤ 0.001 | ≤ 0.5% | |
+| 2 | | ±0.5, ±1 | | ≤ 0.001 | 0 | ≤ 0.001 | ≤ 0.001 | ≤ 0.001 | ≤ 0.5% | |
 | 2 | | | 0.5 | 0.004 | 0.005 | 0.004 | 0.012 | 0.007 | 3.3% | 0.001 |
 
-k = 2 較小的雜訊與 0.8 的比例都在 0.001 上下，略去。比較的尺是批次 1 的
-`HeuristicBot` R(n) 的一半：11 到 14 張是 0.063、0.122、0.055、0.044。
+The smaller noises and the 0.8 scale at k = 2 are all around 0.001 and are
+omitted.  The yardstick is half of `HeuristicBot`'s R(n) from batch 1:
+0.063, 0.122, 0.055 and 0.044 at 11 to 14 cards.
 
-- **共同的偏差幾乎沒有作用，和上面「形狀」的擔心相反。** 從任何一個根出發，
-  牌還多的時候幾乎每條路都會再吃碰一次、走到葉節點，所以偏差平移所有的根。
-  只有在 k = 0、偏低、而有一個根是天花板剪掉的死手（值是精確的）時才選錯；
-  偏高在 k = 0 一次都沒有改變選擇。「eval 偏高 b 分就多吃碰 b 分」不成立，
-  因為吃與不吃的兩邊都走到葉節點。
-- **k = 0 怕的是獨立的雜訊。** σ = 0.5 在 14 張是 0.055，超過一半的
-  R(14) = 0.044；σ = 0.25 每個張數都過。所以 k = 0 要葉節點的誤差 σ 在
-  **0.4 分以內**（內插）。
-- **k = 1 對試過的每一種誤差都過：** σ = 2 最多 0.029（14 張），λ = 0.5 最多
-  0.019。獨立雜訊在這裡是樂觀的（見宣告），但比例是一種全部相關的誤差，
-  它也過。
-- **k = 2 比 k = 1 再小三到八倍。**
+- **The common bias has almost no effect, contrary to the worry of "Shape"
+  above.**  From any root, while cards are plentiful almost every path
+  claims once more and reaches a leaf, so a bias shifts all the roots alike.
+  A choice goes wrong only at k = 0, with the bias low, when one root is a
+  dead hand the ceiling pruned (whose value is exact); a high bias never
+  changed a choice at k = 0.  "If the eval is b points high, the bot claims
+  b points' worth more" does not hold, because both sides of eating or not
+  eating run to leaves.
+- **What k = 0 fears is independent noise.**  σ = 0.5 gives up 0.055 at 14
+  cards, over half of R(14), 0.044; σ = 0.25 passes at every card count.  So
+  k = 0 needs a leaf error σ **within 0.4 points** (interpolated).
+- **k = 1 passes for every error tried:** at most 0.029 for σ = 2 (14 cards)
+  and at most 0.019 for λ = 0.5.  Independent noise is optimistic here (see
+  the declaration), but a scale is an error correlated throughout, and it
+  passes too.
+- **k = 2 is another three to eight times smaller than k = 1.**
 
-給批次 3 的兩個數字：
+The two numbers for batch 3:
 
-| 平台 | k | 葉節點的誤差 σ | 共同偏差 | 比例 λ |
+| Platform | k | Leaf error σ | Common bias | Scale λ |
 | --- | --- | --- | --- | --- |
-| 網頁 | 1 | 2 分以內 | ±1 分以內 | 0.5 以上 |
-| 本機 | 15 到 17 張 2，18 張起 1 | 同上 | 同上 | 同上 |
+| Web | 1 | within 2 points | within ±1 point | 0.5 or more |
+| Desktop | 2 at 15 to 17 cards, 1 from 18 | as above | as above | as above |
 
-所以批次 3 的偏差閘門是：V̂ − V 依（張數，t）的平均在 ±1 分以內，V̂ 對 V
-的迴歸斜率在 0.5 以上，殘差的標準差在 2 分以內。k = 1 對 σ 的寬容來自
-獨立雜訊互相抵消，所以殘差的那一條比另外兩條鬆；批次 3 的損失表直接量
-R̂(n)，以它為準。
+So batch 3's bias gate is: the mean of V̂ − V by (cards, t) within ±1 point,
+the slope of the regression of V̂ on V 0.5 or more, and the standard
+deviation of the residual within 2 points.  The tolerance of k = 1 for σ
+comes from independent noise cancelling, so the condition on the residual is
+looser than the other two; batch 3's loss table measures R̂(n) directly, and
+that governs.
 
-- **零分歧：** `ab/run.sh 20000` 對照 `93b2d7b`（seed base 1795700000，
-  `RESHUFFLE=8`）讀到 0 局分歧。
+- **Zero deals part:** `ab/run.sh 20000` against `93b2d7b` (seed base
+  1795700000, `RESHUFFLE=8`) reads 0 deals that part.
 
-## 批次 3：標註、樣式表、離線的損失
+## Batch 3: labels, pattern tables, the offline loss
 
-- **標註。** 批次 1 的 example 加上輸出：樣式的九個編號、亮出的胡、`live`
-  的張數、每個 t 的值。
-- **訓練。** 一個 example，手寫的梯度下降，不加相依套件，固定 seed。損失是
-  每個 t 的平方誤差。D 取 1、4、16 各訓練一次。
-- **推論。** `src/eval.rs`：樣式的編號、查表、曲線。表編進執行檔。
-- **損失表。** 訓練沒看過的局上，每個張數、每個 k：選到的根照精確的值少
-  幾分 R̂(n)，以及 V̂ − V 依（張數，t）的平均，也就是偏差。
+- **Labels.**  Batch 1's example gains an output: the nine pattern indices,
+  the exposed 胡, the count of `live`, and the value at each t.
+- **Training.**  One example, hand-written gradient descent, no added
+  dependency, a fixed seed.  The loss is the squared error at each t.  One
+  training each for D = 1, 4, 16.
+- **Inference.**  `src/eval.rs`: the pattern indices, the lookups, the
+  curve.  The tables are compiled into the binary.
+- **Loss table.**  On rounds the training has not seen, for each card count
+  and each k: how many points the chosen root gives up by the exact values,
+  R̂(n), and the mean of V̂ − V by (cards, t), which is the bias.
 
-閘門，兩個都要過，用的是每個平台在批次 2 定下的 k：
+Gates, both to be passed, with the k batch 2 fixed for each platform:
 
-- ρ · Σ N(n) ·（R(n) − R̂(n)）在 0.05 分／局以上。網頁的 n 從 11 到 20，
-  本機從 15 到 20。
-- 偏差在批次 2 的敏感度定出的範圍內。
+- ρ · Σ N(n) · (R(n) − R̂(n)) is 0.05 points a deal or more.  n runs from
+  11 to 20 on the web and from 15 to 20 on the desktop.
+- The bias is inside the range batch 2's sensitivity sets.
 
-不過的話依序試，每一項重跑同一張損失表：加一層隱藏層；累加器多收
-`ceiling` 減門檻（建圖時已經算了）；多收背包算出的「到門檻最少還差幾張
-外來牌」。三項都不過就停，eval 不進 bot。
+Failing that, try these in order, each rerunning the same loss table: add a
+hidden layer; give the accumulator `ceiling` minus the threshold as well
+(already computed when the graph is built); give it the knapsack's "fewest
+outside cards still short of the threshold" as well.  If all three fail,
+stop, and the eval does not go into a bot.
 
-測試：
+Tests:
 
-批次 3 的宣告（2026-11-19，跑之前寫下，基準 `7f0d5f1`）：`examples/eval.rs`
-的三個模式，桌子與批次 1 相同，座位 1 在 11 到 20 張的每一個決定都建精確的圖
-（18 張起 `Loose`）。
+Batch 3's declaration (2026-11-19, written before the run, base `7f0d5f1`):
+the three modes of `examples/eval.rs`, the same table as batch 1, with the
+exact graph built for each of seat 1's decisions at 11 to 20 cards (`Loose`
+from 18).
 
-- **標註：** `eval label 2000 1795800000`，2,000 局。每張圖取全部的根，與
-  離根一次、兩次吃碰的節點各至多 64 個（均勻抽樣），每個節點記 t = 1 到
-  min(T, 46) 的值。四人桌的 T 至多 45，所以 t = 46 那一列從來沒有標註，
-  停在初值；見「兩、三人桌」。
-- **訓練：** `eval train labels eval 20 1 4 16`。Adam，學習率 3 × 10⁻³ 線性
-  降到十分之一，20 個 epoch，每批 256 個節點，初值的 seed 是 1795800000 + D；
-  局號除以 10 餘 9 的局留作驗證。三個 D 裡驗證 RMSE 最小的那一張是**被評的
-  表**，在損失表之前定下。
-- **損失表：** `eval loss 500 1795900000 eval-1.bin eval-4.bin eval-16.bin`，
-  500 局，三張表都報，閘門只讀被評的表。淺層的圖用 `Prune::default()`
-  （棄牌全試）加深度上限；`HeuristicBot` 的 R 在同一批決定上量，ρ 用同一次
-  跑的 11 到 14 張的 Σ N · R。偏差只算精確的圖裡也有的葉節點；格子至少
-  1,000 個值才算進「最差的格子」。
-- **補法：** 不過就照上面的順序，每一項在同一份標註上重新訓練，損失表換新的
-  seed base：1796000000、1796100000、1796200000。
-- **零分歧：** `SEED_BASE=1796300000 ab/run.sh 20000`，對照 `7f0d5f1`，在
-  上面都跑完之後。
+- **Labels:** `eval label 2000 1795800000`, 2,000 rounds.  Each graph gives
+  all its roots, and at most 64 nodes each (sampled uniformly) of those one
+  and two claims from a root; each node records the values for t = 1 to
+  min(T, 46).  T is at most 45 at a table of four, so the row t = 46 never
+  has a label and stays at its initial value; see "Two and three players".
+- **Training:** `eval train labels eval 20 1 4 16`.  Adam, the learning rate
+  3 × 10⁻³ falling linearly to a tenth, 20 epochs, 256 nodes a batch, the
+  seed of the initial values 1795800000 + D; rounds whose number leaves 9
+  when divided by 10 are held out for validation.  Of the three D, the table
+  with the smallest validation RMSE is **the table judged**, fixed before
+  the loss table.
+- **Loss table:** `eval loss 500 1795900000 eval-1.bin eval-4.bin eval-16.bin`,
+  500 rounds, all three tables reported, the gate reading only the table
+  judged.  The shallow graph uses `Prune::default()` (all discards tried)
+  plus the depth limit; `HeuristicBot`'s R is measured on the same
+  decisions, and ρ uses the Σ N · R of 11 to 14 cards from the same run.
+  The bias counts only leaves that are in the exact graph too; a cell needs
+  at least 1,000 values to count towards "the worst cell".
+- **Remedies:** on a failure, in the order above, each retrained on the same
+  labels, with a new seed base for the loss table: 1796000000, 1796100000,
+  1796200000.
+- **Zero deals part:** `SEED_BASE=1796300000 ab/run.sh 20000`, control
+  `7f0d5f1`, after all the above have finished.
 
-試跑（seed base 1 與 100，不算數）：標註每局 28 CPU 秒、最多 3.4 GB；損失表
-每局 47 CPU 秒；查一次表 0.2 微秒。30 局的標註訓練出來的表在 20 局上選得比
-`HeuristicBot` 差，D = 16 過擬合（訓練 RMSE 1.16、驗證 2.8），所以標註取
-2,000 局。
+Trial runs (seed bases 1 and 100, not counted): labelling takes 28 CPU
+seconds a round and 3.4 GB at most; the loss table 47 CPU seconds a round; a
+lookup 0.2 microseconds.  A table trained on 30 rounds of labels chose worse
+than `HeuristicBot` on 20 rounds, and D = 16 overfitted (training RMSE 1.16,
+validation 2.8), so the labels take 2,000 rounds.
 
-- **對稱。** 顏色互換、士象互換、車馬炮互換之後，樣式的編號不變；同樣的
-  互換之下精確的 DP 的根值也不變。
-- **編號。** 三張表的編號各自填滿 0 到樣式數減一，沒有兩個不對稱的樣式
-  撞在一起。
-- **沒有葉節點時不變。** 深度上限大於圖的深度時，值與不設上限逐位相同。
-- **合法。** `tests/round.rs` 的四人對局裡放一家用淺層圖的 bot，打完不
-  犯規。這一條跟著 bot 移到批次 4：批次 3 沒有 bot 用表。
+- **Symmetry.**  After interchanging colours, 士 and 象, or 車, 馬 and 炮,
+  the pattern indices do not change; under the same interchanges the root
+  values of the exact DP do not change either.
+- **Indices.**  The indices of each of the three tables fill 0 to the
+  pattern count minus one, and no two patterns that are not symmetric
+  collide.
+- **Unchanged with no leaves.**  With the depth limit greater than the
+  graph's depth, the values are bit-identical to those with no limit.
+- **Legal.**  In the four-player game of `tests/round.rs`, one seat is given
+  a bot that uses the shallow graph, and it plays through without an illegal
+  move.  This one moves with the bot to batch 4: no bot uses the tables in
+  batch 3.
 
-### 批次 3 的結果
+### Batch 3 results
 
-**標註：** `eval label 2000 1795800000`：14,397 張圖、1,951,898 個節點、
-66,895,056 個值，8,466 秒（10 個執行緒），檔案 326 MB。
+**Labels:** `eval label 2000 1795800000`: 14,397 graphs, 1,951,898 nodes,
+66,895,056 values, 8,466 seconds (10 threads), a file of 326 MB.
 
-**訓練：** `eval train labels eval 20 1 4 16`，每個 D 30 秒以內。驗證的
-206,004 個節點上，依 t 的平均值的 RMSE 是 3.37：
+**Training:** `eval train labels eval 20 1 4 16`, within 30 seconds for each
+D.  On the 206,004 validation nodes, the RMSE of the mean value at each t is
+3.37:
 
-| D | 訓練 RMSE | 驗證 RMSE | 根 | 一次吃碰 | 兩次吃碰 |
+| D | Training RMSE | Validation RMSE | Roots | One claim | Two claims |
 | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1 | 2.21 | 2.21 | 1.92 | 2.12 | 2.36 |
 | 4 | 0.84 | 0.99 | 1.03 | 0.99 | 0.99 |
 | 16 | 0.52 | **0.78** | 0.82 | 0.77 | 0.79 |
 
-被評的表是 D = 16，編進執行檔（`src/eval-16.bin`，f32，359 KB，`Eval::default`）。
+The table judged is D = 16, compiled into the binary (`src/eval-16.bin`,
+f32, 359 KB, `Eval::default`).
 
-**損失表**（`eval loss 500 1795900000`，3,664 個決定，2,266 秒，10 個執行緒；
-查一次表三張表平均 0.26 微秒）。R 是 `HeuristicBot` 的首選，R̂ 是淺層的圖選的，
-都是每個決定照精確的值少幾分：
+**Loss table** (`eval loss 500 1795900000`, 3,664 decisions, 2,266 seconds,
+10 threads; a lookup averages 0.26 microseconds over the three tables).  R
+is `HeuristicBot`'s first choice and R̂ the shallow graph's choice, both in
+points given up per decision by the exact values:
 
-| 張數 | 決定 | N | R | D = 16 k = 0 | k = 1 | k = 2 | D = 4 k = 1 | D = 1 k = 1 |
+| Cards | Decisions | N | R | D = 16 k = 0 | k = 1 | k = 2 | D = 4 k = 1 | D = 1 k = 1 |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 20 | 795 | 1.590 | 0.185 | 0.051 | 0.033 | 0.021 | 0.039 | 0.080 |
 | 19 | 58 | 0.116 | 0.108 | 0.059 | 0.050 | 0.002 | 0.075 | 0.181 |
@@ -427,18 +533,20 @@ R̂(n)，以它為準。
 | 12 | 230 | 0.460 | 0.156 | 0.151 | 0.062 | 0.015 | 0.106 | 0.104 |
 | 11 | 251 | 0.502 | 0.135 | 0.073 | 0.009 | 0.001 | 0.021 | 0.123 |
 
-11 到 14 張的 Σ N · R 是 0.271 ± 0.044（批次 1 是 0.293），ρ 用這一次的。
-預測的增益，誤差含應用 D 的 0.014 與共變：
+The Σ N · R of 11 to 14 cards is 0.271 ± 0.044 (0.293 in batch 1), and ρ
+uses this run's.  Predicted gain, the error including application D's 0.014
+and the covariance:
 
-| D | 網頁：11 到 20 張 k = 1 | 本機：15 到 17 張 k = 2，18 張起 k = 1 |
+| D | Web: k = 1 at 11 to 20 cards | Desktop: k = 2 at 15 to 17 cards, k = 1 from 18 |
 | ---: | ---: | ---: |
 | 1 | 0.042 ± 0.047 | 0.147 ± 0.040 |
 | 4 | 0.301 ± 0.053 | 0.245 ± 0.055 |
 | 16 | **0.340 ± 0.058** | **0.267 ± 0.058** |
 
-葉節點對精確的曲線（精確的圖裡也有的葉節點，每個 t 一個值）：
+The leaves against the exact curves (leaves that are in the exact graph too,
+one value per t):
 
-| D | k | 值 | V̂ − V | 斜率 | 殘差 | RMSE | 最差的格子 |
+| D | k | Values | V̂ − V | Slope | Residual | RMSE | Worst cell |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 16 | 0 | 1.5 × 10⁶ | −0.063 | 0.940 | 0.789 | 0.817 | −0.27 |
 | 16 | 1 | 8.7 × 10⁷ | −0.025 | 0.965 | 0.652 | 0.661 | +0.22 |
@@ -446,58 +554,71 @@ R̂(n)，以它為準。
 | 4 | 1 | 8.7 × 10⁷ | −0.055 | 0.954 | 0.836 | 0.850 | −0.65 |
 | 1 | 1 | 8.7 × 10⁷ | −0.060 | 0.854 | 1.676 | 1.738 | −1.62 |
 
-- **兩個閘門都過了，兩個平台都過。** 網頁 +0.34、本機 +0.27，閘門是 0.05；
-  k = 1 的偏差、斜率、殘差是 −0.03、0.97、0.65，範圍是 ±1、0.5、2。三個補法
-  都不必試。
-- **淺層的圖拿回大半的獎金。** 網頁的 R̂ 在每個張數都不到 R 的一半，加起來
-  11 到 20 張的 Σ N · R̂ 是 0.21，Σ N · R 是 0.91；本機的 k = 2 在 15 到 17 張只剩
-  0.003 到 0.008。網頁的 +0.34 比本機大，因為 11 到 14 張也算進去。
-- **k = 0 不夠。** 殘差 0.79，批次 2 說 k = 0 要 0.4 以內；它的 R̂ 在 13、15
-  張比 R 還大。網頁照批次 2 用 k = 1。
-- **相加的九個向量學得動門檻，D 要到 4 以上。** D = 1 在 k = 1 只拿回一點點
-  （+0.04 ± 0.05，不明）。
-- **偏差的格子幾乎都在 ±0.1 以內。** 例外是 k = 2 的 0 到 1 張（−0.4 到
-  −12），值不到 1,000 個，不算；它們是吃到只剩幾張、只等一張的手，訓練資料
-  裡也少。
-- 預測的增益是同一個 ρ 推的，批次 1 的校準與匯率的近似都繼承；真正的答案在
-  批次 4 的 A/B。
-- **零分歧：** `ab/run.sh 20000` 對照 `7f0d5f1`（seed base 1796300000，
-  `RESHUFFLE=8`）讀到 0 局分歧。
+- **Both gates are passed, on both platforms.**  Web +0.34 and desktop
+  +0.27, against a gate of 0.05; the bias, slope and residual at k = 1 are
+  −0.03, 0.97 and 0.65, against a range of ±1, 0.5 and 2.  None of the three
+  remedies need be tried.
+- **The shallow graph takes back most of the prize.**  The web's R̂ is under
+  half of R at every card count; added up over 11 to 20 cards, Σ N · R̂ is
+  0.21 and Σ N · R is 0.91; the desktop's k = 2 leaves only 0.003 to 0.008
+  at 15 to 17 cards.  The web's +0.34 is larger than the desktop's because
+  11 to 14 cards count in it too.
+- **k = 0 is not enough.**  Its residual is 0.79, and batch 2 says k = 0
+  needs within 0.4; its R̂ is larger than R at 13 and 15 cards.  The web uses
+  k = 1, as batch 2 says.
+- **Nine added vectors can learn the threshold, with D at 4 or more.**
+  D = 1 takes back only a little at k = 1 (+0.04 ± 0.05, insufficient data).
+- **The cells of the bias are almost all within ±0.1.**  The exceptions are
+  0 to 1 cards at k = 2 (−0.4 to −12), with fewer than 1,000 values, which
+  do not count; they are hands that have eaten down to a few cards and wait
+  on one card, and are scarce in the training data too.
+- The predicted gain comes from the same ρ, and inherits batch 1's
+  calibration and the approximation of the exchange rate; the real answer is
+  batch 4's A/B.
+- **Zero deals part:** `ab/run.sh 20000` against `7f0d5f1` (seed base
+  1796300000, `RESHUFFLE=8`) reads 0 deals that part.
 
-## 批次 4：A/B
+## Batch 4: A/B
 
-照 `CLAUDE.md` 的鐵則，兩次獨立的實驗，各自的局數與 seed base 在跑之前寫進
-這份文件：
+By the iron rules of `CLAUDE.md`, two independent experiments, each with its
+deal count and seed base written into this document before the run:
 
-| | 候選 | 對照 |
+| | Candidate | Control |
 | --- | --- | --- |
-| 網頁 | 閘門 10 張，之外是 k 層的圖 | `ExpectBot`，閘門 10 張 |
-| 本機 | 閘門 14 張，之外是 k 層的圖 | `ExpectBot`，閘門 14 張 |
+| Web | 10-card gate, a graph k deep beyond it | `ExpectBot`, 10-card gate |
+| Desktop | 14-card gate, a graph k deep beyond it | `ExpectBot`, 14-card gate |
 
-另外三家都是 `HeuristicBot`。一個決定在毫秒的量級時用 `RESHUFFLE=8`。
+The other three seats are all `HeuristicBot`.  With a decision in the order
+of milliseconds, `RESHUFFLE=8` is used.
 
-計時的條件與 `expectation.md` 應用 C、D 相同：網頁的 wasm p95 在 0.1 秒
-以內；本機平均不超過現在 14 張的 186 毫秒。
+The timing conditions are those of `expectation.md` applications C and D:
+the web's wasm p95 within 0.1 seconds; the desktop's mean no more than the
+present 186 milliseconds of 14 cards.
 
-讀法：
+How to read it:
 
-- **win：** commit。提示在閘門外也標點數，不再是沒有單位的評分。
-- **loss：** 先追分歧最大的幾局，再對照批次 3 的偏差。偏差是準的而仍然
-  輸，問題在單人模型在長手牌上的近似，回批次 1 的校準。
-- **不明：** 加局數。
+- **win:** commit.  The hint marks points beyond the gate too, no longer a
+  grade without a unit.
+- **loss:** first trace the deals that moved the most, then compare with
+  batch 3's bias.  If the bias is accurate and it still loses, the problem
+  is the single-player model's approximation on long hands; go back to batch
+  1's calibration.
+- **insufficient data:** add deals.
 
-程式：`ExpectBot::shallow(eval, deep)`，閘門外 `deep` 張以內是兩層的圖、之外
-一層，葉節點讀 `Eval::default()`；張數照閘門的算法。網頁 `deep` = 0（11 到
-20 張都是一層），本機 17。`ab/` 多兩個開關：`SHALLOW` 是候選的 `deep`，
-`BASELINE_GATE` 是對照那一邊的 `ExpectBot` 的閘門。
+Code: `ExpectBot::shallow(eval, deep)`: beyond the gate a graph two deep up
+to `deep` cards and one deep past that, the leaves reading
+`Eval::default()`; cards are counted the way the gate counts them.  The web
+has `deep` = 0 (one deep at all of 11 to 20 cards), the desktop 17.  `ab/`
+gains two switches: `SHALLOW` is the candidate's `deep`, and `BASELINE_GATE`
+the gate of the `ExpectBot` on the control's side.
 
-計時（2026-11-19，`examples/expect_time.rs` 多一個 `deep` 的參數，seed base
-1000，單位毫秒）：
+Timing (2026-11-19, `examples/expect_time.rs` with one more argument,
+`deep`; seed base 1000, in milliseconds):
 
-| 張數 | 本機：`expect_time 300 1000 14 17`，原生 | | | wasm：`expect_time 2000 1000 10 0` | | |
+| Cards | Desktop: `expect_time 300 1000 14 17`, native | | | wasm: `expect_time 2000 1000 10 0` | | |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| | 決定數 | 平均 | p95 | 決定數 | 平均 | p95 |
-| 全部 | 2,442 | 62.1 | 230 | 16,189 | 18.0 | 54.6 |
+| | Decisions | Mean | p95 | Decisions | Mean | p95 |
+| All | 2,442 | 62.1 | 230 | 16,189 | 18.0 | 54.6 |
 | 14 | 242 | 180 | 581 | 1,700 | 8.1 | 16.9 |
 | 15 | 245 | 50.9 | 137 | 1,528 | 10.2 | 21.1 |
 | 16 | 120 | 68.8 | 209 | 805 | 13.5 | 27.9 |
@@ -506,200 +627,256 @@ R̂(n)，以它為準。
 | 19 | 31 | 17.8 | 38.8 | 230 | 29.3 | 56.0 |
 | 20 | 461 | 27.9 | 57.2 | 3,031 | 44.8 | 101 |
 
-- **本機過了：** 15 到 20 張每個張數的平均都在 14 張的 180 毫秒以內，最多
-  是 17 張的 127；最慢的一手 853 毫秒，閘門內是 1.4 秒。
-- **網頁過了，但很緊：** 全部決定的 p95 是 55 毫秒，在 0.1 秒以內；20 張
-  單獨的 p95 是 101 毫秒，最慢的一手 1.1 秒（`HeuristicBot` 的提示最慢是
-  255 毫秒）。
+- **The desktop passes:** the mean at each card count from 15 to 20 is
+  within the 180 milliseconds of 14 cards, the most being 127 at 17 cards;
+  the slowest move is 853 milliseconds, against 1.4 seconds inside the gate.
+- **The web passes, but narrowly:** p95 over all decisions is 55
+  milliseconds, within 0.1 seconds; p95 at 20 cards alone is 101
+  milliseconds, and the slowest move is 1.1 seconds (the slowest
+  `HeuristicBot` hint is 255 milliseconds).
 
-批次 4 的宣告（2026-11-19，跑之前寫下，基準 `5c3cc24`，對照也是它）：
+Batch 4's declaration (2026-11-19, written before the run, base `5c3cc24`,
+which is the control too):
 
-- **網頁：** `EXPECT=1.5 GATE_CARDS=10 SHALLOW=0 BASELINE_EXPECT=1
-  SEED_BASE=1795055385 ab/run.sh 30000`，30,000 局，`RESHUFFLE=8`。
-- **本機：** `EXPECT=1.5 GATE_CARDS=14 SHALLOW=17 BASELINE_EXPECT=1
-  BASELINE_GATE=14 SEED_BASE=1795155385 ab/run.sh 20000`，20,000 局，
-  `RESHUFFLE=8`，在網頁那一次跑完之後。
-- 試跑 400 局（seed base 1，不算數）：網頁 1 分鐘、83% 分歧、標準誤 0.363；
-  本機 6.8 分鐘、76% 分歧、標準誤 0.331。所以網頁 30,000 局約 80 分鐘、標準
-  誤約 0.042，本機 20,000 局約 5.7 小時、約 0.047；批次 3 預測的 +0.34、
-  +0.27 各是七、六個標準誤。
+- **Web:** `EXPECT=1.5 GATE_CARDS=10 SHALLOW=0 BASELINE_EXPECT=1
+  SEED_BASE=1795055385 ab/run.sh 30000`, 30,000 deals, `RESHUFFLE=8`.
+- **Desktop:** `EXPECT=1.5 GATE_CARDS=14 SHALLOW=17 BASELINE_EXPECT=1
+  BASELINE_GATE=14 SEED_BASE=1795155385 ab/run.sh 20000`, 20,000 deals,
+  `RESHUFFLE=8`, after the web's run has finished.
+- Trial run of 400 deals (seed base 1, not counted): web 1 minute, 83% part,
+  standard error 0.363; desktop 6.8 minutes, 76% part, standard error 0.331.
+  So the web's 30,000 deals take about 80 minutes with a standard error of
+  about 0.042, and the desktop's 20,000 deals about 5.7 hours and about
+  0.047; the +0.34 and +0.27 batch 3 predicts are seven and six standard
+  errors.
 
-### 批次 4 的結果
+### Batch 4 results
 
-| | 局數 | 分歧 | 座位 1 胡牌率（對照 → 候選） | 候選減對照 | 95% 區間 | 判定 |
+| | Deals | Part | Seat 1 win rate (control → candidate) | Candidate minus control | 95% CI | Verdict |
 | --- | ---: | ---: | --- | ---: | --- | --- |
-| 網頁 | 30,000 | 25,146 | 24.44% → 25.09% | +0.191 ± 0.046 | [+0.100, +0.281] | win |
-| 本機 | 20,000 | 15,243 | 24.57% → 25.23% | +0.204 ± 0.052 | [+0.102, +0.306] | win |
+| Web | 30,000 | 25,146 | 24.44% → 25.09% | +0.191 ± 0.046 | [+0.100, +0.281] | win |
+| Desktop | 20,000 | 15,243 | 24.57% → 25.23% | +0.204 ± 0.052 | [+0.102, +0.306] | win |
 
-- **兩次都是 win。** 網頁的提示在閘門外改用一層的圖；本機的對手與提示在
-  15 到 17 張用兩層、18 張起一層。提示在每一步都標點數。
-- **拿到的比預測少。** 批次 3 預測網頁 +0.34 ± 0.06、本機 +0.27 ± 0.06；
-  量到的低 2.0 與 0.9 個合併的標準誤。預測照的是 DP 的值，批次 1 的校準
-  說長手牌上它低估胡牌率 24%，所以照它算的獎金有一部分不是真的。
-- 網頁與本機的增益各自相對於自己的對照（閘門 10、14 張），兩者不能相加。
+- **Both are wins.**  The web's hint now uses a graph one deep beyond the
+  gate; the desktop's opponents and hint use two deep at 15 to 17 cards and
+  one deep from 18.  The hint marks points at every move.
+- **Less was gained than predicted.**  Batch 3 predicted web +0.34 ± 0.06
+  and desktop +0.27 ± 0.06; the measurements are 2.0 and 0.9 combined
+  standard errors lower.  The prediction goes by the DP's values, and batch
+  1's calibration says the DP underestimates the win rate of long hands by
+  24%, so part of the prize counted by it is not real.
+- The web's and the desktop's gains are each relative to its own control
+  (gates of 10 and 14 cards), and the two cannot be added.
 
-## 兩、三人桌：表蓋不到的地方
+## Two and three players: where the tables do not reach
 
-批次 1 到 4 都是四人桌，開局 25 draws，圖掃 45 張公牌。兩人桌開局 65 draws
-（174 張）、三人桌 45（113 張），`5c3cc24` 開了這兩種桌子，bot 沒有重量。
+Batches 1 to 4 are all at a table of four, which starts with 25 draws, and
+the graph sweeps 45 public cards.  A table of two starts with 65 draws (174
+cards) and a table of three with 45 (113 cards); `5c3cc24` opened these two
+tables, and the bots were not measured again.
 
-**症狀（2026-11-19）：** 兩人桌開局，淺層的圖寧可拆暗坎也不打單張，和
-`HeuristicBot`、精確的 DP 都相反。同一副 21 張的牌只改 draws，一層的圖：
+**Symptom (2026-11-19):** at the start of a round at a table of two, the
+shallow graph would rather break a concealed triplet than discard a lone
+card, the opposite of both `HeuristicBot` and the exact DP.  The same hand
+of 21 cards with only the draws changed, a graph one deep:
 
-| draws | 掃的張數 | 首選 | 首選的值 | 紅炮（暗坎）的名次 |
+| draws | Cards swept | First choice | Its value | Rank of red 炮 (the concealed triplet) |
 | ---: | ---: | --- | ---: | ---: |
-| 25 | 45 | 白象 | −5.60 | 15 |
-| 26 | 48 | 白象 | −3.65 | 11 |
-| 27 | 51 | 白象 | −2.45 | 7 |
-| 28 | 55 | 紅炮 | −1.70 | 1 |
-| 30 到 65 | 61 到 174 | 紅炮 | −1.27 到 −1.17 | 1 |
+| 25 | 45 | white 象 | −5.60 | 15 |
+| 26 | 48 | white 象 | −3.65 | 11 |
+| 27 | 51 | white 象 | −2.45 | 7 |
+| 28 | 55 | red 炮 | −1.70 | 1 |
+| 30 to 65 | 61 to 174 | red 炮 | −1.27 to −1.17 | 1 |
 
-**原因：** `eval::CARDS` 是 46，標註只到 t = 45。t = 46 那一列的權重是初
-值（|w| = 0.23，其他列約 11；偏差 0），所以每個葉節點在 t = 46 的值約是 0，
-而 t = 45 約是 −5 到 −7。掃超過 46 張，`Graph::sweep` 把曲線的最後一格頂
-著用，吃碰入口愈多的手愈好。26 draws（牌堆 32 張）起讀到它，這副牌在
-28 draws 翻過來。
+**Cause:** `eval::CARDS` is 46, and the labels only go to t = 45.  The
+weights of the row t = 46 are the initial values (|w| = 0.23, about 11 in
+the other rows; bias 0), so every leaf's value at t = 46 is about 0, where
+at t = 45 it is about −5 to −7.  Sweeping more than 46 cards, `Graph::sweep`
+goes on using the last cell of the curve, and the more ways a hand has to
+claim, the better it looks.  It is read from 26 draws (a pile of 32 cards),
+and this hand flips at 28 draws.
 
-**試過而不夠的兩個修法**（兩人桌，試跑各 400 局，seed base 1，不算數；對照
-是閘門外用 `HeuristicBot` 的 `ExpectBot`）：
+**Two fixes tried that were not enough** (a table of two, trial runs of 400
+deals each, seed base 1, not counted; the control is the `ExpectBot` that
+uses `HeuristicBot` beyond the gate):
 
-- 切掉 t = 46、頂著 t = 45：−2.83 ± 0.31。葉節點停在 45 張的值，根的時鐘
-  卻繼續走，每次吃碰都像是虧的，bot 全部放過。
-- 圖只掃 46 張，當成只剩這麼多：−2.11 ± 0.29（三人桌 −0.24 ± 0.31）。
-  時鐘一致了，但 `Outlook` 與標註都是四人桌的。
+- Cutting t = 46 and holding at t = 45: −2.83 ± 0.31.  The leaves stop at
+  the 45-card value while the roots' clock runs on, so every claim looks
+  like a loss and the bot passes them all.
+- Sweeping only 46 cards, as if that were all that is left: −2.11 ± 0.29
+  (−0.24 ± 0.31 at a table of three).  The clocks agree, but `Outlook` and
+  the labels are both a table of four's.
 
-**修法：** 切掉沒學過的那一列（`CARDS` = 45），掃的張數超過 `CARDS` 時
-閘門外照 `HeuristicBot` 打。四人桌永遠不超過；兩人桌剩 25 draws 時手牌
-幾乎都已在閘門內（試跑 1,000 局與上面的對照 0 局分歧，三人桌 2 局）。
-閘門內的 DP 在兩、三人桌不輸 `HeuristicBot`（試跑 1,000 局：+0.07 ± 0.04、
-+0.16 ± 0.07），不動。
+**The fix:** cut the row never learnt (`CARDS` = 45), and play as
+`HeuristicBot` beyond the gate when the cards swept exceed `CARDS`.  A table
+of four never exceeds it; at a table of two with 25 draws left the hand is
+almost always inside the gate already (a trial run of 1,000 deals against
+the control above has 0 deals that part, and 2 at a table of three).  The DP
+inside the gate does not lose to `HeuristicBot` at tables of two and three
+(trial runs of 1,000 deals: +0.07 ± 0.04, +0.16 ± 0.07) and is left alone.
 
-`ab/` 多兩個開關：`PLAYERS` 是桌子的大小，`BASELINE_SHALLOW` 是對照那一邊的
-`deep`。
+`ab/` gains two switches: `PLAYERS` is the size of the table, and
+`BASELINE_SHALLOW` the `deep` of the control's side.
 
-宣告（2026-11-19，跑之前寫下；對照 `3ddb8f3`，`RESHUFFLE=8`，另外幾家都是
-`HeuristicBot`）。網頁是 `EXPECT=1.5 GATE_CARDS=10 SHALLOW=0
-BASELINE_EXPECT=1 BASELINE_SHALLOW=0`，本機是 `EXPECT=1.5 GATE_CARDS=14
-SHALLOW=17 BASELINE_EXPECT=1 BASELINE_GATE=14 BASELINE_SHALLOW=17`：
+Declaration (2026-11-19, written before the run; control `3ddb8f3`,
+`RESHUFFLE=8`, the other seats all `HeuristicBot`).  The web is `EXPECT=1.5
+GATE_CARDS=10 SHALLOW=0 BASELINE_EXPECT=1 BASELINE_SHALLOW=0`, the desktop
+`EXPECT=1.5 GATE_CARDS=14 SHALLOW=17 BASELINE_EXPECT=1 BASELINE_GATE=14
+BASELINE_SHALLOW=17`:
 
-| | `PLAYERS` | 局數 | seed base | 預期 |
+| | `PLAYERS` | Deals | seed base | Expected |
 | --- | ---: | ---: | ---: | --- |
-| 網頁 | 4 | 20,000 | 1795094000 | 0 局分歧 |
-| 本機 | 4 | 2,000 | 1795114000 | 0 局分歧 |
-| 網頁 | 2 | 2,000 | 1795124000 | win |
-| 網頁 | 3 | 2,000 | 1795134000 | win |
-| 本機 | 2 | 500 | 1795144000 | win |
-| 本機 | 3 | 500 | 1795154000 | win |
+| Web | 4 | 20,000 | 1795094000 | 0 deals part |
+| Desktop | 4 | 2,000 | 1795114000 | 0 deals part |
+| Web | 2 | 2,000 | 1795124000 | win |
+| Web | 3 | 2,000 | 1795134000 | win |
+| Desktop | 2 | 500 | 1795144000 | win |
+| Desktop | 3 | 500 | 1795154000 | win |
 
-試跑（seed base 1，不算數）：切掉 t = 46 的版本對 `3ddb8f3`，兩人桌 400 局
-+8.38 ± 0.32、三人桌 +9.85 ± 0.48；所以 2,000 局的標準誤約 0.15 到 0.2，
-本機 500 局約 0.3。六次合計約 90 分鐘。
+Trial runs (seed base 1, not counted): the version with t = 46 cut, against
+`3ddb8f3`, is +8.38 ± 0.32 over 400 deals at a table of two and +9.85 ± 0.48
+at a table of three; so the standard error of 2,000 deals is about 0.15 to
+0.2, and of the desktop's 500 deals about 0.3.  The six runs take about 90
+minutes in all.
 
-### 結果
+### Results
 
-| | `PLAYERS` | 局數 | 分歧 | 座位 1 胡牌率（對照 → 候選） | 候選減對照 | 95% 區間 | 判定 |
+| | `PLAYERS` | Deals | Part | Seat 1 win rate (control → candidate) | Candidate minus control | 95% CI | Verdict |
 | --- | ---: | ---: | ---: | --- | ---: | --- | --- |
-| 網頁 | 4 | 20,000 | 0 | 24.99% → 24.99% | 0 | | 零分歧 |
-| 本機 | 4 | 2,000 | 0 | 25.95% → 25.95% | 0 | | 零分歧 |
-| 網頁 | 2 | 2,000 | 1,960 | 3.95% → 51.10% | +11.342 ± 0.157 | [+11.035, +11.649] | win |
-| 網頁 | 3 | 2,000 | 1,947 | 2.98% → 33.52% | +11.099 ± 0.230 | [+10.648, +11.550] | win |
-| 本機 | 2 | 500 | 488 | 9.12% → 51.95% | +10.367 ± 0.296 | [+9.786, +10.948] | win |
-| 本機 | 3 | 500 | 485 | 4.95% → 34.00% | +10.554 ± 0.431 | [+9.709, +11.398] | win |
+| Web | 4 | 20,000 | 0 | 24.99% → 24.99% | 0 | | zero deals part |
+| Desktop | 4 | 2,000 | 0 | 25.95% → 25.95% | 0 | | zero deals part |
+| Web | 2 | 2,000 | 1,960 | 3.95% → 51.10% | +11.342 ± 0.157 | [+11.035, +11.649] | win |
+| Web | 3 | 2,000 | 1,947 | 2.98% → 33.52% | +11.099 ± 0.230 | [+10.648, +11.550] | win |
+| Desktop | 2 | 500 | 488 | 9.12% → 51.95% | +10.367 ± 0.296 | [+9.786, +10.948] | win |
+| Desktop | 3 | 500 | 485 | 4.95% → 34.00% | +10.554 ± 0.431 | [+9.709, +11.398] | win |
 
-- **六次都照預期。** 四人桌的打法沒有變；兩、三人桌的對照幾乎不胡牌
-  （3% 到 9%），候選回到那張桌子該有的胡牌率（兩人桌一半、三人桌三分之一）。
-- **兩、三人桌的提示在牌堆還長時是 `HeuristicBot` 的評分，不是點數。** 要
-  點數得先有那張桌子的 `Outlook`（`examples/outlook.rs`）與標註，表也要拉長
-  到 174 張；上面兩個修法說照四人桌的表硬算是輸的。還沒做。
-- **2026-11-21 補：`Outlook` 有了，條件多一個。** 兩、三人桌的表量了
-  （`research/outlook.md`「兩、三人桌」）。照那張表一局是 81 張（兩人）與
-  64 張（三人）公牌，不是照四人桌的表算出來的 174 張，所以小桌的表要拉長
-  到的是這兩個數。小桌的表每摸一張的公開牌少，光看「掃的張數不超過
-  `CARDS`」會讓淺層的圖在還能摸 41 張時就用上四人桌的 `Eval`，量到每個
-  分歧輸 5.8 分；`ExpectBot::depth` 因此多看還能摸的張數不超過
-  `eval::DRAWS`（25）。用 `Outlook::default` 時兩個條件是同一件事。
-- **2026-11-21 再補：小桌的牌堆剪到 25 張，這一節說的情況不再發生。**
-  廢牌改成 6 張加每個空位的 20 張（`Rules::dead`，`variants.md`「小桌的
-  廢牌」），兩、三人桌開局也是 25 draws，掃的張數不超過 `CARDS`，淺層的圖
-  從第一手就用得上。`depth` 的兩個條件留著，擋的是把 `dead_tail` 設短的
-  規則；上面的數字都是改之前量的。葉節點的值還是四人桌的標註，小桌上這個
-  打法的 A/B 在 `research/outlook.md`「空位的手牌算廢牌」。
+- **All six are as expected.**  Play at a table of four has not changed; the
+  control at tables of two and three hardly ever wins (3% to 9%), and the
+  candidate returns to the win rate that table should have (a half at a
+  table of two, a third at a table of three).
+- **The hint at tables of two and three is `HeuristicBot`'s grade, not
+  points, while the pile is still long.**  Points need that table's
+  `Outlook` (`examples/outlook.rs`) and labels first, and the tables
+  lengthened to 174 cards; the two fixes above say that forcing it through
+  the four-player tables loses.  Not done yet.
+- **Added 2026-11-21: there is an `Outlook`, and one more condition.**  The
+  tables for two and three players have been measured
+  (`research/outlook.md`, "Tables of two and three").  By them a round is 81
+  public cards (two players) and 64 (three players), not the 174 worked out
+  from the four-player table, so these are the two numbers a small table's
+  tables must be lengthened to.  A small table's table has fewer public
+  cards for each card drawn, and looking only at "the cards swept do not
+  exceed `CARDS`" would have the shallow graph use the four-player `Eval`
+  with 41 draws still left, measured to lose 5.8 points a split; so
+  `ExpectBot::depth` also requires that the draws left do not exceed
+  `eval::DRAWS` (25).  With `Outlook::default` the two conditions are the
+  same thing.
+- **Added again 2026-11-21: the pile of a small table is cut to 25 cards,
+  and what this section describes no longer happens.**  The dead cards are
+  now 6 plus the 20 of each empty seat (`Rules::dead`, `variants.md`, "The
+  dead cards of a small table"), so tables of two and three start with 25
+  draws as well, the cards swept do not exceed `CARDS`, and the shallow
+  graph is usable from the first move.  The two conditions of `depth` stay,
+  and what they stop is rules that set `dead_tail` short; the numbers above
+  were all measured before the change.  The leaf values are still the
+  four-player labels, and the A/B of this play at a small table is in
+  `research/outlook.md`, "Empty seats' hands are dead".
 
-## 兩、三人桌的表
+## Tables for two and three players
 
-2026-11-21，基準 `07d5602`（規則改動那一版，不在分支上）。「應用」D 的
-同一件事，對象換成桌子的大小。
+2026-11-21, base `07d5602` (the revision with the rule change, not on a
+branch).  The same thing as D of "Applications", with the size of the table
+as its object.
 
-**為什麼要做。** 廢牌改了以後小桌從第一手就用淺層的圖，葉節點是四人桌的
-`Eval`。對「閘門外照 `HeuristicBot` 打」的 A/B（`research/outlook.md`
-「空位的手牌算廢牌」的 M 與 N，網頁設定）：三人桌 +0.216 ± 0.051，win；
-兩人桌 −0.184 ± 0.045，loss。牌堆剪到 25 張只對齊了一局摸幾張，每人分到的
-摸牌還是比四人桌多（兩人桌兩倍），吃得到的牌從 0.28 變成 0.42 與 0.74；
-葉節點的值是照四人桌的 `Outlook` 標註的，在小桌就是錯的桌子。
+**Why.**  Since the dead cards changed, a small table uses the shallow graph
+from the first move, and the leaves are the four-player `Eval`.  The A/Bs
+against "playing as `HeuristicBot` beyond the gate" (M and N of
+`research/outlook.md`, "Empty seats' hands are dead", web settings): a table
+of three +0.216 ± 0.051, a win; a table of two −0.184 ± 0.045, a loss.
+Cutting the pile to 25 cards only aligned how many cards a round draws; each
+player still gets more of the draws than at a table of four (twice as many
+at a table of two), and the cards that can be eaten go from 0.28 to 0.42 and
+0.74; the leaf values are labelled under the four-player `Outlook`, which at
+a small table is the wrong table.
 
-宣告（2026-11-21，跑之前寫下）。作法照批次 3，只換桌子與 `Outlook`：
-`examples/eval.rs` 收 `PLAYERS` 與 `EXPECT`，座位 1 用那一桌的
-`Outlook::new` 乘 `EXPECT` 打、圖也用它算值；`ab/` 收 `EVAL`，候選的葉節點
-讀檔案裡的表。
+Declaration (2026-11-21, written before the run).  The method is batch 3's,
+with only the table and the `Outlook` changed: `examples/eval.rs` takes
+`PLAYERS` and `EXPECT`, seat 1 plays by that table's `Outlook::new` times
+`EXPECT`, and the graph computes its values by it too; `ab/` takes `EVAL`,
+and the candidate's leaves read the table in the file.
 
-- **標註：** `PLAYERS=2 EXPECT=1.3 eval label 2000 1799800000` 與
-  `PLAYERS=3 EXPECT=1.4 eval label 2000 1799900000`，各 2,000 局。倍數是
-  `research/outlook.md` 在新規則下校準的。照那一桌的表，一局的公牌兩人
-  桌是 36.8 張，三人桌 41.6 張（四人桌 45.9），都在 `CARDS`（45）以內；
-  超過的列沒有標註，圖也掃不到。
-- **訓練：** `eval train labels eval 20 1 4 16`，設定同批次 3。三個 D 裡
-  驗證 RMSE 最小的那一張是被評的表。
-- **損失表：** `eval loss 300 1800000000`（兩人）與 `1800100000`（三人），
-  同樣的 `PLAYERS` 與 `EXPECT`，各 300 局（批次 3 是 500 局；時間留給
-  A/B）。只是報告，不設閘門：判定看 A/B。
-- **A/B：** 對照 `07d5602`，`RESHUFFLE=8`，十胡，另外幾家都是
-  `HeuristicBot`。候選是那一桌的 `Outlook` 乘倍數、那一桌的 `Eval`、淺層的
-  圖照設定開著。對照是那張桌子現在該比的打法：兩人桌是閘門外照
-  `HeuristicBot` 打的 `ExpectBot`（M 說它比四人桌的 `Eval` 好），三人桌是
-  四人桌的 `Eval`（N 說它比較好）。本機設定沒有 M、N 那樣的數字，對照取
-  規則改動之後的現狀，也就是四人桌的 `Eval`。
+- **Labels:** `PLAYERS=2 EXPECT=1.3 eval label 2000 1799800000` and
+  `PLAYERS=3 EXPECT=1.4 eval label 2000 1799900000`, 2,000 rounds each.  The
+  multipliers are those `research/outlook.md` calibrated under the new
+  rules.  By that table's own table, the public cards of a round are 36.8 at
+  a table of two and 41.6 at a table of three (45.9 at a table of four), all
+  within `CARDS` (45); the rows beyond have no labels, and the graph does
+  not sweep that far either.
+- **Training:** `eval train labels eval 20 1 4 16`, the settings of batch 3.
+  Of the three D, the table with the smallest validation RMSE is the table
+  judged.
+- **Loss table:** `eval loss 300 1800000000` (two players) and `1800100000`
+  (three players), with the same `PLAYERS` and `EXPECT`, 300 rounds each
+  (500 rounds in batch 3; the time is kept for the A/B).  A report only,
+  with no gate: the verdict is the A/B's.
+- **A/B:** control `07d5602`, `RESHUFFLE=8`, 十胡, the other seats all
+  `HeuristicBot`.  The candidate is that table's `Outlook` times its
+  multiplier, that table's `Eval`, and the shallow graph on as the setting
+  has it.  The control is the play that table should now be compared with:
+  at a table of two the `ExpectBot` that plays as `HeuristicBot` beyond the
+  gate (M says it is better than the four-player `Eval`), at a table of
+  three the four-player `Eval` (N says it is the better).  The desktop
+  settings have no numbers like M and N, and their control is the state of
+  things after the rule change, that is the four-player `Eval`.
 
-  | | 人數 | 設定 | 候選 | 對照 | 局數 | seed base |
+  | | Players | Setting | Candidate | Control | Deals | seed base |
   | --- | ---: | --- | --- | --- | ---: | ---: |
-  | W | 2 | 網頁 | `EXPECT=1.3 GATE_CARDS=10 SHALLOW=0 EVAL=…` | `BASELINE_EXPECT=1` | 10,000 | 1800200000 |
-  | X | 3 | 網頁 | `EXPECT=1.4 GATE_CARDS=10 SHALLOW=0 EVAL=…` | `BASELINE_EXPECT=1 BASELINE_SHALLOW=0` | 40,000 | 1800300000 |
-  | Y | 2 | 本機 | `EXPECT=1.3 GATE_CARDS=14 SHALLOW=17 EVAL=…` | `BASELINE_EXPECT=1 BASELINE_GATE=14 BASELINE_SHALLOW=17` | 4,000 | 1800400000 |
-  | Z | 3 | 本機 | `EXPECT=1.4 GATE_CARDS=14 SHALLOW=17 EVAL=…` | 同 Y | 6,000 | 1800500000 |
+  | W | 2 | Web | `EXPECT=1.3 GATE_CARDS=10 SHALLOW=0 EVAL=…` | `BASELINE_EXPECT=1` | 10,000 | 1800200000 |
+  | X | 3 | Web | `EXPECT=1.4 GATE_CARDS=10 SHALLOW=0 EVAL=…` | `BASELINE_EXPECT=1 BASELINE_SHALLOW=0` | 40,000 | 1800300000 |
+  | Y | 2 | Desktop | `EXPECT=1.3 GATE_CARDS=14 SHALLOW=17 EVAL=…` | `BASELINE_EXPECT=1 BASELINE_GATE=14 BASELINE_SHALLOW=17` | 4,000 | 1800400000 |
+  | Z | 3 | Desktop | `EXPECT=1.4 GATE_CARDS=14 SHALLOW=17 EVAL=…` | as Y | 6,000 | 1800500000 |
 
-- **判定各自算。** win：那一桌、那一種設定用那一桌的 `Outlook` 與 `Eval`，
-  表編進執行檔。loss：先追動最多的局。跨 0：資料不足，那一種設定留在
-  對照的打法；兩人桌的網頁設定因此是閘門外退回 `HeuristicBot`，要補一個
-  條件與零分歧。
-- **局數**照 `research/outlook.md` 的試跑：W 的標準誤約 0.043，X 約
-  0.017，Y 約 0.043，Z 約 0.047。X 比的是兩張 `Eval`，差可能小，所以局數
-  多。
-- **時間：** 標註試跑 40 局（seed base 1，不算數），兩人桌每局 38 CPU 秒、
-  最多 2.8 GB，三人桌 46 CPU 秒、3.5 GB，所以兩場標註約 4.7 小時；A/B
-  約 3.7 小時。
-- **表的大小。** 一張 D = 16 的表是 359 KB，網頁的 wasm 現在 620 KB。兩張
-  都編進去會多 720 KB；win 了再決定要不要量化。
+- **Each verdict is its own.**  win: that table at that setting uses that
+  table's `Outlook` and `Eval`, and the table is compiled into the binary.
+  loss: first trace the deals that moved the most.  Straddling 0:
+  insufficient data, and that setting stays with the control's play; the web
+  setting at a table of two is then a fall back to `HeuristicBot` beyond the
+  gate, which needs one more condition and a run with zero deals that part.
+- **The deal counts** follow the trial runs of `research/outlook.md`: the
+  standard error is about 0.043 for W, about 0.017 for X, about 0.043 for Y
+  and about 0.047 for Z.  X compares two `Eval`s, whose difference may be
+  small, hence its larger count.
+- **Time:** a trial run of the labelling over 40 rounds (seed base 1, not
+  counted) took 38 CPU seconds a round and 2.8 GB at most at a table of two,
+  46 CPU seconds and 3.5 GB at a table of three, so the two labelling runs
+  take about 4.7 hours; the A/Bs about 3.7 hours.
+- **The size of the tables.**  One D = 16 table is 359 KB, and the web's
+  wasm is now 620 KB.  Compiling both in adds 720 KB; whether to quantise is
+  decided after a win.
 
-### 兩人桌的結果
+### Results at two players
 
-**標註：** 16,752 張圖、2,293,823 個節點、64,923,580 個值，11,109 秒
-（試跑估 2.1 小時，實際 3.1 小時），檔案 329 MB。
+**Labels:** 16,752 graphs, 2,293,823 nodes, 64,923,580 values, 11,109
+seconds (the trial run estimated 2.1 hours; it took 3.1 hours), a file of
+329 MB.
 
-**訓練：** 每個 D 一分鐘以內。驗證的 235,344 個節點上，依 t 的平均值的
-RMSE 是 2.17（四人桌 3.37）：
+**Training:** within a minute for each D.  On the 235,344 validation nodes,
+the RMSE of the mean value at each t is 2.17 (3.37 at a table of four):
 
-| D | 訓練 RMSE | 驗證 RMSE | 根 | 一次吃碰 | 兩次吃碰 |
+| D | Training RMSE | Validation RMSE | Roots | One claim | Two claims |
 | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1 | 0.96 | 1.05 | 1.03 | 1.05 | 1.06 |
 | 4 | 0.49 | 0.65 | 0.75 | 0.66 | 0.61 |
 | 16 | 0.28 | **0.53** | 0.68 | 0.55 | 0.47 |
 
-被評的表是 D = 16（`target/eval-2-16.bin`）。
+The table judged is D = 16 (`target/eval-2-16.bin`).
 
-**損失表**（`PLAYERS=2 EXPECT=1.3 eval loss 300 1800000000`，2,614 個決定，
-3,329 秒）。欄位同批次 3；「四」是四人桌的表（`src/eval-16.bin`），其餘是
-兩人桌的：
+**Loss table** (`PLAYERS=2 EXPECT=1.3 eval loss 300 1800000000`, 2,614
+decisions, 3,329 seconds).  The columns are those of batch 3; "Four" is the
+four-player table (`src/eval-16.bin`), and the rest are the two-player
+tables:
 
-| 張數 | 決定 | N | R | 四 k = 1 | 四 k = 2 | D = 16 k = 0 | k = 1 | k = 2 | D = 4 k = 1 | D = 1 k = 1 |
+| Cards | Decisions | N | R | Four k = 1 | Four k = 2 | D = 16 k = 0 | k = 1 | k = 2 | D = 4 k = 1 | D = 1 k = 1 |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 20 | 566 | 1.887 | 0.096 | 0.035 | 0.035 | 0.019 | 0.014 | 0.016 | 0.018 | 0.042 |
 | 19 | 44 | 0.147 | 0.079 | 0.032 | 0.042 | 0.021 | 0.008 | 0.006 | 0.007 | 0.014 |
@@ -712,72 +889,83 @@ RMSE 是 2.17（四人桌 3.37）：
 | 12 | 195 | 0.650 | 0.115 | 0.172 | 0.090 | 0.085 | 0.019 | 0.003 | 0.008 | 0.089 |
 | 11 | 227 | 0.757 | 0.104 | 0.092 | 0.033 | 0.061 | 0.013 | 0.001 | 0.017 | 0.047 |
 
-預測的增益（11 到 14 張的 Σ N · R 是 0.287 ± 0.047，折成 0.132 ± 0.014 分）：
+Predicted gain (the Σ N · R of 11 to 14 cards is 0.287 ± 0.047, converted to
+0.132 ± 0.014 points):
 
-| 表 | 網頁：11 到 20 張 k = 1 | 本機：15 到 17 張 k = 2，18 張起 k = 1 |
+| Table | Web: k = 1 at 11 to 20 cards | Desktop: k = 2 at 15 to 17 cards, k = 1 from 18 |
 | --- | ---: | ---: |
-| 四人桌 D = 16 | −0.051 ± 0.062 | 0.075 ± 0.028 |
-| 兩人桌 D = 1 | 0.087 ± 0.032 | 0.105 ± 0.027 |
-| 兩人桌 D = 4 | 0.214 ± 0.035 | 0.161 ± 0.035 |
-| 兩人桌 D = 16 | **0.257 ± 0.040** | **0.179 ± 0.038** |
+| Four players, D = 16 | −0.051 ± 0.062 | 0.075 ± 0.028 |
+| Two players, D = 1 | 0.087 ± 0.032 | 0.105 ± 0.027 |
+| Two players, D = 4 | 0.214 ± 0.035 | 0.161 ± 0.035 |
+| Two players, D = 16 | **0.257 ± 0.040** | **0.179 ± 0.038** |
 
-葉節點對精確的曲線：
+The leaves against the exact curves:
 
-| 表 | k | 值 | V̂ − V | 斜率 | 殘差 | RMSE | 最差的格子 |
+| Table | k | Values | V̂ − V | Slope | Residual | RMSE | Worst cell |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 四人桌 D = 16 | 1 | 5.3 × 10⁷ | −3.060 | 1.164 | 1.141 | 3.287 | −4.51 |
-| 兩人桌 D = 16 | 0 | 9.5 × 10⁵ | −0.036 | 0.987 | 0.397 | 0.400 | −0.22 |
-| 兩人桌 D = 16 | 1 | 5.3 × 10⁷ | −0.017 | 0.991 | 0.326 | 0.327 | −0.11 |
-| 兩人桌 D = 16 | 2 | 6.1 × 10⁸ | −0.004 | 0.990 | 0.297 | 0.298 | −0.09 |
-| 兩人桌 D = 4 | 1 | 5.3 × 10⁷ | −0.006 | 0.980 | 0.486 | 0.488 | +0.22 |
-| 兩人桌 D = 1 | 1 | 5.3 × 10⁷ | −0.020 | 0.955 | 0.803 | 0.809 | −0.89 |
+| Four players, D = 16 | 1 | 5.3 × 10⁷ | −3.060 | 1.164 | 1.141 | 3.287 | −4.51 |
+| Two players, D = 16 | 0 | 9.5 × 10⁵ | −0.036 | 0.987 | 0.397 | 0.400 | −0.22 |
+| Two players, D = 16 | 1 | 5.3 × 10⁷ | −0.017 | 0.991 | 0.326 | 0.327 | −0.11 |
+| Two players, D = 16 | 2 | 6.1 × 10⁸ | −0.004 | 0.990 | 0.297 | 0.298 | −0.09 |
+| Two players, D = 4 | 1 | 5.3 × 10⁷ | −0.006 | 0.980 | 0.486 | 0.488 | +0.22 |
+| Two players, D = 1 | 1 | 5.3 × 10⁷ | −0.020 | 0.955 | 0.803 | 0.809 | −0.89 |
 
-- **四人桌的表在兩人桌每個葉節點低估 3 分。** 偏差 −3.06，公牌越多越低
-  （1 到 5 張 −2.0，31 張以上 −4.5）。損失表預測它在網頁設定是
-  −0.05 ± 0.06，M 量到 −0.184 ± 0.045。說得通但沒有另外驗證的解釋：圖裡
-  的胡是精確的值，不低估，葉節點卻都低 3 分，淺層的圖於是偏向眼前胡得到
-  的那一支。
-- **兩人桌自己的表沒有這個偏差**，k = 1 是 −0.02、斜率 0.99、殘差 0.33，
-  比四人桌的表在四人桌（−0.03、0.97、0.65）還準。
+- **The four-player table underestimates every leaf by 3 points at a table
+  of two.**  The bias is −3.06, and the more public cards the lower (−2.0 at
+  1 to 5 cards, −4.5 at 31 cards or more).  The loss table predicts
+  −0.05 ± 0.06 for it at the web settings, and M measured −0.184 ± 0.045.
+  An explanation that fits but has not been verified separately: the wins
+  inside the graph are exact values and not underestimated, while the leaves
+  are all 3 points low, so the shallow graph leans towards the branch that
+  can win right now.
+- **The two-player table has no such bias:** at k = 1 it is −0.02, slope
+  0.99, residual 0.33, more accurate than the four-player table at a table
+  of four (−0.03, 0.97, 0.65).
 
-**A/B W**（網頁設定，對照 `07d5602` 的閘門外照 `HeuristicBot` 打）：
+**A/B W** (web settings, against `07d5602` playing as `HeuristicBot` beyond
+the gate):
 
-| | 局數 | 分歧 | 座位 1 胡牌率（對照 → 候選） | 候選減對照 | 95% 區間 | 判定 |
+| | Deals | Part | Seat 1 win rate (control → candidate) | Candidate minus control | 95% CI | Verdict |
 | --- | ---: | ---: | --- | ---: | --- | --- |
 | W | 10,000 | 8,541 | 48.26% → 50.28% | +0.375 ± 0.042 | [+0.293, +0.457] | win |
 
-seed base 1800200000，2,805 秒。損失表預測 +0.257 ± 0.040。
+seed base 1800200000, 2,805 seconds.  The loss table predicted
++0.257 ± 0.040.
 
-**A/B Y**（本機設定，對照 `07d5602` 的四人桌 `Outlook` 與 `Eval`）：
+**A/B Y** (desktop settings, against the four-player `Outlook` and `Eval` of
+`07d5602`):
 
-| | 局數 | 分歧 | 座位 1 胡牌率（對照 → 候選） | 候選減對照 | 95% 區間 | 判定 |
+| | Deals | Part | Seat 1 win rate (control → candidate) | Candidate minus control | 95% CI | Verdict |
 | --- | ---: | ---: | --- | ---: | --- | --- |
 | Y | 4,000 | 2,910 | 50.29% → 51.55% | +0.320 ± 0.056 | [+0.210, +0.431] | win |
 
-seed base 1800400000，7,766 秒（和三人桌的標註同時跑）。
+seed base 1800400000, 7,766 seconds (run alongside the three-player
+labelling).
 
-**兩人桌兩種設定都 win**：兩人桌用自己的 `Outlook`（乘 1.3）與自己的
-`Eval`。
+**Both settings are wins at a table of two**: a table of two uses its own
+`Outlook` (times 1.3) and its own `Eval`.
 
-### 三人桌的結果
+### Results at three players
 
-**標註：** 15,456 張圖、2,083,337 個節點、65,506,421 個值，14,502 秒（後
-三個小時和兩人桌的損失表與 A/B 同時跑），檔案 325 MB。
+**Labels:** 15,456 graphs, 2,083,337 nodes, 65,506,421 values, 14,502
+seconds (the last three hours alongside the two-player loss table and A/Bs),
+a file of 325 MB.
 
-**訓練：** 驗證的 199,336 個節點上，依 t 的平均值的 RMSE 是 2.90：
+**Training:** on the 199,336 validation nodes, the RMSE of the mean value at
+each t is 2.90:
 
-| D | 訓練 RMSE | 驗證 RMSE | 根 | 一次吃碰 | 兩次吃碰 |
+| D | Training RMSE | Validation RMSE | Roots | One claim | Two claims |
 | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1 | 1.58 | 1.70 | 1.52 | 1.65 | 1.77 |
 | 4 | 0.77 | 0.95 | 0.93 | 0.96 | 0.96 |
 | 16 | 0.41 | **0.80** | 0.72 | 0.81 | 0.80 |
 
-被評的表是 D = 16（`target/eval-3-16.bin`）。
+The table judged is D = 16 (`target/eval-3-16.bin`).
 
-**損失表**（`PLAYERS=3 EXPECT=1.4 eval loss 300 1800100000`，2,293 個決定，
-1,555 秒）：
+**Loss table** (`PLAYERS=3 EXPECT=1.4 eval loss 300 1800100000`, 2,293
+decisions, 1,555 seconds):
 
-| 張數 | 決定 | N | R | 四 k = 1 | 四 k = 2 | D = 16 k = 0 | k = 1 | k = 2 | D = 4 k = 1 | D = 1 k = 1 |
+| Cards | Decisions | N | R | Four k = 1 | Four k = 2 | D = 16 k = 0 | k = 1 | k = 2 | D = 4 k = 1 | D = 1 k = 1 |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 20 | 498 | 1.660 | 0.170 | 0.025 | 0.021 | 0.031 | 0.012 | 0.012 | 0.023 | 0.067 |
 | 19 | 54 | 0.180 | 0.050 | 0.028 | 0.009 | 0.097 | 0.003 | 0.005 | 0.016 | 0.114 |
@@ -790,152 +978,179 @@ seed base 1800400000，7,766 秒（和三人桌的標註同時跑）。
 | 12 | 154 | 0.513 | 0.078 | 0.074 | 0.008 | 0.051 | 0.012 | 0.003 | 0.039 | 0.079 |
 | 11 | 151 | 0.503 | 0.133 | 0.023 | 0.001 | 0.069 | 0.005 | 0.003 | 0.008 | 0.090 |
 
-預測的增益（11 到 14 張的 Σ N · R 是 0.268 ± 0.055）：
+Predicted gain (the Σ N · R of 11 to 14 cards is 0.268 ± 0.055):
 
-| 表 | 網頁：11 到 20 張 k = 1 | 本機：15 到 17 張 k = 2，18 張起 k = 1 |
+| Table | Web: k = 1 at 11 to 20 cards | Desktop: k = 2 at 15 to 17 cards, k = 1 from 18 |
 | --- | ---: | ---: |
-| 四人桌 D = 16 | 0.341 ± 0.068 | 0.275 ± 0.071 |
-| 三人桌 D = 1 | 0.176 ± 0.047 | 0.181 ± 0.054 |
-| 三人桌 D = 4 | 0.350 ± 0.069 | 0.279 ± 0.072 |
-| 三人桌 D = 16 | **0.404 ± 0.078** | **0.301 ± 0.076** |
+| Four players, D = 16 | 0.341 ± 0.068 | 0.275 ± 0.071 |
+| Three players, D = 1 | 0.176 ± 0.047 | 0.181 ± 0.054 |
+| Three players, D = 4 | 0.350 ± 0.069 | 0.279 ± 0.072 |
+| Three players, D = 16 | **0.404 ± 0.078** | **0.301 ± 0.076** |
 
-葉節點對精確的曲線：
+The leaves against the exact curves:
 
-| 表 | k | 值 | V̂ − V | 斜率 | 殘差 | RMSE | 最差的格子 |
+| Table | k | Values | V̂ − V | Slope | Residual | RMSE | Worst cell |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 四人桌 D = 16 | 1 | 5.3 × 10⁷ | −0.960 | 1.019 | 0.771 | 1.233 | −1.62 |
-| 三人桌 D = 16 | 0 | 9.3 × 10⁵ | −0.018 | 0.969 | 0.614 | 0.622 | −0.21 |
-| 三人桌 D = 16 | 1 | 5.3 × 10⁷ | −0.003 | 0.983 | 0.492 | 0.495 | +0.17 |
-| 三人桌 D = 16 | 2 | 6.0 × 10⁸ | −0.000 | 0.986 | 0.436 | 0.438 | −0.20 |
-| 三人桌 D = 4 | 1 | 5.3 × 10⁷ | −0.023 | 0.966 | 0.725 | 0.732 | +0.19 |
-| 三人桌 D = 1 | 1 | 5.3 × 10⁷ | −0.065 | 0.905 | 1.313 | 1.343 | −0.93 |
+| Four players, D = 16 | 1 | 5.3 × 10⁷ | −0.960 | 1.019 | 0.771 | 1.233 | −1.62 |
+| Three players, D = 16 | 0 | 9.3 × 10⁵ | −0.018 | 0.969 | 0.614 | 0.622 | −0.21 |
+| Three players, D = 16 | 1 | 5.3 × 10⁷ | −0.003 | 0.983 | 0.492 | 0.495 | +0.17 |
+| Three players, D = 16 | 2 | 6.0 × 10⁸ | −0.000 | 0.986 | 0.436 | 0.438 | −0.20 |
+| Three players, D = 4 | 1 | 5.3 × 10⁷ | −0.023 | 0.966 | 0.725 | 0.732 | +0.19 |
+| Three players, D = 1 | 1 | 5.3 × 10⁷ | −0.065 | 0.905 | 1.313 | 1.343 | −0.93 |
 
-四人桌的表在三人桌低估 1 分（兩人桌 3 分），斜率 1.02；選牌的損失和三人桌
-自己的表差不多（預測的增益 0.34 對 0.40，誤差 0.07）。
+The four-player table underestimates by 1 point at a table of three (3
+points at a table of two), with a slope of 1.02; its loss in choosing cards
+is about the same as the three-player table's own (predicted gains of 0.34
+against 0.40, error 0.07).
 
-**A/B X、Z**（對照 `07d5602` 的四人桌 `Outlook` 與 `Eval`）：
+**A/B X, Z** (against the four-player `Outlook` and `Eval` of `07d5602`):
 
-| | 設定 | 局數 | 分歧 | 座位 1 胡牌率（對照 → 候選） | 候選減對照 | 95% 區間 | 判定 |
+| | Setting | Deals | Part | Seat 1 win rate (control → candidate) | Candidate minus control | 95% CI | Verdict |
 | --- | --- | ---: | ---: | --- | ---: | --- | --- |
-| X | 網頁 | 40,000 | 26,168 | 33.22% → 33.13% | −0.021 ± 0.025 | [−0.070, +0.028] | 資料不足 |
-| Z | 本機 | 6,000 | 3,525 | 34.46% → 34.22% | −0.095 ± 0.061 | [−0.215, +0.025] | 資料不足 |
+| X | Web | 40,000 | 26,168 | 33.22% → 33.13% | −0.021 ± 0.025 | [−0.070, +0.028] | insufficient data |
+| Z | Desktop | 6,000 | 3,525 | 34.46% → 34.22% | −0.095 ± 0.061 | [−0.215, +0.025] | insufficient data |
 
-seed base 1800300000（6,138 秒）與 1800500000（5,177 秒）。
+seed bases 1800300000 (6,138 seconds) and 1800500000 (5,177 seconds).
 
-**三人桌兩種設定都跨 0，打法不動**：三人桌繼續用四人桌的 `Outlook`（乘
-1.5）與四人桌的 `Eval`，三人桌的表不編進執行檔。這不是「一樣好」：X 的
-區間容得下 −0.07 到 +0.03，Z 容得下 −0.22 到 +0.03。候選一次換了兩樣
-（`Outlook` 與 `Eval`），這兩場分不出是哪一樣沒有幫上忙。
+**Both settings straddle 0 at a table of three, and play is left alone**: a
+table of three goes on using the four-player `Outlook` (times 1.5) and the
+four-player `Eval`, and the three-player table is not compiled into the
+binary.  This is not "as good": X's interval admits −0.07 to +0.03, and Z's
+−0.22 to +0.03.  The candidate changed two things at once (`Outlook` and
+`Eval`), and these two runs cannot tell which of them failed to help.
 
-### 兩人桌的八胡
+### 八胡 at two players
 
-兩人桌 win 的是十胡。`Outlook::new` 在兩人桌不看門檻，兩人桌的 `Eval` 也是
-十胡標註的；兩人桌的八胡現在（`07d5602`）用四人桌十胡的 `Outlook` 與
-`Eval`。要不要連八胡一起換，不能只靠推論。
+What won at a table of two is 十胡.  `Outlook::new` does not look at the
+threshold at a table of two, and the two-player `Eval` is labelled at 十胡
+as well; 八胡 at a table of two now (`07d5602`) uses the four-player ten-胡
+`Outlook` and `Eval`.  Whether to change 八胡 along with it cannot rest on
+inference alone.
 
-宣告（2026-11-22，跑之前寫下；對照 `07d5602`，`RESHUFFLE=8`，
-`PLAYERS=2 THRESHOLD=8`，另一家是 `HeuristicBot`）。候選是兩人桌十胡的
-`Outlook` 乘 1.3 與兩人桌的 `Eval`，對照是現在的打法：
+Declaration (2026-11-22, written before the run; control `07d5602`,
+`RESHUFFLE=8`, `PLAYERS=2 THRESHOLD=8`, the other seat `HeuristicBot`).  The
+candidate is the two-player ten-胡 `Outlook` times 1.3 and the two-player
+`Eval`; the control is the present play:
 
-| | 設定 | 候選 | 對照 | 局數 | seed base |
+| | Setting | Candidate | Control | Deals | seed base |
 | --- | --- | --- | --- | ---: | ---: |
-| W8 | 網頁 | `EXPECT=1.3 GATE_CARDS=10 SHALLOW=0 EVAL=…` | `BASELINE_EXPECT=1 BASELINE_SHALLOW=0` | 10,000 | 1800600000 |
-| Y8 | 本機 | `EXPECT=1.3 GATE_CARDS=14 SHALLOW=17 EVAL=…` | `BASELINE_EXPECT=1 BASELINE_GATE=14 BASELINE_SHALLOW=17` | 4,000 | 1800700000 |
+| W8 | Web | `EXPECT=1.3 GATE_CARDS=10 SHALLOW=0 EVAL=…` | `BASELINE_EXPECT=1 BASELINE_SHALLOW=0` | 10,000 | 1800600000 |
+| Y8 | Desktop | `EXPECT=1.3 GATE_CARDS=14 SHALLOW=17 EVAL=…` | `BASELINE_EXPECT=1 BASELINE_GATE=14 BASELINE_SHALLOW=17` | 4,000 | 1800700000 |
 
-判定：兩場都 win，兩人桌不分門檻都用自己的表。否則兩人桌的八胡留在現在的
-打法（`ExpectBot::new` 與選表的地方多看一個門檻），loss 先追動最多的局。
+Verdict: if both runs are wins, a table of two uses its own tables whatever
+the threshold.  Otherwise 八胡 at a table of two stays with the present play
+(`ExpectBot::new` and the place that picks the table look at the threshold
+as well), and a loss first has the deals that moved the most traced.
 
-| | 局數 | 分歧 | 座位 1 胡牌率（對照 → 候選） | 候選減對照 | 95% 區間 | 判定 |
+| | Deals | Part | Seat 1 win rate (control → candidate) | Candidate minus control | 95% CI | Verdict |
 | --- | ---: | ---: | --- | ---: | --- | --- |
 | W8 | 10,000 | 7,776 | 48.15% → 49.19% | +0.302 ± 0.040 | [+0.224, +0.380] | win |
-| Y8 | 4,000 | 2,849 | 50.47% → 50.34% | +0.048 ± 0.056 | [−0.061, +0.158] | 資料不足 |
+| Y8 | 4,000 | 2,849 | 50.47% → 50.34% | +0.048 ± 0.056 | [−0.061, +0.158] | insufficient data |
 
-1,951 秒與 4,893 秒。**不是兩場都 win，兩人桌的八胡照舊用四人十胡的表。**
-網頁設定單獨是 win，沒有用上：宣告把兩種設定綁在一起，資料出來以後不改
-判定的規則。要用它得讓 `web/src/lib.rs` 的 `bot()` 自己照設定選表，另外
-宣告、另外量。
+1,951 seconds and 4,893 seconds.  **Not both runs are wins, so 八胡 at a
+table of two keeps the four-player ten-胡 tables as before.**  The web
+setting alone is a win and goes unused: the declaration tied the two
+settings together, and the rule for the verdict is not changed once the data
+are in.  To use it, `bot()` in `web/src/lib.rs` would have to pick the table
+by its own setting, with a separate declaration and a separate measurement.
 
-### 接進程式
+### Wired into the code
 
-- **`Eval::of(&Rules)`**：兩人十胡是 `src/eval-16-2.bin`（就是
-  `target/eval-2-16.bin`，359 KB），其餘是 `Eval::default`。三人桌的表不
-  編進執行檔。
-- **`ExpectBot::new`**：兩人十胡用 `Outlook::new` 乘 1.3，其餘照舊是
-  `Outlook::default` 乘 `END_SCALE`。
-- **`web/src/lib.rs` 的 `bot()`** 用 `Eval::of(rules)`，網頁與桌面版共用。
-  wasm 從 620 KB 變成 982 KB（gzip 782 KB）。
-- **兩人桌的表第 37 到 45 列沒有標註**（偏差還是初始的 0）：兩人桌的
-  `Outlook` 一局只數到 36 張公牌，`ExpectBot::new` 讀不到那幾列。拿這張表
-  配別的 `Outlook` 會讀到。
-- **`ab/` 的 `EXPECT=new`** 是出貨的 bot：`ExpectBot::new` 的 `Outlook` 與
-  `Eval::of` 的表。
+- **`Eval::of(&Rules)`**: two players at ten 胡 is `src/eval-16-2.bin`
+  (which is `target/eval-2-16.bin`, 359 KB), and the rest is
+  `Eval::default`.  The three-player table is not compiled into the binary.
+- **`ExpectBot::new`**: two players at ten 胡 use `Outlook::new` times 1.3,
+  and the rest is `Outlook::default` times `END_SCALE` as before.
+- **`bot()` in `web/src/lib.rs`** uses `Eval::of(rules)`, shared by the web
+  page and the desktop app.  The wasm goes from 620 KB to 982 KB (782 KB
+  gzipped).
+- **Rows 37 to 45 of the two-player table have no labels** (their biases are
+  still the initial 0): the two-player `Outlook` counts only up to 36 public
+  cards a round, and `ExpectBot::new` never reads those rows.  Pairing this
+  table with another `Outlook` would read them.
+- **`EXPECT=new` in `ab/`** is the shipped bot: the `Outlook` of
+  `ExpectBot::new` and the table of `Eval::of`.
 
-**零分歧**（對照 `07d5602`，`RESHUFFLE=8`，候選 `EXPECT=new`，對照
-`BASELINE_EXPECT=1` 加同樣的閘門與 `BASELINE_SHALLOW`）。別的桌子的打法
-沒有動：
+**Zero deals part** (control `07d5602`, `RESHUFFLE=8`, candidate
+`EXPECT=new`, control `BASELINE_EXPECT=1` with the same gate and
+`BASELINE_SHALLOW`).  Play at the other tables has not moved:
 
-| 設定 | 桌子 | 局數 | seed base | 分歧 |
+| Setting | Table | Deals | seed base | Part |
 | --- | --- | ---: | ---: | ---: |
-| 網頁 | 四人十胡 | 2,000 | 1800800000 | 0 |
-| 網頁 | 三人十胡 | 2,000 | 1800900000 | 0 |
-| 網頁 | 兩人八胡 | 2,000 | 1801000000 | 0 |
-| 網頁 | 四人八胡 | 2,000 | 1801100000 | 0 |
-| 網頁 | 三人八胡 | 2,000 | 1801200000 | 0 |
-| 本機 | 四人十胡 | 500 | 1801300000 | 0 |
-| 本機 | 三人十胡 | 500 | 1801400000 | 0 |
-| 本機 | 兩人八胡 | 500 | 1801500000 | 0 |
+| Web | four players, ten 胡 | 2,000 | 1800800000 | 0 |
+| Web | three players, ten 胡 | 2,000 | 1800900000 | 0 |
+| Web | two players, 八胡 | 2,000 | 1801000000 | 0 |
+| Web | four players, 八胡 | 2,000 | 1801100000 | 0 |
+| Web | three players, 八胡 | 2,000 | 1801200000 | 0 |
+| Desktop | four players, ten 胡 | 500 | 1801300000 | 0 |
+| Desktop | three players, ten 胡 | 500 | 1801400000 | 0 |
+| Desktop | two players, 八胡 | 500 | 1801500000 | 0 |
 
-兩人十胡接上的就是 W 量的那個 bot：W 的前 1,000 局（seed base
-1800200000）用 `EXPECT=new` 與用 `EXPECT=1.3 EVAL=target/eval-2-16.bin`
-各跑一次，輸出逐字相同（836 局分歧，+0.232 ± 0.133）。之後只動了測試與
-註解。
+What is wired in for two players at ten 胡 is the very bot W measured: W's
+first 1,000 deals (seed base 1800200000) were run once with `EXPECT=new` and
+once with `EXPECT=1.3 EVAL=target/eval-2-16.bin`, and the output is the same
+word for word (836 deals part, +0.232 ± 0.133).  Only tests and comments
+have been touched since.
 
-## 八胡：十胡的表在閘門外
+## 八胡: the ten-胡 tables beyond the gate
 
-「形狀」說八胡在有它的表之前，閘門外照舊是 `HeuristicBot`。程式不是這樣：
-`web/src/lib.rs` 的 `bot()` 不看門檻，`ExpectBot::depth` 只擋公牌張數，所以
-批次 4 起八胡的四人桌在閘門外用十胡的表打淺層的圖。這個打法沒有量過。圖裡
-的胡與天花板的剪枝照 `Rules` 的門檻，是對的；葉節點的值是十胡的，差 2 胡
-就胡的手被當成還差 4 胡。
+"Shape" says that until 八胡 has tables of its own, it is `HeuristicBot`
+beyond the gate as before.  The code is not so: `bot()` in `web/src/lib.rs`
+does not look at the threshold, and `ExpectBot::depth` only stops on the
+count of public cards, so since batch 4 a table of four at 八胡 plays the
+shallow graph on the ten-胡 tables beyond the gate.  This play has not been
+measured.  The wins inside the graph and the ceiling pruning go by the
+threshold of `Rules` and are right; the leaf values are 十胡's, and a hand 2
+胡 short of winning is taken for one 4 胡 short.
 
-`ab/` 多一個開關：`THRESHOLD` 是兩邊的門檻，預設 10。
+`ab/` gains one switch: `THRESHOLD` is the threshold on both sides, 10 by
+default.
 
-宣告（2026-11-20，跑之前寫下；對照 `09eb4c4`，`RESHUFFLE=8`，
-`THRESHOLD=8`，四人桌，另外幾家都是 `HeuristicBot`）。候選是現在的打法，
-對照是閘門相同、閘門外照 `HeuristicBot` 打的 `ExpectBot`：
+Declaration (2026-11-20, written before the run; control `09eb4c4`,
+`RESHUFFLE=8`, `THRESHOLD=8`, a table of four, the other seats all
+`HeuristicBot`).  The candidate is the present play, and the control the
+`ExpectBot` with the same gate that plays as `HeuristicBot` beyond it:
 
-| | 設定 | 局數 | seed base |
+| | Setting | Deals | seed base |
 | --- | --- | ---: | ---: |
-| 網頁 | `EXPECT=1.5 GATE_CARDS=10 SHALLOW=0 BASELINE_EXPECT=1` | 10,000 | 1795200000 |
-| 本機 | `EXPECT=1.5 GATE_CARDS=14 SHALLOW=17 BASELINE_EXPECT=1 BASELINE_GATE=14` | 20,000 | 1795300000 |
+| Web | `EXPECT=1.5 GATE_CARDS=10 SHALLOW=0 BASELINE_EXPECT=1` | 10,000 | 1795200000 |
+| Desktop | `EXPECT=1.5 GATE_CARDS=14 SHALLOW=17 BASELINE_EXPECT=1 BASELINE_GATE=14` | 20,000 | 1795300000 |
 
-- 判定各自算。loss：那一種設定在門檻不是 10 時閘門外退回 `HeuristicBot`
-  （`depth` 多一個條件，像兩、三人桌），再跑一次零分歧。win：打法留著，
-  改「形狀」那一句。跨 0：資料不足，打法不動，寫下來。
-- 試跑 400 局（seed base 1，不算數）：網頁 56 秒、84% 分歧、−0.798 ± 0.341；
-  本機 6 分鐘、78% 分歧、−0.113 ± 0.344。所以網頁 10,000 局約 24 分鐘、
-  標準誤約 0.07，本機 20,000 局約 5 小時、約 0.05。
+- Each verdict is its own.  loss: that setting falls back to `HeuristicBot`
+  beyond the gate when the threshold is not 10 (one more condition in
+  `depth`, as for tables of two and three), and the zero-part run is made
+  again.  win: the play stays, and that sentence of "Shape" is changed.
+  Straddling 0: insufficient data, play is left alone, and it is written
+  down.
+- Trial run of 400 deals (seed base 1, not counted): web 56 seconds, 84%
+  part, −0.798 ± 0.341; desktop 6 minutes, 78% part, −0.113 ± 0.344.  So the
+  web's 10,000 deals take about 24 minutes with a standard error of about
+  0.07, and the desktop's 20,000 deals about 5 hours and about 0.05.
 
-### 結果
+### Results
 
-| | 局數 | 分歧 | 座位 1 胡牌率（對照 → 候選） | 候選減對照 | 95% 區間 | 判定 |
+| | Deals | Part | Seat 1 win rate (control → candidate) | Candidate minus control | 95% CI | Verdict |
 | --- | ---: | ---: | --- | ---: | --- | --- |
-| 網頁 | 10,000 | 8,278 | 24.45% → 24.43% | +0.006 ± 0.074 | [−0.138, +0.151] | 資料不足 |
-| 本機 | 20,000 | 15,330 | 24.96% → 25.14% | +0.080 ± 0.049 | [−0.015, +0.175] | 資料不足 |
+| Web | 10,000 | 8,278 | 24.45% → 24.43% | +0.006 ± 0.074 | [−0.138, +0.151] | insufficient data |
+| Desktop | 20,000 | 15,330 | 24.96% → 25.14% | +0.080 ± 0.049 | [−0.015, +0.175] | insufficient data |
 
-- **兩種設定都跨 0，打法不動。** 八胡的四人桌在閘門外繼續用十胡的表打淺層
-  的圖。這不是「沒有輸」：網頁的區間容得下 −0.14，本機的容得下 −0.02。
-- **試跑的負號沒有重現。** 400 局的 −0.798 ± 0.341（網頁）在 10,000 局是
-  +0.006；本機的 −0.113 變成 +0.080。
-- **和十胡比，表在八胡沒有量到好處。** 同樣的設定在十胡是 +0.191 ± 0.046
-  （網頁）與 +0.204 ± 0.052（本機），都是 win。八胡自己的表（應用 D）仍然
-  是候選。
-- 如果本機真的是 +0.08，要有八成把握分出來，估計合計約 60,000 局、
-  15 小時；沒有排。
+- **Both settings straddle 0, and play is left alone.**  A table of four at
+  八胡 goes on playing the shallow graph on the ten-胡 tables beyond the
+  gate.  This is not "no loss": the web's interval admits −0.14, and the
+  desktop's −0.02.
+- **The minus signs of the trial run did not recur.**  The −0.798 ± 0.341 of
+  400 deals (web) is +0.006 at 10,000 deals; the desktop's −0.113 became
+  +0.080.
+- **Compared with 十胡, no benefit of the tables was measured at 八胡.**
+  The same settings at 十胡 are +0.191 ± 0.046 (web) and +0.204 ± 0.052
+  (desktop), both wins.  八胡's own tables (application D) are still a
+  candidate.
+- If the desktop really is +0.08, telling it apart with 80% confidence would
+  take about 60,000 deals in all, 15 hours (an estimate); not scheduled.
 
-## 程式的形狀
+## Shape of the code
 
-都還是提議。
+All still proposals.
 
 ```rust
 pub struct Prune {
@@ -965,54 +1180,70 @@ impl ExpectBot {
 }
 ```
 
-- **不另外做一個 bot 的型別。** `ExpectBot` 現在是「閘門內精確，之外
-  `HeuristicBot`」，多一個欄位就是「之外淺層」。k = 0 就是純粹的 eval bot。
-  值相同的選擇照舊保持 `HeuristicBot` 的順序。
-- **子節點和父節點至多差兩塊**（吃碰的那一塊與打掉的那一塊），所以累加器
-  可以增量更新。第一版不做，量到 eval 是瓶頸再做。
+- **No separate bot type.**  `ExpectBot` is now "exact inside the gate,
+  `HeuristicBot` beyond", and one more field makes it "shallow beyond".
+  k = 0 is the pure eval bot.  Choices of equal value keep `HeuristicBot`'s
+  order as before.
+- **A child differs from its parent in at most two blocks** (the block of
+  the claim and the block of the discard), so the accumulator can be updated
+  incrementally.  Not in the first version; do it once the eval is measured
+  to be the bottleneck.
 
-## 應用
+## Applications
 
-批次 4 有一次 win 之後。改變打法的各自跑 A/B。
+After batch 4 has one win.  Those that change play each run their own A/B.
 
-| | 應用 | 改變打法 | 開始的條件 |
+| | Application | Changes play | Condition to start |
 | --- | --- | --- | --- |
-| A | 提示全程標點數 | 否，隨批次 4（完成） | 批次 4 是 win |
-| B | Monte Carlo 的 playout 與葉節點用 k = 0（`expectation.md` 應用 H） | 候選 | 批次 4 是 win |
-| C | 提示顯示胡牌機率：同一張表多一個輸出，標註是 `Payoff::Win` | 否 | 批次 1 的校準過 |
-| D | 八胡的表 | 候選 | 網頁要給八胡同樣的對手 |
-| E | 對手推論：`live` 換成推論的張數，樣式的鍵不變 | 候選 | 路線一有推論可接 |
+| A | The hint marks points throughout | No, with batch 4 (done) | Batch 4 is a win |
+| B | k = 0 for Monte Carlo's playouts and leaves (`expectation.md` application H) | Candidate | Batch 4 is a win |
+| C | The hint shows the chance to win: one more output of the same table, labelled with `Payoff::Win` | No | Batch 1's calibration passes |
+| D | Tables for 八胡 | Candidate | The web is to give 八胡 the same opponents |
+| E | Opponent inference: `live` replaced by inferred counts, the pattern key unchanged | Candidate | Route 1 has an inference to plug in |
 
-## 知道是近似的地方
+## Known approximations
 
-- **`expectation.md` 的六項全部繼承。** eval 學的是模型的值，模型錯的地方
-  它照錯。長手牌看得更遠，「`live` 固定在根」與「別家的棄牌當成均勻」錯得
-  比短手牌多；批次 1 的校準量的就是這個。
-- **九塊的向量是相加的。** 塊與塊之間只透過門檻、張數與時鐘互相牽制，
-  一層 relu 要學這三件事；學不好時批次 3 列了三個補法。
-- **18 張以上的標註來自剪過棄牌的圖。**
-- **老師不是對手。** 表學的是 DP 的值，不是怎麼贏 `HeuristicBot`，所以比
-  路線四原本的蒸餾少一層「只對這個對手有效」的疑慮；`Outlook` 的常數仍然
-  是從 `HeuristicBot` 自對局量的。
+- **All six items of `expectation.md` are inherited.**  The eval learns the
+  model's value, and where the model is wrong it is wrong too.  A long hand
+  looks further ahead, and "`live` fixed at the root" and "the other seats'
+  discards taken as uniform" are more wrong than for a short hand; that is
+  what batch 1's calibration measures.
+- **The nine blocks' vectors add.**  The blocks constrain one another only
+  through the threshold, the card count and the clock, and one layer of relu
+  has to learn these three; should it learn them badly, batch 3 lists three
+  remedies.
+- **The labels at 18 cards or more come from graphs with pruned discards.**
+- **The teacher is not the opponent.**  The table learns the DP's value, not
+  how to beat `HeuristicBot`, so it has one doubt fewer than route 4's
+  original distillation, "valid only against this opponent"; `Outlook`'s
+  constants are still measured from `HeuristicBot` self-play.
 
-## 不做的事
+## Not doing
 
-- **執行時對每一張活牌算一次背包。** 「到門檻還差幾張」與「哪些牌讓它少
-  一張」是麻將的向聽數與有效牌，照現有 `reach` 的成本推，每個葉節點約
-  100 微秒（估計），k = 2 用不起。它只當批次 3 的補法，而且只算一次、不對
-  每張牌算。
-- **手調的面子、搭子、單張權重。** 就是 `HeuristicBot` 的評分；路線二量過
-  它的線性組合已經用到底。
-- **Monte Carlo 的標註。** DP 的值沒有雜訊，而且已經贏過設閘門的
-  Monte Carlo（`expectation.md` 批次 4）。
-- **葉節點短到閘門內時改成完整展開。** 許多葉節點底下的子圖合起來有多大
-  還沒量；批次 4 贏了再看。
-- **跨決定重用累加器或圖。** `live` 每個決定都變。
+- **A knapsack for every live card at run time.**  "How many cards short of
+  the threshold" and "which cards make it one fewer" are mahjong's shanten
+  and effective tiles; by the cost of the present `reach` it is about 100
+  microseconds a leaf (an estimate), which k = 2 cannot afford.  It serves
+  only as a remedy for batch 3, and then computed once, not for every card.
+- **Hand-tuned weights for melds, 搭子 and lone cards.**  That is
+  `HeuristicBot`'s grade; route 2 measured that its linear combinations are
+  already used up.
+- **Monte Carlo labels.**  The DP's values have no noise, and have already
+  beaten the gated Monte Carlo (`expectation.md` batch 4).
+- **Expanding in full once a leaf is short enough to be inside the gate.**
+  How large the subgraphs under many leaves are together has not been
+  measured; look again once batch 4 has won.
+- **Reusing the accumulator or the graph across decisions.**  `live` changes
+  at every decision.
 
-## 未決問題
+## Open questions
 
-- 長手牌的胡牌率低估 24%，是 `Loose` 還是 h × 1.5？（批次 1 的校準）
-- ~~eval 要多準才夠，深一層能換多少誤差？~~ 批次 2：k = 0 要 σ 0.4 以內；k = 1
-  容得下 σ 2、偏差 ±1、λ 0.5。相近的手一起看錯的誤差只量了比例一種。
-- ~~相加的九個向量學得動門檻嗎？D 要多大？~~ 批次 3：學得動，D = 16 驗證 RMSE 0.78；D = 1 不夠。
-- 18 張以上用 `Loose` 的圖當標註，偏多少？
+- The win rate of long hands is underestimated by 24%: is it `Loose` or
+  h × 1.5?  (Batch 1's calibration)
+- ~~How accurate must the eval be, and how much error does one more level
+  buy?~~  Batch 2: k = 0 needs σ within 0.4; k = 1 tolerates σ 2, bias ±1,
+  λ 0.5.  Of the errors that misjudge similar hands together, only the scale
+  was measured.
+- ~~Can nine added vectors learn the threshold?  How large must D be?~~
+  Batch 3: they can, validation RMSE 0.78 at D = 16; D = 1 is not enough.
+- How far off are the labels at 18 cards or more, taken from `Loose` graphs?

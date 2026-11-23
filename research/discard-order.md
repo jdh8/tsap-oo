@@ -1,46 +1,52 @@
-# 好牌先打：孤張的順序
+# 「好牌先打」 (good cards first): the order of lone cards
 
-宣告日期：2026-11-20。假說：「好牌先打」可能不對。[棄牌的危險度](discard-danger.md)
-只量了兵卒、士象、車馬炮落地被胡的機率，`HeuristicBot` 的孤張順序本身從沒
-跑過 A/B。
+Declared 2026-11-20.  The hypothesis: "good cards first" may be wrong.
+[The danger of a discard](discard-danger.md) measured only how often
+soldiers, 士象 and 車馬炮 are won on when they come down; `HeuristicBot`'s
+order of lone cards itself has never been through an A/B.
 
-`prospects` 給孤張的懲罰是 `COPIES * eaten[kin]`，即被吃進去的牌組胡數
-（兵卒 3、將士象 2、車馬炮 1），越貴的孤張越先打。兩個候選都保持平均水位
-不變，只改順序：
+`prospects` fines a lone card `COPIES * eaten[kin]`, that is, the 胡 of the
+meld it would be eaten into (soldiers 3, 將士象 2, 車馬炮 1), so the dearer
+a lone card, the sooner it goes.  Both candidates keep the average level as
+it is and change only the order:
 
-| 候選 | 孤張懲罰 | 兵卒 | 士象 | 車馬炮 |
+| Candidate | Fine on a lone card | Soldiers | 士象 | 車馬炮 |
 | --- | --- | ---: | ---: | ---: |
-| 現行（對照） | `COPIES * eaten[kin]` | 3 | 2 | 1 |
+| current (control) | `COPIES * eaten[kin]` | 3 | 2 | 1 |
 | flat | `COPIES * eaten[0]` | 2 | 2 | 2 |
 | reverse | `COPIES * (eaten[1] + eaten[2] - eaten[kin])` | 1 | 2 | 3 |
 
-對照 `b25fb0c`，四家，`RESHUFFLE=8`，各 100,000 局，在 gamete 上跑：
+Control `b25fb0c`, four seats, `RESHUFFLE=8`, 100,000 deals each, run on
+gamete:
 
-- flat：seed base 1795400000
-- reverse：seed base 1795500000
+- flat: seed base 1795400000
+- reverse: seed base 1795500000
 
-## 結果
+## Results
 
 | | flat | reverse |
 | --- | ---: | ---: |
-| 局數 | 100,000 | 100,000 |
-| 分歧的局數 | 48,315 | 70,456 |
-| 得分差（分／局） | −0.057 ± 0.017 | +0.027 ± 0.022 |
+| Deals | 100,000 | 100,000 |
+| Deals that part | 48,315 | 70,456 |
+| Score difference (points a deal) | −0.057 ± 0.017 | +0.027 ± 0.022 |
 | 95% CI | [−0.090, −0.025] | [−0.015, +0.070] |
-| 結論 | loss | 資料不足 |
-| 胡牌率，對照 → 候選 | 24.22% → 24.08% | 24.35% → 24.45% |
-| 分歧的局平均（分） | −0.119 | +0.039 |
-| 同一局面內的標準差（分） | 19.10 | 20.39 |
-| 局面之間的標準差（分） | 3.48 | 3.76 |
+| Verdict | loss | insufficient data |
+| Win rate, control → candidate | 24.22% → 24.08% | 24.35% → 24.45% |
+| Mean over the deals that part (points) | −0.119 | +0.039 |
+| Standard deviation within a split (points) | 19.10 | 20.39 |
+| Standard deviation between splits (points) | 3.48 | 3.76 |
 
-flat 輸，reverse 的 CI 跨 0，是資料不足，不是「沒輸」。兩者都不進
-`HeuristicBot`，打法不變。假說「好牌先打可能不對」既沒被證實也沒被推翻：
-把順序整個倒過來，在 100,000 局內量不出差別。
+flat loses; reverse's CI straddles 0, which is insufficient data, not "no
+loss".  Neither goes into `HeuristicBot`, and play is unchanged.  The
+hypothesis that good cards first may be wrong is neither confirmed nor
+refuted: with the order turned right round, 100,000 deals measure no
+difference.
 
-## flat 輸在哪裡
+## Where flat loses
 
-照鐵則，宣告輸之前先追查。套上 `research/room-for-melds-trace.patch`，取
-同一個 seed base 的前 20,000 局：
+By the iron rules, a loss is traced before it is declared.  Apply
+`research/room-for-melds-trace.patch` and take the first 20,000 deals of the
+same seed base:
 
 ```sh
 git apply research/room-for-melds-trace.patch
@@ -48,43 +54,49 @@ TRACE=1 SEED_BASE=1795400000 ab/run.sh 20000 b25fb0c > out.txt
 python3 ab/tally.py out.txt 20000
 ```
 
-這 20,000 局裡 9,634 局分歧，−0.008 ± 0.037 分／局，本身看不出輸贏；
-下面的分組是看了結果才分的，只能用來找原因與挑下一個實驗。
+Of these 20,000 deals 9,634 part, at −0.008 ± 0.037 points a deal, which by
+itself shows neither a win nor a loss; the groups below were formed after
+seeing the results, and serve only to look for the cause and to pick the
+next experiment.
 
-| 對照 → 候選 | 局數 | 平均（分） | ± | 每局貢獻（分） |
+| Control → candidate | Deals | Mean (points) | ± | Contribution a deal (points) |
 | --- | ---: | ---: | ---: | ---: |
-| 吃車馬炮 → 過 | 287 | −0.71 | 0.38 | −0.0102 |
-| 吃對子 → 過 | 33 | −1.59 | 1.46 | −0.0026 |
-| 過 → 吃將士象 | 32 | −1.62 | 0.84 | −0.0026 |
-| 過 → 吃兵卒 | 44 | −1.14 | 0.53 | −0.0025 |
-| 過 → 吃對子 | 19 | −1.97 | 2.53 | −0.0019 |
-| 過 → 吃車馬炮 | 10 | −2.28 | 2.11 | −0.0011 |
-| 吃兵卒 → 吃兵卒 | 7 | +0.63 | 3.51 | +0.0002 |
-| 過 → 碰 | 6 | +1.10 | 2.40 | +0.0003 |
-| 吃兵卒 → 過 | 1 | +16.63 | — | +0.0008 |
-| 碰 → 過 | 11 | +1.67 | 1.79 | +0.0009 |
-| 吃將士象 → 過 | 46 | +0.66 | 0.65 | +0.0015 |
-| 棄牌 → 棄牌 | 9,138 | +0.02 | 0.08 | +0.0087 |
+| eat 車馬炮 → pass | 287 | −0.71 | 0.38 | −0.0102 |
+| eat a pair → pass | 33 | −1.59 | 1.46 | −0.0026 |
+| pass → eat 將士象 | 32 | −1.62 | 0.84 | −0.0026 |
+| pass → eat soldiers | 44 | −1.14 | 0.53 | −0.0025 |
+| pass → eat a pair | 19 | −1.97 | 2.53 | −0.0019 |
+| pass → eat 車馬炮 | 10 | −2.28 | 2.11 | −0.0011 |
+| eat soldiers → eat soldiers | 7 | +0.63 | 3.51 | +0.0002 |
+| pass → pong | 6 | +1.10 | 2.40 | +0.0003 |
+| eat soldiers → pass | 1 | +16.63 | — | +0.0008 |
+| pong → pass | 11 | +1.67 | 1.79 | +0.0009 |
+| eat 將士象 → pass | 46 | +0.66 | 0.65 | +0.0015 |
+| discard → discard | 9,138 | +0.02 | 0.08 | +0.0087 |
 
-分歧有 95% 是棄牌，而棄牌合計是 +0.02 ± 0.08：孤張先打哪一張，量不出
-差別。吃與碰的 496 局合計 −0.69 ± 0.29 分，每局 −0.017；孤張的懲罰同時
-也是吃不吃的估值，flat 動到的是這裡，最大的一組是原本吃車馬炮、現在
-不吃。
+95% of the deals that part do so at a discard, and the discards together
+come to +0.02 ± 0.08: which lone card goes first measures no difference.
+The 496 deals of eats and pongs together come to −0.69 ± 0.29 points, −0.017
+a deal; the fine on a lone card is also the valuation of whether to eat, and
+that is what flat disturbs; the largest group is where the control ate
+車馬炮 and the candidate now does not.
 
-棄牌再依兩邊各打哪一類分：
+The discards again, by which kind each side discarded:
 
-| 對照 → 候選 | 局數 | 平均（分） | ± | 每局貢獻（分） |
+| Control → candidate | Deals | Mean (points) | ± | Contribution a deal (points) |
 | --- | ---: | ---: | ---: | ---: |
 | 士象 → 車馬炮 | 6,128 | −0.06 | 0.10 | −0.0175 |
-| 兵卒 → 士象 | 900 | −0.10 | 0.22 | −0.0046 |
+| soldiers → 士象 | 900 | −0.10 | 0.22 | −0.0046 |
 | 車馬炮 → 車馬炮 | 36 | +0.27 | 1.50 | +0.0005 |
-| 車馬炮 → 兵卒 | 19 | +1.43 | 2.62 | +0.0014 |
-| 兵卒 → 車馬炮 | 1,657 | +0.05 | 0.18 | +0.0045 |
+| 車馬炮 → soldiers | 19 | +1.43 | 2.62 | +0.0014 |
+| soldiers → 車馬炮 | 1,657 | +0.05 | 0.18 | +0.0045 |
 | 車馬炮 → 士象 | 398 | +1.23 | 0.42 | +0.0244 |
 
-（「士象」含將。）棄牌的分歧 94% 發生在牌堆還有 24 張以上時，平均
-+0.00 分。
+("士象" includes 將.)  94% of the discards that part come while the pile
+still has 24 cards or more, at a mean of +0.00 points.
 
-結論：flat 的輸是實的（判決來自宣告好的 100,000 局），但追蹤指向吃牌的
-估值而不是棄牌的順序。若要再問「好牌先打」，下一個實驗該只改棄牌時的
-孤張順序、吃牌的估值照舊，另取 seed 另行宣告。
+Conclusion: flat's loss is real (the verdict comes from the 100,000 deals
+declared), but the trace points at the valuation of eats, not at the order
+of discards.  To ask about good cards first again, the next experiment
+should change only the order of lone cards at a discard and leave the
+valuation of eats as it is, with a fresh seed and a fresh declaration.

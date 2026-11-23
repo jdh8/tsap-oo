@@ -8,6 +8,14 @@ The browser front end is the standalone crate in `web/`, the desktop one
 (`web/`'s page in a Tauri window, against opponents that search) the one in
 `tauri/`, and the A/B harness the one in `ab/`.
 
+Everything here is in English: code, comments, `doc/`, `research/`, the
+changelog and commit messages.  Card faces and the game's own terms stay in
+Chinese characters (胡, 將士象, 搭子), and so does the page in `web/`, which
+is for players.  This repository's docs are about the program: design in
+`doc/`, measurement in `research/`.  Teaching the game, and research into
+what the rules are from source to source and place to place, belong in
+`../tsap-oo-book`, in Taiwanese Traditional Chinese.
+
 After updating the codebase, please
 
 - Format the code with `cargo fmt` (also in `web/` and `tauri/`).
@@ -75,4 +83,5 @@ Invariants, each guarded by `tests/round.rs`:
 Rules questions: the Chinese Wikipedia article on 十胡 and the common
 Taiwanese write-ups agree on the table in `Rules::new`; where they disagree
 (four-colour soldiers 4 vs 5, 將 kong values) the README says which was
-chosen.
+chosen.  The sources, quoted and dated, are in
+`../tsap-oo-book/research/`.

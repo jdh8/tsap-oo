@@ -1,118 +1,149 @@
-# 胡數的天花板：設計
+# The 胡 ceiling: design
 
-寫於 2026-11-18，基準 `6d5a2a8`；批次 0 到 3 已完成，批次 4 做了兩項，進度見下表。這份文件取代
-`doc/stronger-bot.md` 路線二裡「封頂只用來拒吃對子」那個實驗：帳換成精確的，
-工程拆成五批，每一批都有閘門，過了才做下一批。
+Written 2026-11-18, base `6d5a2a8`; batches 0 to 3 are complete and two items
+of batch 4 are done, with the progress in the table below.  This document
+replaces the "cap used only to refuse pair eats" experiment in route 2 of
+`doc/stronger-bot.md`: the arithmetic becomes exact, and the engineering is
+split into five batches, each with a gate to pass before the next is done.
 
-## 要回答的問題
+## The question to answer
 
-一手牌不靠運氣最多能胡到幾胡，算得出來。`HeuristicBot` 知道這個數字之後
-會不會變強？第一個用途是吃對子：吃下去會讓天花板掉到門檻以下的那幾口，
-不吃是不是比較好？
+The most 胡 a hand can reach without luck can be computed.  Does
+`HeuristicBot` get stronger for knowing that number?  The first use is pair
+eats: for the ones that would drop the ceiling below the threshold, is it
+better not to eat?
 
-## 進度
+## Progress
 
-每一批大約是一個 session。做完一批就更新這張表。
+Each batch is about one session.  Update this table when a batch is done.
 
-| 批次 | 產出 | 改變打法 | 閘門 | 狀態 |
+| Batch | Output | Changes play | Gate | Status |
 | --- | --- | --- | --- | --- |
-| 0 | 帳與統計進 repo | 否 | 無 | 完成 |
-| 1 | `ceiling` 求解器與測試 | 否，要量到零分歧 | 測試全過 | 完成 |
-| 2 | 探針的 A/B，附預先宣告的分組 | 候選 | 見批次 2 | 完成：整體 loss（−2.173 ± 0.008，CI [−2.189, −2.156]）；甲 +0.0143、乙 +0.0254 分／局，CI 皆在 0 之上 → 批次 3（800,000 局，seed 1794940763，對照 168e1e4） |
-| 3 | 收窄的規則，新 seed 的 A/B | 是 | win 才 commit | 完成：win（+0.053 ± 0.002，CI [+0.049, +0.056]；800,000 局，seed 1794947206，對照 5b62dc6） |
-| 4 | 天花板的其他用途 | 候選 | 批次 2 或 3 有贏 | 進行中：節點數已量，動態規劃不接手（`research/dp-nodes.md`）；`short` 的下界 win（+0.002 ± 0.000，CI [+0.001, +0.003]；200,000 局，seed 1794954270，對照 7ad669b）；`draw` 的吃對子規則 loss（−0.002 ± 0.000，CI [−0.003, −0.001]；400,000 局，seed 1794956595，對照 39d37b2） |
+| 0 | The arithmetic and the statistics into the repo | no | none | done |
+| 1 | The `ceiling` solver and its tests | no, to be measured at zero deals that part | all tests pass | done |
+| 2 | The probe's A/B, with groups declared beforehand | candidate | see batch 2 | done: loss overall (−2.173 ± 0.008, CI [−2.189, −2.156]); A +0.0143 and B +0.0254 points a deal, both CIs above 0 → batch 3 (800,000 deals, seed 1794940763, control 168e1e4) |
+| 3 | The narrowed rule, an A/B on a new seed | yes | commit only on a win | done: win (+0.053 ± 0.002, CI [+0.049, +0.056]; 800,000 deals, seed 1794947206, control 5b62dc6) |
+| 4 | Other uses of the ceiling | candidate | a win in batch 2 or 3 | in progress: the node counts are measured and dynamic programming does not take over (`research/dp-nodes.md`); the floor on `short`, win (+0.002 ± 0.000, CI [+0.001, +0.003]; 200,000 deals, seed 1794954270, control 7ad669b); the pair-eat rule in `draw`, loss (−0.002 ± 0.000, CI [−0.003, −0.001]; 400,000 deals, seed 1794956595, control 39d37b2) |
 
-## 為什麼換掉原本的實驗
+## Why the original experiment was replaced
 
-`research/room-for-melds.md` 的帳數的是「還放得下幾個三張組」，有三個缺口：
+The arithmetic of `research/room-for-melds.md` counts "how many three-card
+melds there is still room for", and has three gaps:
 
-- **沒有價錢。** 封頂只讓 `short` 多扣幾個半胡，每個 64；吃對子少兩張散牌
-  省 256。帳說「做不成」，評分只當成「遠一點」。
-- **只看一種排法。** 將帥算單張還是算進將士象，三色兵卒要不要等第四色，
-  都會讓「還要幾個對子」換一個答案。
-- **不算四張組。** 槓和四色兵卒不在裡面。
+- **No price.**  The cap only makes `short` take off a few more half 胡, 64
+  each; eating a pair saves 256 for two loose cards fewer.  The arithmetic
+  says "cannot be made"; the grade takes it only as "a bit further".
+- **Only one layout is looked at.**  Whether a general (將帥) counts as a
+  single or goes into 將士象, and whether soldiers of three colours wait for
+  the fourth colour, each change the answer to "how many more pairs are
+  needed".
+- **Four-card melds are not counted.**  Kongs and soldiers of four colours
+  are not in it.
 
-獎金也小：「只封頂」事後分組估的上限約 +0.006 分／局。所以工程要排在量測
-後面，量不到就停。
+The prize is small too: the bound estimated by grouping after the fact for
+"cap only" is about +0.006 points a deal.  So the engineering goes behind
+the measurement, and stops if nothing can be measured.
 
-## 帳：七個位置
+## The arithmetic: seven slots
 
-胡牌的手一定是 21 張，看成 7 個三張的位置，每個位置基準 1 胡：
+A winning hand is always 21 cards; see it as 7 slots of three cards, each
+slot 1 胡 at base:
 
-**胡 = 7 + 2k + 將士象數 + 2 ×（暗刻 + 三色兵卒 + 四色兵卒 + 槓）+ 加成**
+**胡 = 7 + 2k + the number of 將士象 + 2 × (concealed triplets + soldiers of
+three colours + soldiers of four colours + kongs) + bonus**
 
-- **k =（單張 − 對子）÷ 3。** 總數是 21 張，所以一定是整數。
-- **單張：** 落單的將帥，加上每個四張組多出的那一張。
-- **加成：** 四色兵卒 +1、明槓 +2、暗槓 +4。
-- **胡牌：** 7 之後的各項合計至少 3（八胡是 1）。
+- **k = (singles − pairs) ÷ 3.**  The total is 21 cards, so it is always an
+  integer.
+- **Singles:** the lone generals, plus the extra card of each four-card
+  meld.
+- **Bonus:** soldiers of four colours +1, exposed kong +2, concealed quad
+  +4.
+- **Winning:** the terms after the 7 total at least 3 (1 at 八胡).
 
-由此：
+From this:
 
-- **將帥配一個對子是基準的位置。** 一張將帥本身不多給胡；單張比對子多
-  三張時，那三張才是一個 3 胡的位置，等於一個暗刻。
-- **槓是暗刻的位置加一張值 3 胡的單張**（暗槓 5 胡），四色兵卒是三色的
-  位置加一張值 2 胡的單張。配一個對子，槓有 +4、四色有 +3，單獨就夠。
-- **免費的對子數是（單張 − 已吃的對子）除以 3 的餘數。** 餘 0 時再吃一個
-  對子，k 少 1：天花板少 2 胡，還得再湊兩個對子。這和舊帳的「O 除以 3
-  餘 2」是同一個條件。
+- **A general matched with a pair is a base slot.**  A general by itself
+  gives no extra 胡; when the singles outnumber the pairs by three cards,
+  those three cards make a slot of 3 胡, equal to a concealed triplet.
+- **A kong is a concealed triplet's slot plus a single worth 3 胡** (5 胡 for
+  a concealed quad), and soldiers of four colours are the slot of three
+  colours plus a single worth 2 胡.  Matched with a pair, a kong has +4 and
+  four colours +3, enough alone.
+- **The number of free pairs is the remainder of (singles − pairs already
+  eaten) divided by 3.**  Eating one more pair at remainder 0 lowers k by 1:
+  the ceiling drops 2 胡, and two more pairs have to be found.  This is the
+  same condition as the old arithmetic's "O divided by 3 leaves 2".
 
-驗證：`HeuristicBot` 四家自對局 20,000 局（seed 1795000000）的 19,404 手
-胡牌，恆等式逐手成立。同一批牌的統計：
+Verification: over 20,000 rounds of `HeuristicBot` self-play at four seats
+(seed 1795000000), the identity holds hand by hand on all 19,404 winning
+hands.  The statistics of the same rounds:
 
 | | |
 | --- | ---: |
-| 每手落單的將帥 | 2.76 張，其中 0.70 張是摸來的 |
-| 每手的對子 | 2.12 個 |
-| k = −1 ／ 0 ／ +1 ／ +2 以上 | 5.5% ／ 56.4% ／ 35.2% ／ 2.9% |
-| 少了 2k 就不到十胡的胡牌 | 9.8% |
+| Lone generals a hand | 2.76, of which 0.70 were drawn |
+| Pairs a hand | 2.12 |
+| k = −1 / 0 / +1 / +2 or more | 5.5% / 56.4% / 35.2% / 2.9% |
+| Wins that would fall short of ten 胡 without the 2k | 9.8% |
 
-統計程式是 `examples/census.rs`，帳與完整的表在 `research/seven-slots.md`。
+The statistics program is `examples/census.rs`; the arithmetic and the full
+tables are in `research/seven-slots.md`.
 
-## 天花板的定義
+## Definition of the ceiling
 
-**天花板**是一手牌在下面的假設下，最後 21 張的排法能有的最多胡數：
+The **ceiling** is the most 胡 a layout of a hand's final 21 cards can have,
+under the assumptions below:
 
-- 還沒出現的牌，要哪一張就來哪一張，要幾張有幾張沒出現的。
-- 外來的將帥最多 `generals` 張（槓的第四張不算在內）。
+- Any card not yet seen comes when it is wanted, in as many copies as are
+  still unseen.
+- At most `generals` generals come from outside (the fourth card of a kong
+  is not counted).
 
-最後的排法由三種東西組成：已經亮出的牌組；全由暗牌組成的牌組，照暗牌
-計胡；留下的暗牌加一張外來牌的牌組，照明牌計胡。
+The final layout is made of three kinds of thing: melds already exposed;
+melds made wholly of concealed cards, scored as concealed; and melds of
+concealed cards kept plus one outside card, scored as exposed.
 
-| 加一張外來牌 | 留下的暗牌 | 胡 |
+| Plus one outside card | Concealed cards kept | 胡 |
 | --- | ---: | ---: |
-| 對子 | 1 | 0 |
-| 碰 | 2 | 1 |
-| 明槓 | 3 | 6 |
-| 將士象、車馬炮 | 2 | 2、1 |
-| 三色兵卒 | 2 | 3 |
-| 四色兵卒 | 3 | 5 |
-| 將帥單張（算一張外來的將帥） | 0 | 1 |
-| 士象加外來的將帥（算一張） | 2 | 2 |
+| Pair | 1 | 0 |
+| Pong | 2 | 1 |
+| Exposed kong | 3 | 6 |
+| 將士象, 車馬炮 | 2 | 2, 1 |
+| Soldiers of three colours | 2 | 3 |
+| Soldiers of four colours | 3 | 5 |
+| Lone general (counts as one outside general) | 0 | 1 |
+| 士象 plus an outside general (counts as one) | 2 | 2 |
 
-限制：
+Constraints:
 
-- **張數。** 暗牌 n 張、亮出的牌組共 e 張、外來牌 m 張、打掉 d 張，則
-  d − m = n + e − 21。等牌的手是 d = m − 1，剛吃完還沒打的手是 d = m。
-- **將帥不能打**，也不能碰或吃成對子。
-- **留下三張或四張相同的牌，就是一個暗刻、暗槓或明槓**，不能拆。
-- **每張外來牌都要有還沒出現的同張**，同一張牌被要幾次就要有幾張。
+- **Card count.**  With n concealed cards, e cards in the exposed melds, m
+  outside cards and d discarded, d − m = n + e − 21.  A hand awaiting a card
+  has d = m − 1, and a hand that has just eaten and not yet discarded has
+  d = m.
+- **Generals cannot be discarded**, nor ponged or eaten into a pair.
+- **Three or four identical cards kept are a concealed triplet, a concealed
+  quad or an exposed kong**, and cannot be split.
+- **Every outside card must have a copy not yet seen**, as many copies as
+  the times the same card is wanted.
 
-刻意不管的事，所以它是上限：誰能吃誰的牌、剛吃的牌不能打、先後順序、
-相公、別家搶走。
+What it deliberately ignores, which makes it an upper bound: who can eat
+whose card, that the card just eaten cannot be discarded, the order of
+events, 相公, and the other seats taking the cards first.
 
-`generals` 取 0 是「不靠運氣」；取 1 是「再摸到一張將帥」。兩個都要，因為
-胡牌的手平均有 0.70 張摸來的將帥，只看 0 會把活的手判成死的。
+`generals` at 0 is "without luck"; at 1 it is "one more general drawn".
+Both are needed, because a winning hand has 0.70 drawn generals on average,
+and looking at 0 alone would judge live hands dead.
 
-## 批次 0：帳與統計進 repo
+## Batch 0: the arithmetic and the statistics into the repo
 
-- `examples/census.rs`：上面那個統計，照 `examples/dealt.rs` 的寫法，
-  `Cargo.toml` 加一筆 `[[example]]`。
-- `research/seven-slots.md`：帳、恆等式的驗證、完整的統計表、工具與 seed。
-- 不動 `src/`，不必跑 A/B。
+- `examples/census.rs`: the statistics above, written the way
+  `examples/dealt.rs` is, with a `[[example]]` entry added to `Cargo.toml`.
+- `research/seven-slots.md`: the arithmetic, the verification of the
+  identity, the full tables of statistics, the tools and the seed.
+- `src/` is not touched, and no A/B is needed.
 
-## 批次 1：`ceiling` 求解器
+## Batch 1: the `ceiling` solver
 
-新模組 `src/ceiling.rs`，一個純函式：
+A new module `src/ceiling.rs`, one pure function:
 
 ```rust
 /// The most 胡 `hand` can win with beside `exposed`, if every card in
@@ -121,51 +152,67 @@
 pub fn ceiling(rules: &Rules, exposed: &[Meld], hand: Hand, live: Hand, generals: usize) -> Option<u32>
 ```
 
-`live` 的算法與 `HeuristicBot::start` 相同。`ab/` 與批次 2 的候選都要用，
-所以是公開的。
+`live` is computed as in `HeuristicBot::start`.  `ab/` and batch 2's
+candidate both need it, so it is public.
 
-做法：
+Method:
 
-- **分塊。** 牌只在九塊裡互相成組：四色各一塊將士象、各一塊車馬炮，兵卒
-  一塊。外來牌也只來自同一塊。
-- **每塊列舉。** 把這一塊的暗牌分成上面的各種牌組與打掉的牌，對每一組
-  （d − m，用掉幾張外來的將帥）記下最多的胡。一塊最多 16 張，直接列舉，
-  以（手上的張數、沒出現的張數）為鍵記下結果。
-- **合併。** 九塊逐一疊起來，同一組（d − m，將帥數）取最多的胡；最後讀
-  d − m = n + e − 21 的那一格，加上亮出的牌組的胡。
+- **Blocks.**  Cards meld with one another only within nine blocks: one of
+  將士象 and one of 車馬炮 for each of the four colours, and one of soldiers.
+  Outside cards too come only from the same block.
+- **Enumerate each block.**  Split the block's concealed cards into the
+  kinds of meld above and the cards discarded, and for each (d − m, outside
+  generals used) record the most 胡.  A block is at most 16 cards and is
+  enumerated directly, the result stored under the key (cards in hand,
+  cards unseen).
+- **Merge.**  Stack the nine blocks one by one, keeping the most 胡 for each
+  (d − m, generals); at the end read the cell d − m = n + e − 21 and add the
+  胡 of the exposed melds.
 
-測試：
+Tests:
 
-- **手算的例子。** 舊帳表裡的 O = 2 到 8、一個搭子加一張孤張（做不成）、
-  大肚（`車車車馬炮` 只胡第四張車）、將帥配對子、三張將帥、暗刻加槓。
-- **自對局的不變量。** 胡牌者在胡之前的每一個決定點，那之後外來的將帥
-  不超過 `generals` 張時，天花板不小於最後的胡數。放在 `tests/round.rs`。
-- **零分歧。** `ab/run.sh 20000` 讀到 0 局不同。
+- **Hand-worked cases.**  O = 2 to 8 from the old arithmetic's table, a 搭子
+  plus a lone card (cannot be made), 大肚 (`車車車馬炮` wins only on the fourth
+  車), a general matched with a pair, three generals, a concealed triplet
+  plus a kong.
+- **An invariant of self-play.**  At every decision point of the winner
+  before the win, when no more than `generals` outside generals come after
+  it, the ceiling is no less than the final 胡.  It lives in
+  `tests/round.rs`.
+- **Zero deals that part.**  `ab/run.sh 20000` reads 0 deals that differ.
 
-批次 1 做出來的兩件事，批次 2 要照著：
+Two things that came out of batch 1, which batch 2 must follow:
 
-- **`live` 與剛打出的那張牌。** 不變量的測試在吃碰的決定點把牌桌上那張牌
-  算進 `live`，因為它還拿得到；`HeuristicBot::start` 的 `live` 不含它。探針
-  比較「過」與「吃」時，「過」用 bot 的 `live`（那張牌會進棄牌堆），「吃」把
-  牌組放進 `exposed`。
-- **三張相同的牌可以先打一張再拆。** 天花板不管先後，所以 `車車車馬炮` 少了
-  第四張車仍算得到兩個明的車馬炮（先打一張車）。`locked_completions` 在當下
-  不准這樣吃；天花板是上限，這是刻意的。
+- **`live` and the card just discarded.**  At a decision to eat or pong, the
+  invariant's test counts the card on the table in `live`, because it can
+  still be had; the `live` of `HeuristicBot::start` does not include it.
+  When the probe compares "pass" with "eat", "pass" uses the bot's `live`
+  (the card goes to the discards), and "eat" puts the meld in `exposed`.
+- **Three identical cards may be split by discarding one first.**  The
+  ceiling ignores order, so `車車車馬炮` without the fourth 車 still counts two
+  exposed 車馬炮 (discard one 車 first).  `locked_completions` does not allow
+  that eat at the moment; the ceiling is an upper bound, and this is
+  deliberate.
 
-## 批次 2：探針
+## Batch 2: the probe
 
-候選（探針）只改一件事：**輪到自己決定吃碰時，吃了會讓 `generals = 0` 的
-天花板變低的吃對子，不列入選擇。**
+The candidate (the probe) changes one thing only: **when it is its turn to
+decide on an eat or pong, a pair eat that would lower the `generals = 0`
+ceiling is left out of the choices.**
 
-- 只擋真正的決定（`HeuristicBot::claims`），不動 `draw` 裡假想的吃對子。
-  所以「過」的評分和對照一模一樣，分歧只會是「吃對子 → 別的」；出現別種
-  分歧就是實作錯了。bot 對自己未來的預測因此和實際的打法不一致，這是
-  刻意的，批次 3 有贏再回頭處理。
-- 天花板不變的吃對子照舊。它們平均很值得（一律不吃是 −1.50 分／局）。
+- It blocks only real decisions (`HeuristicBot::claims`), and leaves the
+  imagined pair eats in `draw` alone.  So the grade of "pass" is exactly the
+  control's, and the only parting can be "pair eat → something else"; any
+  other kind of parting means the implementation is wrong.  The bot's
+  forecast of its own future therefore disagrees with its actual play; this
+  is deliberate, to be dealt with if batch 3 wins.
+- Pair eats that leave the ceiling unchanged go on as before.  They are well
+  worth it on average (never eating is −1.50 points a deal).
 
-追蹤：`ab/` 對每個分歧多印四個數字：`generals` 取 0 與 1 時，吃之前與
-吃之後的天花板。探針與追蹤都不在 `main` 上，各存成一個 patch；
-`hu-ceiling-trace.patch` 帶著 `ab/tally.py` 與 `ab/groups.py`：
+Trace: for every parting `ab/` prints four more numbers: the ceiling before
+the eat and after it, with `generals` at 0 and at 1.  Neither the probe nor
+the trace is on `main`; each is kept as a patch;
+`hu-ceiling-trace.patch` carries `ab/tally.py` and `ab/groups.py`:
 
 ```sh
 git apply research/hu-ceiling-probe.patch research/hu-ceiling-trace.patch
@@ -173,165 +220,207 @@ TRACE=1 ab/run.sh 800000 > out.txt
 python3 ab/groups.py out.txt 800000
 ```
 
-預先宣告的分組，依吃完之後的天花板：
+The groups declared beforehand, by the ceiling after the eat:
 
-| 組 | 條件 | 預期 |
+| Group | Condition | Expectation |
 | --- | --- | --- |
-| 甲 | `generals = 1` 也不到門檻 | 不吃比較好 |
-| 乙 | `generals = 0` 不到門檻，`generals = 1` 到 | 不吃略好 |
-| 丙 | `generals = 0` 仍到門檻 | 不知道，可能是吃比較好 |
+| A | Below the threshold even with `generals = 1` | better not to eat |
+| B | Below the threshold with `generals = 0`, reaches it with `generals = 1` | slightly better not to eat |
+| C | Still reaches the threshold with `generals = 0` | unknown, eating may be better |
 
-量測：
+Measurement:
 
-- 新的 seed base，`RESHUFFLE=8`，對照 `HEAD`。
-- 局數在看到任何得分之前定下。先用另一個 seed 跑 5,000 局計時，結果丟掉；
-  預設 800,000 局，推估超過三小時就改成 400,000 局。超過一小時就照全域
-  規則 detach，把狀態寫進 memory 的 `in-flight-runs.md`。
+- A new seed base, `RESHUFFLE=8`, control `HEAD`.
+- The deal count is set before any score is seen.  First time 5,000 deals on
+  another seed and throw the result away; 800,000 deals by default, changed
+  to 400,000 deals if the projection exceeds three hours.  Over an hour,
+  detach by the global rule and write the state to `in-flight-runs.md` in
+  memory.
 
-閘門：
+Gate:
 
-- **整體 win**（CI 在 0 之上）：探針本身可以 commit。分組只用來決定批次 3
-  要不要再收窄。
-- **整體不是 win，但甲、乙或兩者的 CI 在 0 之上**：做批次 3。
-- **其他**：這條線停在這裡，寫進 `research/` 與 `CHANGELOG.md`，bot 不改。
-  CI 跨 0 的分組是資料不足，不是「可以留著」。
+- **Win overall** (CI above 0): the probe itself may be committed.  The
+  groups only decide whether batch 3 narrows it further.
+- **Not a win overall, but the CI of A, of B or of both is above 0**: do
+  batch 3.
+- **Otherwise**: this line stops here, is written up in `research/` and
+  `CHANGELOG.md`, and the bot does not change.  A group whose CI straddles 0
+  is insufficient data, not "may be kept".
 
-結果（800,000 局，seed base 1794940763，`RESHUFFLE=8`，對照 `168e1e4`，
-357,189 局分歧）：
+Results (800,000 deals, seed base 1794940763, `RESHUFFLE=8`, control
+`168e1e4`, 357,189 deals part):
 
-| | 分／局 | 95% CI | 結論 |
+| | Points a deal | 95% CI | Verdict |
 | --- | ---: | --- | --- |
-| 整體 | −2.173 ± 0.008 | [−2.189, −2.156] | loss |
-| 甲 | +0.0143 | [+0.0133, +0.0154] | 在 0 之上 |
-| 乙 | +0.0254 | [+0.0228, +0.0279] | 在 0 之上 |
-| 丙 | −2.213 | [−2.229, −2.196] | 在 0 之下 |
+| Overall | −2.173 ± 0.008 | [−2.189, −2.156] | loss |
+| A | +0.0143 | [+0.0133, +0.0154] | above 0 |
+| B | +0.0254 | [+0.0228, +0.0279] | above 0 |
+| C | −2.213 | [−2.229, −2.196] | below 0 |
 
-探針不 commit；甲、乙過了第二道閘門，做批次 3。
+The probe is not committed; A and B pass the second gate, so batch 3 is
+done.
 
-## 批次 3：收窄的規則
+## Batch 3: the narrowed rule
 
-只擋批次 2 裡 CI 在 0 之上的那幾組。新的 seed base，局數依批次 2 量到的
-分歧率與標準差在跑之前定下，win 才 commit。批次 2 的分組是在那批牌上
-看的，所以判決只看這一次。
+Block only the groups of batch 2 whose CI is above 0.  A new seed base, the
+deal count set before the run from the parting rate and the standard
+deviation measured in batch 2, commit only on a win.  Batch 2's groups were
+read on those deals, so the verdict rests on this run alone.
 
-規則：吃對子讓 `generals = 0` 的天花板變低，**而且**掉到門檻以下（或沒有
-排法），才不列入選擇；就是甲與乙。局數定為 800,000：照批次 2 的分歧率與
-甲、乙的標準誤，預估效果約 +0.04 分／局、標準誤約 0.0014。5,000 局的計時
-（seed 1，結果丟掉）是 14 秒。
+The rule: a pair eat is left out of the choices only when it lowers the
+`generals = 0` ceiling **and** drops it below the threshold (or leaves no
+layout); that is A and B.  The deal count is set at 800,000: from batch 2's
+parting rate and the standard errors of A and B, the effect is projected
+at about +0.04 points a deal and the standard error at about 0.0014.
+Timing 5,000 deals (seed 1, the result thrown away) took 14 seconds.
 
-結果（800,000 局，seed base 1794947206，`RESHUFFLE=8`，對照 `5b62dc6`，
-59,885 局分歧，全是「吃對子 → 別的」，其中 59,650 局是「過」）：
+Results (800,000 deals, seed base 1794947206, `RESHUFFLE=8`, control
+`5b62dc6`, 59,885 deals part, all of them "pair eat → something else", 59,650
+of them to "pass"):
 
-| | 分／局 | 95% CI | 結論 |
+| | Points a deal | 95% CI | Verdict |
 | --- | ---: | --- | --- |
-| 整體 | +0.053 ± 0.002 | [+0.049, +0.056] | win |
-| 甲 | +0.0173 | [+0.0162, +0.0184] | 在 0 之上 |
-| 乙 | +0.0353 | [+0.0323, +0.0383] | 在 0 之上 |
+| Overall | +0.053 ± 0.002 | [+0.049, +0.056] | win |
+| A | +0.0173 | [+0.0162, +0.0184] | above 0 |
+| B | +0.0353 | [+0.0323, +0.0383] | above 0 |
 
-收窄的規則進 `HeuristicBot::claims`，網頁的提示跟著變。`draw` 裡假想的吃
-對子還沒跟上，留給批次 4。量的時候用的追蹤仍是
-`research/hu-ceiling-trace.patch`；它的 `tally.py` 不認得帶天花板的行，
-分組要用 `groups.py`。
+The narrowed rule goes into `HeuristicBot::claims`, and the web page's hint
+changes with it.  The imagined pair eats in `draw` have not followed yet and
+are left to batch 4.  The trace used for the measurement is still
+`research/hu-ceiling-trace.patch`; its `tally.py` does not recognise the
+lines that carry ceilings, so the groups need `groups.py`.
 
-## 批次 4：其他用途
+## Batch 4: other uses
 
-有贏才設計，各自 A/B。原本下面四項也可以由一個單人期望值的動態規劃一次
-取代（`doc/stronger-bot.md` 路線三），天花板在裡面是精確的剪枝。節點數了
-（`research/dp-nodes.md`，`examples/nodes.rs`）：剛發的 20 張手平均 7 × 10⁵
-個節點、6 × 10⁷ 條邊，每個決定 22 秒，比路線三估的多兩到三個數量級；手牌
-12 張以下才是幾十毫秒。所以批次 4 不由動態規劃接手，四項各自做；設閘門的
-動態規劃留給路線三。候選：
+Designed only on a win, each with its own A/B.  Originally the four items
+below could also be replaced at once by one dynamic programme of
+single-player expectation (`doc/stronger-bot.md`, route 3), in which the
+ceiling is an exact pruning.  The nodes were counted (`research/dp-nodes.md`,
+`examples/nodes.rs`): a freshly dealt hand of 20 averages 7 × 10⁵ nodes and
+6 × 10⁷ edges, 22 seconds a decision, two to three orders of magnitude more
+than route 3 estimated; only hands of 12 cards or fewer take tens of
+milliseconds.  So dynamic programming does not take over batch 4 and the
+four items are done one by one; the gated dynamic programme is left to
+route 3.  The candidates:
 
-- **`dead`。** 現在假設每張牌都換成一張將帥，寬得幾乎擋不到東西。
-- **`short` 與 `hope`。** 用「天花板離門檻多遠」取代搭子的半胡數。做了，
-  見下。
-- **棄牌。** 讓天花板掉到門檻以下的那一張不打。
-- **`draw`。** 假想的吃對子與實際的規則一致。`short` 的下界已經讓
-  `take` 看到天花板，但不是批次 3 那條規則。做了，loss，見下。
+- **`dead`.**  It now assumes every card is exchanged for a general, so
+  loose that it blocks almost nothing.
+- **`short` and `hope`.**  Replace the 搭子's count of half 胡 with "how far
+  the ceiling is from the threshold".  Done, see below.
+- **Discards.**  Do not discard the card that drops the ceiling below the
+  threshold.
+- **`draw`.**  Make the imagined pair eats agree with the actual rule.  The
+  floor on `short` already lets `take` see the ceiling, but that is not
+  batch 3's rule.  Done, loss, see below.
 
-### `short` 的下界（已量測，win）
+### The floor on `short` (measured, win)
 
-`short` 原本是 2 ×（門檻 − 牌組的胡）− 搭子的希望，希望是每個搭子能吃成的
-牌組的胡，不管它們放不放得下。候選：`short` 至少是 2 ×（門檻 − 天花板），
-天花板由 `ceiling::reach` 算，不含亮出的牌組的胡；`take` 假想的吃碰也走同
-一條路，所以 `draw` 一併跟上。三種形式，都對照 `7ad669b`：
+`short` was 2 × (threshold − the melds' 胡) − the 搭子's hope, the hope being
+the 胡 of the meld each 搭子 can be eaten into, whether or not there is room
+for them.  The candidate: `short` is at least 2 × (threshold − ceiling), the
+ceiling computed by `ceiling::reach` without the 胡 of the exposed melds;
+the eats and pongs `take` imagines go the same way, so `draw` follows along.
+Three forms, all against `7ad669b`:
 
-| 形式 | 局數 | seed base | 分歧 | 分／局 | 95% CI | 結論 |
+| Form | Deals | seed base | Part | Points a deal | 95% CI | Verdict |
 | --- | ---: | ---: | ---: | ---: | --- | --- |
-| 整個換成 2 ×（門檻 − 天花板），g = 0 | 5,000（冒煙，seed 1） | 1 | 1,530 | −0.380 ± 0.064 | [−0.506, −0.255] | 丟棄 |
-| 取大者，g = 0 | 200,000 | 1794953471 | 8,482 | −0.036 ± 0.003 | [−0.043, −0.029] | loss |
-| 取大者，g = 1 | 200,000 | 1794954270 | 555 | +0.002 ± 0.000 | [+0.001, +0.003] | win |
+| Replaced outright by 2 × (threshold − ceiling), g = 0 | 5,000 (smoke test, seed 1) | 1 | 1,530 | −0.380 ± 0.064 | [−0.506, −0.255] | discarded |
+| The larger of the two, g = 0 | 200,000 | 1794953471 | 8,482 | −0.036 ± 0.003 | [−0.043, −0.029] | loss |
+| The larger of the two, g = 1 | 200,000 | 1794954270 | 555 | +0.002 ± 0.000 | [+0.001, +0.003] | win |
 
-學到的：
+What was learnt:
 
-- **換掉 `short` 就沒有往門檻推的梯度。** 大多數手牌的天花板都過門檻，
-  `short` 變 0，bot 不再追胡。
-- **g = 0 把活的手判成死的。** 前 20,000 局的追蹤裡，損失全在「對照碰、
-  候選過」（207 局，每局 −3.35）：碰完 g = 0 的天花板掉到門檻下，但摸一張
-  將帥就夠；棄牌的分歧是 +0.009 ± 0.007。吃對子的規則（批次 3）用 g = 0
-  是對的，碰不是。
-- **g = 1 只改 0.28% 的牌局，** 效果也只有每局 0.002 分；這一項的獎金
-  本來就估在 +0.006 以下。
+- **With `short` replaced there is no gradient towards the threshold.**
+  Most hands' ceilings pass the threshold, `short` becomes 0, and the bot no
+  longer chases 胡.
+- **g = 0 judges live hands dead.**  In the trace of the first 20,000 deals
+  the loss is all in "the control pongs, the candidate passes" (207 deals,
+  −3.35 each): after the pong the g = 0 ceiling drops below the threshold,
+  but one drawn general is enough; the partings at a discard are +0.009 ±
+  0.007.  g = 0 is right for the pair-eat rule (batch 3), and not for pongs.
+- **g = 1 changes only 0.28% of the deals,** and the effect is only 0.002
+  points a deal; this item's prize was estimated under +0.006 to begin
+  with.
 
-棄牌的例子（測試 `a_soldier_between_two_others_splits_when_short`）：亮出
-5 胡，手上紅兵、黃兵、黃兵、綠卒與白車、白馬，要打一張。打車或馬，天花板
-是 11：紅黃、黃綠各吃一張第三色。打黃兵剩 10，而且只剩「四色兵卒加車的
-對子」一條路，等包只有 9。`HeuristicBot` 現在不論胡數夠不夠都打黃兵：兩個
-排法都先收暗的三色兵卒，多的那張黃兵是最孤的散牌，`hope` 看不到拆開的
-6 胡。所以棄牌的規則要比各張打掉之後的天花板，只看「掉到門檻以下」會漏掉
-這一手。
+An example at a discard (the test
+`a_soldier_between_two_others_splits_when_short`): 5 胡 exposed, and in hand
+a red 兵, a yellow 兵, a yellow 兵, a green 卒, a white 車 and a white 馬, with
+one card to discard.  Discarding the 車 or the 馬, the ceiling is 11: the
+red and yellow, and the yellow and green, each eat a third colour.
+Discarding a yellow 兵 leaves 10, and only one way there, "soldiers of four
+colours plus a pair of 車"; waiting for the 包 gives only 9.  `HeuristicBot`
+now discards the yellow 兵 whether or not the 胡 are enough: both layouts
+take the concealed soldiers of three colours first, the extra yellow 兵 is
+the loneliest loose card, and `hope` does not see the 6 胡 of the split.  So
+the rule for discards must compare the ceilings after each discard; looking
+only at "drops below the threshold" would miss this hand.
 
-### `draw` 的吃對子規則（已量測，loss）
+### The pair-eat rule in `draw` (measured, loss)
 
-候選：`draw` 假想摸到的牌時，批次 3 在 `claims` 裡擋掉的吃對子也不列入
-（摸到將帥、非吃不可時照舊），讓 bot 對下一張牌的預測和實際的打法一致。
-`claims` 本身的判斷不變。
+The candidate: when `draw` imagines the card drawn, the pair eats batch 3
+blocks in `claims` are left out too (as before when a general is drawn and
+must be eaten), so that the bot's forecast of the next card agrees with its
+actual play.  The judgement of `claims` itself does not change.
 
-| 局數 | seed base | 分歧 | 分／局 | 95% CI | 結論 |
+| Deals | seed base | Part | Points a deal | 95% CI | Verdict |
 | ---: | ---: | ---: | ---: | --- | --- |
 | 400,000 | 1794956595 | 3,072 | −0.002 ± 0.000 | [−0.003, −0.001] | loss |
 
-局數由 5,000 局的冒煙（seed 1，丟棄：分歧 0.94%）在跑之前定下。對照
-`39d37b2`。
+The deal count was set before the run from a smoke test of 5,000 deals (seed
+1, discarded: 0.94% part).  Control `39d37b2`.
 
-追蹤（同一個 seed base 的前 100,000 局，`research/hu-ceiling-trace.patch`）：
-分歧全是「對照過、候選吃碰」。下家的「過」是用 `draw` 估的，擋掉吃對子
-之後摸牌的期望變低，原本輸給「過」的吃碰就贏了。多出來的吃碰每一類都虧：
+Trace (the first 100,000 deals of the same seed base,
+`research/hu-ceiling-trace.patch`): the partings are all "the control
+passes, the candidate eats or pongs".  The next seat's "pass" is valued by
+`draw`; with the pair eats blocked the expectation of the draw falls, and
+the eats and pongs that used to lose to "pass" win.  Every kind of extra eat
+or pong loses:
 
-| 對照 → 候選 | 分歧 | 分／次 | 標準誤 | 分／局 |
+| Control → candidate | Part | Points each | Standard error | Points a deal |
 | --- | ---: | ---: | ---: | ---: |
-| 過 → 吃對子 | 150 | −0.884 | 0.342 | −0.0013 |
-| 過 → 吃車馬炮 | 284 | −0.308 | 0.166 | −0.0009 |
-| 過 → 吃將士象 | 214 | −0.349 | 0.195 | −0.0007 |
-| 過 → 碰 | 113 | −0.097 | 0.436 | −0.0001 |
+| pass → pair eat | 150 | −0.884 | 0.342 | −0.0013 |
+| pass → 車馬炮 eat | 284 | −0.308 | 0.166 | −0.0009 |
+| pass → 將士象 eat | 214 | −0.349 | 0.195 | −0.0007 |
+| pass → pong | 113 | −0.097 | 0.436 | −0.0001 |
 
-學到的：`draw` 高估摸牌，等於替「過」加了一點分，這點偏差是有用的。
-一致不是目的；要改 `draw`，得連 `claims` 裡吃碰對「過」的門檻一起看。
-候選存成 `research/hu-ceiling-draw-pairs.patch`。
+What was learnt: `draw` overvalues the draw, which amounts to adding a
+little to "pass", and that bias is useful.  Agreement is not the goal; to
+change `draw`, the threshold of eats and pongs against "pass" in `claims`
+has to be looked at with it.  The candidate is kept as
+`research/hu-ceiling-draw-pairs.patch`.
 
-## 每一批的收尾
+## Wrapping up each batch
 
-照 `CLAUDE.md`：`cargo fmt`、clippy、三組測試、文件、`CHANGELOG.md`，提議
-commit message，使用者說了才 commit。量測的結果不論輸贏都記下數字、局數、
-seed base、對照的 SHA 與結論，並更新本文件的進度表。
+By `CLAUDE.md`: `cargo fmt`, clippy, the three sets of tests, the docs,
+`CHANGELOG.md`, propose a commit message, and commit only when the user says
+so.  A measurement, win or lose, is recorded with its numbers, deal count,
+seed base, the control's SHA and the verdict, and the progress table of this
+document is updated.
 
-## 不做的事
+## What is not done
 
-- **不放進 susik。** 天花板要知道明牌與暗牌各值幾胡、哪些牌還沒出現，
-  那是這個 crate 的事。
-- **不算機率。** 天花板只回答到不到得了，不回答多容易到。
-- **不接進 `MonteCarloBot`、網頁與桌面版。** 提示就是 `HeuristicBot`，
-  bot 有贏才會跟著變。
+- **Not put in susik.**  The ceiling needs to know how many 胡 exposed and
+  concealed cards are each worth and which cards are not yet seen; that is
+  this crate's business.
+- **No probabilities.**  The ceiling only answers whether a hand can get
+  there, not how easily.
+- **Not wired into `MonteCarloBot`, the web page or the desktop app.**  The
+  hint is `HeuristicBot`, and changes only when the bot wins.
 
-## 風險與未決問題
+## Risks and open questions
 
-- **獎金可能量不到。** 估的上限約 +0.006 分／局。「只封頂」100,000 局的
-  標準誤是 0.004 分；分歧率相近的話，800,000 局約 0.0015 分，上限只有它的
-  四倍。最可能的結局之一是停在批次 2 而結論不明。
-- **甲組可能幾乎是空的。** `short` 已經在罰做不成的手。那本身是結果：
-  bot 原本就避開了，這條線結束。
-- **求解器比估的大。** 兵卒那一塊有四色與外來牌的張數限制，是最容易寫錯
-  的地方；不變量的測試是為它準備的。
-- **統計來自 `HeuristicBot` 自己的胡牌。** 2.76 張將帥、0.70 張摸來的，
-  都帶著這個 bot 的習慣。
-- **探針只記每局第一次分歧。** 後面幾口吃對子的效果算在第一口頭上。
+- **The prize may not be measurable.**  The estimated bound is about +0.006
+  points a deal.  "Cap only" had a standard error of 0.004 points over
+  100,000 deals; at a similar parting rate, 800,000 deals give about 0.0015
+  points, and the bound is only four times that.  One of the likeliest
+  endings is to stop at batch 2 with insufficient data.
+- **Group A may be almost empty.**  `short` already fines hands that cannot
+  be made.  That is a result in itself: the bot was avoiding them already,
+  and this line ends.
+- **The solver is bigger than estimated.**  The soldiers' block has the
+  constraints of four colours and of the counts of outside cards, and is the
+  easiest place to get wrong; the invariant's test is there for it.
+- **The statistics come from `HeuristicBot`'s own wins.**  The 2.76
+  generals and the 0.70 drawn both carry this bot's habits.
+- **The probe records only the first parting of each deal.**  The effect of
+  the later pair eats is charged to the first.
