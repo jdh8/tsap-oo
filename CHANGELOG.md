@@ -25,6 +25,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   run with less energy, about five times slower.  A fresh pueued starts
   at 2.
 
+- `AFTER=ID ab/queue.sh ...` queues a run behind pueue task ID and runs
+  it only if that task's log says `Verdict: win`; otherwise the task
+  shows as failed.
+
+- `doc/generals.md`, batch 4.  `HeuristicBot` counting a general it waits
+  on as 3 where any other card counts 8 (8 × ρ) is not adopted: against
+  `8dc900b` with `RESHUFFLE=8`, 200,000 deals, seed base 1795461522, 435
+  deals part, −0.000 ± 0.001 points a deal, 95% CI [−0.003, +0.002],
+  insufficient data; the tables of three, of two and of 8 胡 were gated on
+  a win and did not run.  `examples/overspend` rerun on `8dc900b`, 20,000
+  rounds, seed base 1796461521: `ExpectBot` eats 781 of the 4,144 pairs
+  that leave the hand a general short (18.8%, from 24.9%), and 27 of the
+  60 that leave it fully melded with nothing else to wait on (from 35 of
+  39); its estimate of a waiting hand's chance is off by 3.3 percentage
+  points on average.  No bot changes.
+
 - `examples/outlook.rs` measures the generals' rate ρ (`doc/generals.md`,
   batch 1): the generals among the public cards over the sum of K ÷ N, K
   the generals and N the cards the watching seat has not seen, rebuilt

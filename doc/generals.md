@@ -45,7 +45,7 @@ Each batch is about one session.  Update this table when a batch is done.
 | 2 | `Outlook`'s discount into `Graph`, calibration, A/B | Yes | The A/B runs only once the calibration passes; commit only on a win | Calibration failed: the hands that extend 0 are fixed, the 搭子 got worse; no A/B run |
 | 2b | Every rank's appearance rate into `Graph`, calibration, A/B | Yes | Batch 2's calibration passed; the A/B runs only once its own calibration passes; commit only on a win | Done, win on both the web and the desktop |
 | 3 | Relearn the `Eval` table under the new `Outlook`, A/B | Yes | Batch 2 or 2b has won and 2b has its verdict; commit only on a win | Dropped: the CIs of the web and the desktop both straddle 0; the table is not replaced |
-| 4 | Overspending before the hand is waiting: rerun the statistics, check whether the appearance rates are fixed well enough | Candidate | See batch 4 | Not started |
+| 4 | Overspending before the hand is waiting: rerun the statistics, check whether the appearance rates are fixed well enough | Candidate | See batch 4 | Statistics done: 18.8% of B1 eaten, the 10% gate not passed, the waiting table within 3.3 percentage points; the probe is skipped and the line ends.  The A/B of `waits` is insufficient data and reverted |
 | 5 | Revision of the book | No | Batches 2, 2b and 4 have their verdicts | Not started |
 
 ## Terms
@@ -655,6 +655,104 @@ fresh seed:
 Another candidate belongs in this batch: `HeuristicBot`'s `waits` counts a
 general as `WAIT` like any other card it waits on.  Multiplying generals by
 ρ is an A/B by itself, on the default seat of `ab/run.sh`, and far cheaper.
+
+Batch 4's declaration (2026-11-24, written down before the runs), two runs
+that do not depend on each other, both queued through pueue:
+
+- The statistics: `examples/overspend`, 20,000 rounds as in batch 0, seed
+  base 1796461521, on `8dc900b` unchanged.
+- The A/B of `waits`: a general the hand would win on counts 3 where any
+  other card counts `WAIT` = 8 (8 × 0.406, rounded), at every table.
+  `ab/queue.sh generals-wait`: 200,000 deals, `RESHUFFLE=8`, four players
+  at 10 胡, control `8dc900b`, seed base the clock when the task starts.  The
+  other tables' ρ differ, so a win here ships the 3 for four players at 10
+  胡 only, until each of them has an A/B of its own.
+- The other tables (declared the same day, before task 1's data): the
+  weight is now 8 × the table's ρ, rounded, so 3 at four players (10 and 8
+  胡), 4 at three and 5 at two, and 8 where no ρ was measured.  Three A/Bs
+  queued with `AFTER=1`, each run only if the A/B above is a win, each
+  200,000 deals, `RESHUFFLE=8`, control `8dc900b`, seed base the clock at
+  its start: `PLAYERS=3`, `PLAYERS=2`, `THRESHOLD=8`.  Each table ships its
+  weight on its own win; the others go back to 8.
+
+The probe waits on the statistics, and batch 5 on this batch's verdicts.
+
+### What batch 4 measured
+
+The A/B of `waits` (2026-11-24), `HeuristicBot` with a general counting 3,
+four players at 10 胡, control `8dc900b`, `RESHUFFLE=8`, seed base
+1795461522:
+
+| Deals that part | Candidate − control (points a deal) | 95% CI | Seat 1 win rate | Verdict |
+| ---: | ---: | --- | --- | --- |
+| 435 / 200,000 | −0.000 ± 0.001 | [−0.003, +0.002] | 24.10% → 24.10% | insufficient data |
+
+- **The weight almost never changes a play**: one deal in 460 parts, and
+  among those the mean is −0.097 points.  The CI straddles 0, so it is
+  insufficient data, and at ± 0.003 points a deal nothing here is worth
+  more deals.  `WAIT` stays 8 for every card; `src/heuristic.rs` is
+  reverted.
+- **The three other tables did not run**: they were gated on a win here.
+  The patch is in `target/generals-4/wait-general.patch`.
+
+The statistics: `examples/overspend`, 20,000 rounds, seed base 1796461521,
+base `8dc900b`; the CSVs are in `target/generals-4/`.  The 51,586 decisions
+where a pair could be eaten, batch 0 → batch 4:
+
+| | Decisions | Eaten | Share eaten | Own estimate, eat − pass (points) |
+| --- | ---: | ---: | ---: | ---: |
+| C: within the limit | 39,686 → 40,099 | 19,830 → 19,948 | 50% → 50% | +0.11 → −0.12 |
+| B1: one short only after eating | 4,176 → 4,144 | 1,039 → 781 | 24.9% → 18.8% | −2.23 → −2.72 |
+| B2: one short already before eating | 1,629 → 1,384 | 616 → 502 | 38% → 36% | −0.66 → −0.55 |
+| A: short even with one more drawn | 5,826 → 5,959 | 243 → 271 | 4% → 5% | −2.31 → −1.86 |
+
+- **The gate is not passed**: 18.8% of B1 is eaten, down a quarter from
+  24.9%, above the 10% that would end the line.
+- **The eats the overestimate drove are gone.**  Fully melded after eating
+  and extending 0, B1 eats 27 of 60 where batch 0 ate 35 of 39.  Over
+  B1, B2 and C, when passing leaves a 搭子 that waits on 3 or more, it eats
+  15 of 52 (7 of 9 on 3, 8 of 37 on 4, 0 of 6 on 5 or more) where batch 0
+  ate 45 of 47.
+- **The B1 pairs still eaten are marginal.**  The 781 are better than the
+  best other play by 0.84 points on average by its own estimate (median
+  0.39; 93% under 2 points), 0.033 points a round in all.  B1 won 7% ± 1
+  after eating and 15% ± 1 after passing, but that is observation: it
+  passes with the better hands.
+
+The waiting table, actual win rate ± its standard error (the engine's
+estimate, hands):
+
+| | 15 draws or more | 8–14 draws | 0–7 draws |
+| --- | ---: | ---: | ---: |
+| Fully melded, extends 0 | 60% ± 4 (52%, 125) | 44% ± 4 (45%, 174) | 25% ± 4 (30%, 116) |
+| Fully melded, extends 1 | 65% ± 4 (58%, 131) | 45% ± 4 (52%, 172) | 48% ± 6 (37%, 61) |
+| Fully melded, extends 2 | 67% ± 3 (62%, 343) | 51% ± 3 (57%, 305) | 40% ± 5 (43%, 86) |
+| Fully melded, extends 3 | 70% ± 3 (66%, 296) | 62% ± 4 (60%, 185) | 62% ± 9 (48%, 29) |
+| Fully melded, extends 4 or more | 79% ± 1 (73%, 1,165) | 62% ± 3 (67%, 374) | 54% ± 6 (52%, 71) |
+| 搭子, waits on 1 | 43% ± 3 (35%, 327) | 26% ± 3 (25%, 207) | 13% ± 4 (14%, 62) |
+| 搭子, waits on 2 | 42% ± 3 (44%, 357) | 37% ± 3 (34%, 246) | 16% ± 4 (19%, 68) |
+| 搭子, waits on 3 | 52% ± 1 (52%, 1,342) | 39% ± 2 (42%, 532) | 32% ± 4 (28%, 121) |
+| 搭子, waits on 4 | 57% ± 1 (55%, 1,402) | 41% ± 2 (46%, 444) | 22% ± 5 (34%, 77) |
+| 搭子, waits on 5 or more | 57% ± 1 (58%, 1,274) | 47% ± 2 (51%, 410) | 35% ± 6 (42%, 74) |
+| 士象 waiting for its own general | 32% ± 3 (33%, 338) | 17% ± 3 (22%, 163) | 13% ± 5 (13%, 38) |
+
+- **The mean absolute miss over the 33 cells, weighted by hands, is 3.3
+  percentage points**, and no row is off the same way in all three bands.
+  The hands that extend 0, 15 to 20 high in batch 0, are now 8 low, 1 high
+  and 5 high.
+- **What is left has a pattern by draws, not by rank**: with 15 draws or
+  more left every fully melded row is 4 to 8 low (extends 4 or more, 79% ± 1
+  against 73%, is the surest), and with 8–14 left most rows are 3 to 7
+  high.  That points at h or `cards` by draws left, not at a rank's rate.
+- **The 搭子 rows with 15 draws or more left are within 2**, save the one
+  that waits on 1 (8 low).
+
+The probe is skipped (2026-11-24) and this line ends here.  The declaration
+says the probe is made only when the table is accurate and the engine still
+eats.  The table is close, and the engine still eats 18.8%, but what the
+probe could win is about the 0.033 points a round above, and batch 3 could
+not resolve 0.02 at the desktop's settings in 20,000 deals (standard error
+0.036).  Whether the B1 pairs still eaten win or lose was not measured.
 
 ## Batch 5: the book
 

@@ -14,6 +14,7 @@
 #   control   resolved now (default HEAD), not when the task starts
 #   env       captured now by pueue (SEED_BASE, RESHUFFLE, PLAYERS, ...);
 #             an unset SEED_BASE is still the clock when the task starts
+#   AFTER=ID  wait for task ID and run only if its verdict was a win
 #
 #   pueue status             the queue and each task's exit status
 #   pueue log ID --full      the run's output: seed base, control, verdict
@@ -58,4 +59,9 @@ idle=(nice -n19)
 if command -v chrt >/dev/null; then idle=(chrt --idle 0); fi
 
 printf -v cmd '%q ' "${idle[@]}" ab/run.sh "$deals" "$control"
-pueue add --label "$slug" --working-directory "$wt" -- "$cmd"
+after=()
+if [[ -n ${AFTER:-} ]]; then
+	after=(--after "$AFTER")
+	cmd="pueue log $AFTER --full | grep -q '^Verdict: win' && $cmd"
+fi
+pueue add --label "$slug" --working-directory "$wt" ${after[@]+"${after[@]}"} -- "$cmd"
