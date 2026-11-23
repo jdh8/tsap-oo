@@ -64,7 +64,9 @@ to what a card-game bot needs.
   included, into a worktree under `~/ab/` and runs `ab/run.sh` there
   through pueue, one task at a time.  `pueue status` is the index of what
   is in flight and `pueue log ID --full` the result; never start a run or
-  a release build beside the queue.
+  a release build beside the queue.  `ab/cores.sh 0|1|2` is the user's
+  power switch for it (pause, E-cores only, every core): leave the level
+  alone, and expect a run at 1 to take about five times as long.
 - Write it down in `CHANGELOG.md` and the commit message: the numbers, the
   deal count, the seed base, the control's SHA and the verdict.
 - A change meant to leave play alone (a refactor, a speed-up) owes the same

@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   took 12.6 s.  No bot changes: `ab/queue.sh pueue-harness 20000`
   against `04d3609`, seed base 1795459850, reads 0 deals that part.
 
+- `ab/cores.sh 0|1|2` is the queue's power switch on a Mac: 0 pauses the
+  queue and the run in flight, 1 keeps pueue and its tasks on the E-cores
+  (background QoS, set on the running process tree and inherited by tasks
+  that start later), 2 gives every core back.  On battery, 1 finishes a
+  run with less energy, about five times slower.  A fresh pueued starts
+  at 2.
+
 - `examples/outlook.rs` measures the generals' rate ρ (`doc/generals.md`,
   batch 1): the generals among the public cards over the sum of K ÷ N, K
   the generals and N the cards the watching seat has not seen, rebuilt

@@ -18,6 +18,7 @@
 #   pueue status             the queue and each task's exit status
 #   pueue log ID --full      the run's output: seed base, control, verdict
 #   pueue kill ID / remove ID
+#   ab/cores.sh 0|1|2        pause / E-cores only / every core (macOS)
 #   git worktree remove --force ~/ab/tsap-oo-SLUG    once the verdict is read
 set -euo pipefail
 
@@ -51,7 +52,8 @@ git worktree add --detach "$wt" "$rev" >&2
 # Lowest priority, every core.  Never `taskpolicy -b`: background QoS keeps
 # a process on Apple silicon's E-cores, and on an M4 (4 P + 6 E) the run
 # took 5.5 times as long; `nice` cost nothing measurable.  Linux has the
-# politer SCHED_IDLE.
+# politer SCHED_IDLE.  To save the battery, ask for the E-cores on purpose
+# with `ab/cores.sh 1`, or pause with `ab/cores.sh 0`.
 idle=(nice -n19)
 if command -v chrt >/dev/null; then idle=(chrt --idle 0); fi
 
