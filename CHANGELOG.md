@@ -64,6 +64,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   39); its estimate of a waiting hand's chance is off by 3.3 percentage
   points on average.  No bot changes.
 
+- `research/settlement-variants.md`: what the public write-ups add on top
+  of "the winner collects their 胡 from each seat": 底, 花, 押點, the 高胡
+  variant, 五龍 doubling, 金門's 加三/加八 and 開六/拾八 offsets.  None
+  has the discarder pay alone.  Nothing modelled.
+
 - `examples/outlook.rs` measures the generals' rate ρ (`doc/generals.md`,
   batch 1): the generals among the public cards over the sum of K ÷ N, K
   the generals and N the cards the watching seat has not seen, rebuilt
