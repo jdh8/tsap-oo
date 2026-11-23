@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `cargo run --release --example guest -- CLONE [deals] [seed] [expect]`
+  plays a match against another program's bot: the Normal AI of
+  chunhua1972/four-color-game (`ee33cf0`), which `node` imports from a
+  clone through `examples/guest.mjs`.  Their repository states no licence
+  and none of it is copied.  `Round` stays the rules authority, so this
+  is the guest adapted to this table.  10,000 deals, seed base
+  1795469454, seat 1, dealer rotating, host `HeuristicBot`: among three
+  hosts, guest − host is −4.003 ± 0.217 points a deal, 95% CI
+  [−4.429, −3.577]; among three guests, host − guest is +5.456 ± 0.244,
+  95% CI [+4.978, +5.934].
+
 - `ab/queue.sh SLUG [deals] [control]` queues an A/B through pueue, one at
   a time: it freezes the checkout, uncommitted files included, into a
   worktree under `~/ab/` and runs `ab/run.sh` there at `nice -n19`
