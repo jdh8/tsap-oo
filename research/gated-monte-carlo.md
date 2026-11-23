@@ -63,7 +63,7 @@ SAMPLES=128 RESHUFFLE=0 GATE_CARDS=10 GATE_SHANTEN=0 \
 The three ran one after another, on a binary copied out after the build, so
 nothing was rebuilt in the meantime.  The binary of the first run is older
 than that of the other two: `HeuristicBot::shanten` did not yet look at the
-eat or pong on offer.  With only `GATE_CARDS` set the 向聽數 is never asked
+eat or pong on offer.  With only `GATE_CARDS` set the shanten is never asked
 for, so the two versions play the same under the first run's settings; the
 first 2,000 deals of the first run, replayed once with each binary, give
 output identical to the digit (55 deals differ, −0.062 ± 0.090).  The binary

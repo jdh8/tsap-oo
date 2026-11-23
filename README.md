@@ -6,7 +6,7 @@
 
 十胡 (Taiwanese *tsa̍p-ôo*, "ten hu") is the Four Color Cards game of Taiwan:
 four players, twenty cards each, and a hand wins when all twenty-one cards
-lay out as melds worth ten 胡 or more.  This crate implements the Taiwanese
+lay out as melds worth 10 胡 or more.  This crate implements the Taiwanese
 rules on top of the [susik] deck: a runtime-checked `Round` state machine
 that resolves every public card in priority order (win, forced kong, pong,
 eat), a `Game` scoreboard, an information-hygienic `View`, the `Strategy`
@@ -39,14 +39,14 @@ puts the same page in a desktop window, against opponents that search:
   or four colours, or a pair — even by a seat holding the pair, which may
   pong instead.  Win beats kong beats pong beats eat; equal
   claims go to the earlier seat in turn order.  Winning is compulsory.
-- Generals (將帥) are each a meld by themselves, one 胡 apiece however many
+- Generals (將帥) are each a meld by themselves, 1 胡 apiece however many
   are held.  A drawn general that nobody wins on or kongs must be eaten by
   its drawer, who lays it on the table alone or, holding the 士象, as 將士象
   if they prefer (`ClaimOptions::forced`: no pass).  Generals are never
   ponged or eaten into a pair, and may not be discarded.  Only three
   generals in hand kong the fourth; ones on the table do not count.
 - A seat with nothing to discard is a 相公: the round ends, they pay the
-  threshold, ten 胡, to each other seat, and the same dealer deals again.
+  threshold, 10 胡, to each other seat, and the same dealer deals again.
   No claim that would lead there is allowed (`ClaimOptions::blocked`), so it
   only follows a drawn general or a forced kong.
 - Three or four identical cards in hand are never split, for a claim or in
@@ -69,21 +69,21 @@ and the common Taiwanese write-ups agree on it).  House variants — a
 different value for four-colour soldiers, the 將 parity rule — are not
 modelled; all values are fields of `Rules`.
 
-八胡 is `Rules::eight()`: the same table with eight to win, and so eight for
+8 胡 is `Rules::eight()`: the same table with eight to win, and so eight for
 a 相公.
 
 The table is `Rules::players`, two to four, four by default; the write-ups
 allow two to five.  A smaller table deals and scores the same: twenty cards
 each, one more to the dealer, the rest to the pile, and a win or a 相公
-settled with each other seat.  The five-player game 八胡 is often named for
+settled with each other seat.  The five-player game 8 胡 is often named for
 is not modelled (`Seat::COUNT` is four).  The bots were tuned at four and
-at ten 胡; `ExpectBot` has tables of its own for two players at ten 胡, and
-plays three players and 八胡 by those of four:
+at 10 胡; `ExpectBot` has tables of its own for two players at 10 胡, and
+plays three players and 8 胡 by those of four:
 [`doc/variants.md`](doc/variants.md) lists what is missing.
 
 Open questions, played provisionally:
 
-- The 相公 penalty of ten 胡 to each seat is from the Taiwanese write-ups;
+- The 相公 penalty of 10 胡 to each seat is from the Taiwanese write-ups;
   that the round then ends and the dealer stays is a guess, as they do not
   say.
 - A fourth general drawn by another seat is konged by the holder of the
@@ -92,9 +92,9 @@ Open questions, played provisionally:
 - That the drawer of a general may choose between the lone general and
   將士象 is from Board Game Arena, which lists both as eats; the Taiwanese
   write-ups only say it must be eaten.
-- No 加槓: a ponged triplet never takes its fourth card.  Board Game Arena
-  ("Once a meld has been played to the table, it cannot be added to or
-  changed") and the family rules of T. N. Truong and Wei-Hwa Huang say so
+- No adding to a pong: a ponged triplet never takes its fourth card.
+  Board Game Arena ("Once a meld has been played to the table, it cannot be
+  added to or changed") and the family rules of T. N. Truong and Wei-Hwa Huang say so
   outright; the Taiwanese write-ups only ever kong a triplet held in hand.
   The few pages that add to a pong mix in mahjong rules.
 

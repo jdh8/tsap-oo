@@ -1,4 +1,4 @@
-# Safe cards: how much 「不能過水」 (no passing up a win) proves
+# Safe cards: how much the compulsory win proves
 
 Measured 2026-11-16.  The question: winning is compulsory, so a card that
 comes down and nobody wins on proves that no seat asked could win on it at

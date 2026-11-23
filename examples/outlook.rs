@@ -27,8 +27,8 @@
 //! cargo run --release --example outlook -- [rounds] [seed] [calibration rounds]
 //! ```
 //!
-//! `THRESHOLD` (default 10) is the 胡 to win: 8 is 八胡.  `PLAYERS` (default
-//! 4) is the table's size.
+//! `THRESHOLD` (default 10) is the 胡 to win: 8 is `Rules::eight`.
+//! `PLAYERS` (default 4) is the table's size.
 use tsap_oo::susik::{Hand, Meld, Rank};
 use tsap_oo::{
     Event, Graph, HeuristicBot, Outlook, Payoff, Phase, Prune, Rules, Seat, Step, Strategy, Table,

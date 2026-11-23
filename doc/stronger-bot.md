@@ -461,7 +461,7 @@ from the grade.
 
 ### One experiment: a waiting hand does not eat or pong into fewer waiting cards
 
-A hand at 八胡: 3 胡 on the table, five generals (將帥) in hand, a pair of
+A hand at 8 胡: 3 胡 on the table, five generals (將帥) in hand, a pair of
 red 炮, two loose cards, a yellow 兵 and a green 卒, already at 8 胡, waiting
 on the red 兵 and the white 卒, 8 cards at most.  The next seat draws a red
 炮 and the bot chooses to pong: 1 more 胡 and one loose card fewer (128 saved
@@ -566,7 +566,7 @@ measured.
   comes my way (an eat takes only my own draw and the previous seat's card,
   and the other seats' pongs go first); the other seats ending the round
   needs a chance per turn (the table in `research/safe-cards.md`); the nine
-  blocks cannot be worked wholly apart because of the discard and the ten-胡
+  blocks cannot be worked wholly apart because of the discard and the 10-胡
   threshold; and the payoff must be in points, not 胡.
 - **Still expected to be small.**  This is still the same information under
   a uniform belief; the Monte Carlo that searches only late is +0.070 points
@@ -624,7 +624,7 @@ players once there are conclusions.
 ### What a table of two is
 
 - **The rules do not change.**  20 cards each, 21 for the dealer, 6 dead
-  cards, ten 胡.  Every source found says two or three can play, and none
+  cards, 10 胡.  Every source found says two or three can play, and none
   writes out what to change with fewer players; Board Game Arena's ranked
   default is two players, with rules that do not vary with the number
   (`research/prior-art.md`, section C).  (Added 2026-11-21: the dead cards
@@ -762,10 +762,10 @@ deals.
 ### Method
 
 `MonteCarloBot::gated(cards, shanten)`: it searches only when the concealed
-cards are no more than `cards`, or the 向聽數
+cards are no more than `cards`, or the shanten
 (`HeuristicBot::shanten`, how many eats or pongs short of waiting) is no
-more than `shanten`, and plays greedily otherwise.  The 向聽數 is
-found by search: a formula that counts melds and 搭子 cannot see the ten 胡 a
+more than `shanten`, and plays greedily otherwise.  The shanten is
+found by search: a formula that counts melds and 搭子 cannot see the 10 胡 a
 win needs.  It is not a term of the grade, and `HeuristicBot`'s play is
 unchanged.
 

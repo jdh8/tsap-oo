@@ -279,7 +279,7 @@ mod playouts {
         playout(Rules::new());
     }
 
-    /// The same under 八胡: nothing in the engine assumes ten.
+    /// The same under 8 胡: nothing in the engine assumes ten.
     #[test]
     fn bots_finish_rounds_of_eight() {
         playout(Rules::eight());

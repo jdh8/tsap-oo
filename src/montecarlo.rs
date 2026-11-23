@@ -36,7 +36,7 @@ pub struct MonteCarloBot<R> {
     policy: HeuristicBot,
     /// The most concealed cards the bot searches with
     cards: usize,
-    /// The 向聽數 within which it searches whatever the cards
+    /// The shanten within which it searches whatever the cards
     shanten: Option<u32>,
 }
 

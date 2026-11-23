@@ -209,7 +209,7 @@ h × 1.5, in ten bins:
   the table, the other seats' h stays the same, while its own e and generals
   may change.
 
-## 八胡
+## 8 胡
 
 Measured 2026-11-20, base `c922a91`.  Step 2 of "The order to fill them in"
 in `variants.md`: the same measurement, threshold 8.  `examples/outlook.rs`
@@ -218,10 +218,10 @@ takes `THRESHOLD`.
 Constants: `THRESHOLD=8 outlook 10000 800` (10,000 rounds, seed 800; the
 calibration is the 10,000 rounds of the same run, seed 801).  Calibration
 with one constant changed: `THRESHOLD=8 outlook 0 802 10000` (seed 803,
-starting from the 八胡 tables).  The three seeds and the round counts were
+starting from the 8 胡 tables).  The three seeds and the round counts were
 all fixed before the runs.
 
-| | 十胡 | 八胡 |
+| | 10 胡 | 8 胡 |
 | --- | ---: | ---: |
 | h inside the gate (per card) | 0.0711 | 0.0854 |
 | L inside the gate | −12.26 | −11.30 |
@@ -229,13 +229,13 @@ all fixed before the runs.
 | A general is the seat's own draw, inside the gate | 0.2156 | 0.2088 |
 | Public cards a draw | 2.136 | 2.278 |
 
-h is higher than at 十胡 in every segment, reaching 0.14 to 0.17 in the last
-few; straight off the deal it is 0.035, where 十胡 has 0.018.  All 26
+h is higher than at 10 胡 in every segment, reaching 0.14 to 0.17 in the last
+few; straight off the deal it is 0.035, where 10 胡 has 0.018.  All 26
 segments are `END_8` and `CARDS_8` in `src/expect.rs`, and `Outlook::new`
 picks by `Rules::threshold`.
 
 The calibration (seed 801, 19,758 decisions) is biased in the same direction
-as at 十胡: the two tables predict a win rate of 0.406 against an actual
+as at 10 胡: the two tables predict a win rate of 0.406 against an actual
 0.304, and a score of +7.54 against +2.75 ± 0.30.  With one constant changed
 (seed 803, 19,288 decisions):
 
@@ -246,22 +246,22 @@ as at 十胡: the two tables predict a win rate of 0.406 against an actual
 | Cards a segment × 0.8 | 0.391 | 0.307 | 7.06 | 2.95 |
 | e × 0.7 | 0.397 | 0.307 | 7.15 | 2.95 |
 
-h × 1.5 takes up most of the bias at 八胡 too, so `END_SCALE` stays.
+h × 1.5 takes up most of the bias at 8 胡 too, so `END_SCALE` stays.
 
 ### A/B
 
 Declared (2026-11-20, written down before the run; control `c922a91`,
 `RESHUFFLE=8`, `THRESHOLD=8`, a table of four, every other seat a
-`HeuristicBot`).  The candidate is the 八胡 `Outlook` and the control the
-十胡 one, both times 1.5, with the same gate and shallow graph:
+`HeuristicBot`).  The candidate is the 8 胡 `Outlook` and the control the
+10 胡 one, both times 1.5, with the same gate and shallow graph:
 
 | | Settings | Deals | Seed base |
 | --- | --- | ---: | ---: |
 | Web | `EXPECT=1.5 GATE_CARDS=10 SHALLOW=0 BASELINE_EXPECT=1 BASELINE_SHALLOW=0` | 40,000 | 1795400000 |
 | Desktop | `EXPECT=1.5 GATE_CARDS=14 SHALLOW=17 BASELINE_EXPECT=1 BASELINE_GATE=14 BASELINE_SHALLOW=17` | 20,000 | 1795500000 |
 
-- Each gets its own verdict.  Win: that setting uses the 八胡 tables.  Loss:
-  that setting goes back to the 十胡 tables (`Outlook::new` also looks at
+- Each gets its own verdict.  Win: that setting uses the 8 胡 tables.  Loss:
+  that setting goes back to the 10 胡 tables (`Outlook::new` also looks at
   the gate, or does not take 8).  Straddling 0: insufficient data, play is
   left as it is, and it is written down.
 - Trial runs (seed base 1, not counted): web, 400 deals in 35 seconds, 16%
@@ -278,17 +278,17 @@ Declared (2026-11-20, written down before the run; control `c922a91`,
 | Desktop | 20,000 | 3,619 | 25.39% → 25.43% | +0.005 ± 0.024 | [−0.041, +0.052] | insufficient data |
 
 - **Both settings straddle 0; play is left as it is.**  `ExpectBot::new`
-  goes on using the 十胡 `Outlook` at 八胡; the 八胡 tables stay in
+  goes on using the 10 胡 `Outlook` at 8 胡; the 8 胡 tables stay in
   `Outlook::new`, and the `EXPECT` candidate of `ab/` uses them.
 - **The difference is small to begin with.**  Only 12% (web) and 18%
-  (desktop) of the deals part: the 十胡 tables and the 八胡 tables choose
+  (desktop) of the deals part: the 10 胡 tables and the 8 胡 tables choose
   the same move in most deals.  The web's upper bound is +0.048 and its
   lower −0.004: even if it is a gain, it is under 0.05 points a deal.
 - **The trial runs' minus signs did not recur** (web −0.091, desktop −0.354,
   both over 400 deals or fewer).
 - If the web's really is +0.022, telling it apart with 80% power takes about
   110,000 deals, close to 3 hours; that is not scheduled.  An `Eval` for
-  八胡 (step 3 in `variants.md`) is worth doing before this, and its labels
+  8 胡 (step 3 in `variants.md`) is worth doing before this, and its labels
   can use `Outlook::new` directly.
 
 ## Tables of two and three
@@ -301,7 +301,7 @@ rules are in the last section, "Empty seats' hands are dead".
 
 Measured 2026-11-20, base `4e461d0`.  The other half of step 2 of "The order
 to fill them in" in `variants.md`: the same measurement with two or three
-seats at the table, 十胡.  `examples/outlook.rs` takes `PLAYERS`; the draws
+seats at the table, 10 胡.  `examples/outlook.rs` takes `PLAYERS`; the draws
 in a round go by the number of players (65 at a table of two, 45 at a table
 of three), and the tables grow to match.
 
@@ -337,8 +337,8 @@ runs.
   tables have not changed.
 - All the segments are `END_2` and `CARDS_2` (66 segments) and `END_3` and
   `CARDS_3` (46 segments) in `src/expect.rs`, and `Outlook::new` picks by
-  `Rules::players`.  八胡 at a small table was not measured; it uses that
-  table's 十胡 tables.
+  `Rules::players`.  8 胡 at a small table was not measured; it uses that
+  table's 10 胡 tables.
 
 Calibration, two tables (seeds 201 and 301):
 
@@ -371,7 +371,7 @@ players have 0.382 against 0.291.  With one constant changed (seeds 203 and
 ### A/B
 
 Declared (2026-11-20, written down before the run; control `4e461d0`,
-`RESHUFFLE=8`, 十胡, every other seat a `HeuristicBot`).  The candidate is
+`RESHUFFLE=8`, 10 胡, every other seat a `HeuristicBot`).  The candidate is
 that table's `Outlook` times the multiplier in `EXPECT`, the control is
 `ExpectBot::new` (the four-player tables times 1.5), and the gate and the
 shallow graph are the same on both sides:
@@ -458,7 +458,7 @@ at every table; only a candidate with other tables changes.  The four-player
 reading of zero deals that part is in the results below.
 
 Declared (2026-11-20, written down before the run; control `4e461d0`,
-`RESHUFFLE=8`, 十胡, settings as in the first pass, the candidate the
+`RESHUFFLE=8`, 10 胡, settings as in the first pass, the candidate the
 working tree: that table's tables times the calibrated multiplier, plus the
 condition above).  New seeds; the deals of the first pass do not count:
 
@@ -492,7 +492,7 @@ condition above).  New seeds; the deals of the first pass do not count:
 | J | 3 | Desktop | 1.4 | 20,000 | 3,785 | 33.79% → 33.92% | +0.016 ± 0.020 | [−0.024, +0.055] | insufficient data |
 
 - **The web's settings win at both tables.**  `ExpectBot::new` (a 10-card
-  gate) uses each table's own tables at 十胡 tables of two and three, with h
+  gate) uses each table's own tables at 10 胡 tables of two and three, with h
   times 1.2 and 1.4; the web page's hint is this bot.  The scores are tiny:
   +0.006 a deal at a table of two and +0.019 at a table of three, with only
   6% and 5% of the deals parting.
@@ -508,8 +508,8 @@ condition above).  New seeds; the deals of the first pass do not count:
   in when the shallow graph starts, so it accounts for two thirds of the
   first pass's parting at a table of three; a table of two only went from
   6.7% to 6.2%.
-- 八胡 at a small table was not measured; `ExpectBot::new` still uses the
-  four-player 十胡 tables there.
+- 8 胡 at a small table was not measured; `ExpectBot::new` still uses the
+  four-player 10 胡 tables there.
 
 ### Zero deals that part
 
@@ -534,7 +534,7 @@ web, 20,000 deals, seed base 1797500000; desktop, 2,000 deals, seed base
 
 `variants.md` says there is no number that counts for `ExpectBot` against
 `HeuristicBot` at a small table.  Declared (2026-11-21, written down before
-the run; control the `HeuristicBot` of `4e461d0`, `RESHUFFLE=8`, 十胡, the
+the run; control the `HeuristicBot` of `4e461d0`, `RESHUFFLE=8`, 10 胡, the
 candidate the `ExpectBot` of the web's settings, that is, the candidate of G
 and H).  Measurement only, no change to play:
 
@@ -614,8 +614,8 @@ counts were all fixed before the runs and repeat none of the old rules'.
   both tables) and 0 at a table of three, as at four players.
 - The tables are `END_2`, `CARDS_2`, `END_3` and `CARDS_3` in
   `src/expect.rs`, 26 segments each, and `Outlook::new` picks by
-  `Rules::players`.  八胡 at a small table was not measured and uses that
-  table's 十胡 tables.
+  `Rules::players`.  8 胡 at a small table was not measured and uses that
+  table's 10 胡 tables.
 
 Calibration, two tables (seeds 211 and 311):
 
@@ -645,7 +645,7 @@ With one constant changed (seeds 213 and 313):
 
 Declared (2026-11-21, written down before the run; control `07d5602`, the
 commit that changed the rules, in which a small table uses the four-player
-tables times 1.5; `RESHUFFLE=8`, 十胡, every other seat a `HeuristicBot`).
+tables times 1.5; `RESHUFFLE=8`, 10 胡, every other seat a `HeuristicBot`).
 The candidate is the working tree: `07d5602` plus the new tables of
 `Outlook::new`, its play changing only with the switches below.  Web is a
 10-card gate and the shallow graph one deep (`GATE_CARDS=10 SHALLOW=0`);
@@ -689,7 +689,7 @@ Three questions:
   the play stays.  Loss, first trace the deals that moved the most, then
   have that setting fall back to `HeuristicBot` past the gate at a small
   table.  Straddling 0, insufficient data, play is left as it is (it stays,
-  the same handling as 八胡), and it is written down.  **The table's own
+  the same handling as 8 胡), and it is written down.  **The table's own
   tables:** win, that table and that setting use that table's tables and
   multiplier.  Loss, trace first.  Straddling 0, insufficient data, the
   four-player tables stay in use.  **Q and R** change no play.
@@ -770,22 +770,22 @@ players".
 
 | | Table | Settings | Deals | Candidate minus control | 95% CI | Verdict |
 | --- | --- | --- | ---: | ---: | --- | --- |
-| W | Two players, 十胡 | Web | 10,000 | +0.375 ± 0.042 | [+0.293, +0.457] | win |
-| Y | Two players, 十胡 | Desktop | 4,000 | +0.320 ± 0.056 | [+0.210, +0.431] | win |
-| X | Three players, 十胡 | Web | 40,000 | −0.021 ± 0.025 | [−0.070, +0.028] | insufficient data |
-| Z | Three players, 十胡 | Desktop | 6,000 | −0.095 ± 0.061 | [−0.215, +0.025] | insufficient data |
-| W8 | Two players, 八胡 | Web | 10,000 | +0.302 ± 0.040 | [+0.224, +0.380] | win |
-| Y8 | Two players, 八胡 | Desktop | 4,000 | +0.048 ± 0.056 | [−0.061, +0.158] | insufficient data |
+| W | Two players, 10 胡 | Web | 10,000 | +0.375 ± 0.042 | [+0.293, +0.457] | win |
+| Y | Two players, 10 胡 | Desktop | 4,000 | +0.320 ± 0.056 | [+0.210, +0.431] | win |
+| X | Three players, 10 胡 | Web | 40,000 | −0.021 ± 0.025 | [−0.070, +0.028] | insufficient data |
+| Z | Three players, 10 胡 | Desktop | 6,000 | −0.095 ± 0.061 | [−0.215, +0.025] | insufficient data |
+| W8 | Two players, 8 胡 | Web | 10,000 | +0.302 ± 0.040 | [+0.224, +0.380] | win |
+| Y8 | Two players, 8 胡 | Desktop | 4,000 | +0.048 ± 0.056 | [−0.061, +0.158] | insufficient data |
 
-- **Two players at 十胡 use their own `Outlook` (times 1.3) and `Eval`**
+- **Two players at 10 胡 use their own `Outlook` (times 1.3) and `Eval`**
   (`ExpectBot::new`, `Eval::of`).  Every other table stays on the tables of
-  four players at 十胡.
+  four players at 10 胡.
 - **M's loss matches the tables' bias.**  The four-player tables
   underestimate each leaf by 3.06 points at a table of two and by 0.96 at a
   table of three; the two-player tables' own bias is −0.02.  Against the
   same control, the four-player `Outlook` and `Eval` are −0.184 and the
   two-player `Outlook` and `Eval` +0.375 (the two changed together and
   cannot be told apart).  No deals of M were traced separately.
-- **The multiplier 1.4 at a table of three and two players at 八胡 are not
+- **The multiplier 1.4 at a table of three and two players at 8 胡 are not
   adopted,** one for insufficient data, the other because only the web's
   settings won and the declaration asked for both runs.

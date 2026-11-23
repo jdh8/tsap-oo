@@ -7,7 +7,7 @@
 //! seat a `MonteCarloBot` of that many samples as the candidate instead, and
 //! `PEEK` as well to seat the Peeker.  `GATE_CARDS` and `GATE_SHANTEN` gate
 //! the `MonteCarloBot` (`MonteCarloBot::gated`): it searches only with that
-//! many concealed cards or fewer, or within that 向聽數.  Set `EXPECT` to
+//! many concealed cards or fewer, or within that shanten.  Set `EXPECT` to
 //! seat an `ExpectBot` instead, its `Outlook::new` h scaled by that factor
 //! (1.5 is `ExpectBot::new`'s at four), or with `FOUR` its `Outlook::default`
 //! whatever the table, or with `EXPECT=new` the outlook `ExpectBot::new`
@@ -24,7 +24,7 @@
 //! `GATE_CARDS` says, or at `BASELINE_GATE`: a wider gate against the one in
 //! place; with `BASELINE_SHALLOW` it plays past its gate as `SHALLOW` has
 //! the candidate.  `PLAYERS` (default 4) is the table's size on both sides, and
-//! `THRESHOLD` (default 10) the 胡 to win: 8 is 八胡.
+//! `THRESHOLD` (default 10) the 胡 to win: 8 is `Rules::eight`.
 //!
 //! Set `RESHUFFLE` to K to average out the luck after the two first part
 //! ways: the deal is played once with the candidate, and at its first choice

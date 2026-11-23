@@ -526,7 +526,7 @@ impl HeuristicBot {
 }
 
 impl HeuristicBot {
-    /// The seat's 向聽數 once it has answered, when that is `limit` or less:
+    /// The seat's shanten once it has answered, when that is `limit` or less:
     /// how many claims its hand is from waiting
     ///
     /// 0 is a hand that wins on some card not yet seen (聽牌).  A hand comes
@@ -754,7 +754,7 @@ mod tests {
             .map(|n| n + 1)
     }
 
-    /// The shortcuts of the 向聽數 — the loose cards it gives up on, the
+    /// The shortcuts of the shanten — the loose cards it gives up on, the
     /// dead hands, the bound that tightens — never change the answer, in
     /// every position of a few rounds of play.
     #[cfg(feature = "rand")]

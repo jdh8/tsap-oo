@@ -6,7 +6,7 @@
 //!
 //! 1. A win (胡) outranks everything.  Whoever can lay out all 21 cards for
 //!    the threshold takes the card at once; a drawer's own win comes first,
-//!    then the seats in turn order.  Winning is compulsory (不能過水).
+//!    then the seats in turn order.  Winning is compulsory.
 //! 2. The fourth card of a concealed triplet must be konged (槓); the kong
 //!    is applied for the seat without asking.
 //! 3. Then the seats are asked in turn order, the drawer first: anyone

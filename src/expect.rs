@@ -55,7 +55,7 @@ impl Outlook {
     /// The table measured at `rules`' table size, or at four under its
     /// threshold, or [`Outlook::default`]
     ///
-    /// A table of two or three is measured at ten 胡 only, and with the
+    /// A table of two or three is measured at 10 胡 only, and with the
     /// 25 draws a round [`Rules::dead`] leaves it.
     #[must_use]
     pub fn new(rules: &Rules) -> Self {
@@ -180,14 +180,14 @@ const DISCARDED: [[f64; 7]; 3] = [
     [0.0000, 1.3731, 1.3731, 1.5968, 1.5968, 1.5968, 0.5000],
 ];
 
-/// [`END`] at 八胡: `THRESHOLD=8 outlook 10000 800`
+/// [`END`] at 8 胡: `THRESHOLD=8 outlook 10000 800`
 const END_8: [f64; 26] = [
     0.1734, 0.1734, 0.1429, 0.1479, 0.1221, 0.1462, 0.1350, 0.1432, 0.1146, 0.1238, 0.1087, 0.1058,
     0.1069, 0.0888, 0.0899, 0.0912, 0.0726, 0.0721, 0.0702, 0.0568, 0.0519, 0.0493, 0.0432, 0.0324,
     0.0350, 0.0350,
 ];
 
-/// [`CARDS`] at 八胡: `THRESHOLD=8 outlook 10000 800`
+/// [`CARDS`] at 8 胡: `THRESHOLD=8 outlook 10000 800`
 const CARDS_8: [f64; 26] = [
     0.3168, 1.2466, 1.2917, 1.3016, 1.4740, 1.4203, 1.3701, 1.4603, 1.4460, 1.4533, 1.5207, 1.5631,
     1.5912, 1.6754, 1.6991, 1.7635, 1.8283, 1.9323, 1.9720, 2.0716, 2.1837, 2.3270, 2.4861, 2.6536,
@@ -605,19 +605,19 @@ pub struct ExpectBot {
 
 impl ExpectBot {
     /// A bot for `rules` gated at 10 cards, with [`Outlook::default`] at
-    /// four players and ten 胡, and elsewhere with its h scaled by
-    /// [`END_SCALE`] and its cards drawn evenly; two players at ten 胡 play by
+    /// four players and 10 胡, and elsewhere with its h scaled by
+    /// [`END_SCALE`] and its cards drawn evenly; two players at 10 胡 play by
     /// [`Outlook::new`], its h scaled by 1.3, which [`Eval::of`]'s tables
     /// for them are learnt with
     #[must_use]
     pub fn new(rules: &Rules) -> Self {
-        // ponytail: the four-player ten-胡 tables at 八胡 and at a table of
+        // ponytail: the four-player 10-胡 tables at 8 胡 and at a table of
         // three too.  `Outlook::new`'s measured insufficient data against
         // them at four and, with tables of their own, at three and at two
-        // players' 八胡 (`doc/eval.md`, "Tables for two and three players").
+        // players' 8 胡 (`doc/eval.md`, "Tables for two and three players").
         let (mut outlook, scale) = match (rules.players, rules.threshold) {
             (2, 10) => (Outlook::new(rules), 1.3),
-            // The ranks' rates are measured at four players and ten 胡
+            // The ranks' rates are measured at four players and 10 胡
             // only, and with them the measured h calibrates unscaled
             // (`doc/generals.md`, batch 2b).
             (Seat::COUNT, 10) => (Outlook::default(), 1.0),
@@ -1082,7 +1082,7 @@ mod tests {
         }
     }
 
-    /// Two players at ten 胡 play by their own table, h × 1.3, and every
+    /// Two players at 10 胡 play by their own table, h × 1.3, and every
     /// other table by the table of four, its cards drawn evenly: the
     /// only one whose own won its A/B
     #[test]

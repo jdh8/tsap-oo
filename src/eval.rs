@@ -113,13 +113,13 @@ impl Default for Eval {
 
 impl Eval {
     /// The tables a table of `rules` plays by: its own for two players at
-    /// ten 胡, learnt from `PLAYERS=2 EXPECT=1.3 eval label 2000 1799800000`
+    /// 10 胡, learnt from `PLAYERS=2 EXPECT=1.3 eval label 2000 1799800000`
     /// (held-out RMSE 0.53 points), and [`Eval::default`] for any other
     ///
     /// The two players' tables go with the outlook
     /// [`ExpectBot::new`](crate::ExpectBot::new) gives them, which counts 36
     /// public cards a round: their rows beyond are not learnt.
-    // ponytail: three players' own tables and two players' at 八胡 measured
+    // ponytail: three players' own tables and two players' at 8 胡 measured
     // insufficient data against the four-player ones (`doc/eval.md`,
     // "Tables for two and three players"), so they stay out of the binary.
     #[must_use]
@@ -371,7 +371,7 @@ mod tests {
         assert_eq!(Eval::default().dim(), 16);
     }
 
-    /// Only two players at ten 胡 have tables of their own
+    /// Only two players at 10 胡 have tables of their own
     #[test]
     fn two_at_ten_has_its_own_tables() {
         for rules in [Rules::new(), Rules::eight()] {

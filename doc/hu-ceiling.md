@@ -58,7 +58,7 @@ three colours + soldiers of four colours + kongs) + bonus**
   meld.
 - **Bonus:** soldiers of four colours +1, exposed kong +2, concealed quad
   +4.
-- **Winning:** the terms after the 7 total at least 3 (1 at 八胡).
+- **Winning:** the terms after the 7 total at least 3 (1 at 8 胡).
 
 From this:
 
@@ -83,7 +83,7 @@ hands.  The statistics of the same rounds:
 | Lone generals a hand | 2.76, of which 0.70 were drawn |
 | Pairs a hand | 2.12 |
 | k = −1 / 0 / +1 / +2 or more | 5.5% / 56.4% / 35.2% / 2.9% |
-| Wins that would fall short of ten 胡 without the 2k | 9.8% |
+| Wins that would fall short of 10 胡 without the 2k | 9.8% |
 
 The statistics program is `examples/census.rs`; the arithmetic and the full
 tables are in `research/seven-slots.md`.

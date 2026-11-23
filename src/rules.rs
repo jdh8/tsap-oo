@@ -13,7 +13,7 @@ pub struct Rules {
     /// Players at the table, 2 to [`Seat::COUNT`](crate::Seat::COUNT): the
     /// first seats of [`Seat::ALL`](crate::Seat::ALL)
     pub players: usize,
-    /// Minimum 胡 to win: the eponymous ten, or eight in 八胡
+    /// Minimum 胡 to win: the eponymous 10, or 8
     pub threshold: u32,
     /// Cards at the bottom of the pile that are never drawn (廢牌) at a full
     /// table; [`Rules::dead`] adds the hands of the seats left empty
@@ -73,7 +73,7 @@ impl Rules {
         self.dead_tail + 20 * Seat::COUNT.saturating_sub(self.players)
     }
 
-    /// 八胡: the same table with eight to win
+    /// 8 胡: the same table with eight to win
     ///
     /// A 相公 pays the threshold, so eight here too.
     #[must_use]

@@ -49,7 +49,7 @@ out of the 胡 to win (3/10 胡).
 Once a round is over the bots' hands are shown and counted too, and the
 winner shows the winning count.
 
-設定 (or the `s` key) picks the table: 十胡, ten to win, or 八胡, eight.
+設定 (or the `s` key) picks the table: 10 胡 to win, or 8.
 Changing it starts a new game, and the choice is remembered in the browser.
 
 On a touch screen a discard takes two taps: the first picks the card and
@@ -60,7 +60,7 @@ pin either way.
 Generals cannot be discarded, so they are dimmed in your hand.  A 碰 or 吃
 that would leave you nothing to discard is shown as a disabled button;
 running out of discards anyway (相公) ends the round and costs you the threshold
-(ten 胡, or eight) to each bot.
+(10 胡, or eight) to each bot.
 
 ## Deploy
 

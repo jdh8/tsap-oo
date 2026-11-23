@@ -364,7 +364,7 @@ mod tests {
         let held = hand("兵.兵兵.卒.車馬");
         let live = exposed.iter().fold(Hand::FULL - held, |h, m| h - m.cards());
         let top = |cards: &str, live| ceiling(&rules, &exposed, hand(cards), live, 0);
-        // 紅黃 and 黃綠 each eat a third colour and 車馬 go: 5 + 3 + 3
+        // Red, yellow and yellow, green each eat a third colour and 車馬 go: 5 + 3 + 3
         assert_eq!(top("兵.兵兵.卒.車馬", live), Some(11));
         assert_eq!(top("兵.兵兵.卒.馬", live), Some(11));
         // Without the second 黃兵 the three colours and 車馬炮 make 9; ten

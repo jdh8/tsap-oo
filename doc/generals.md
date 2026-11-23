@@ -184,8 +184,8 @@ and `cards` tables.  A segment with fewer than 500 cards takes the value of
 the nearest segment, as h does.
 
 - The constants and the calibration's seed and round count are fixed before
-  the run; four players at ten 胡 is measured first, and the tables of two
-  and three players and of 八胡 by the same command with `PLAYERS` and
+  the run; four players at 10 胡 is measured first, and the tables of two
+  and three players and of 8 胡 by the same command with `PLAYERS` and
   `THRESHOLD`.
 - `src/` is not touched; `ab/run.sh 20000` must read 0 deals that part.
 
@@ -213,15 +213,15 @@ THRESHOLD=8 cargo run --release --example outlook -- 20000 1795364857 0
 
 | Table | All | Within the gate | Within the gate, without the seat's own discards |
 | --- | ---: | ---: | ---: |
-| Four players, ten 胡 | 0.383 ± 0.001 | 0.406 ± 0.002 | 0.480 ± 0.003 |
-| Three players, ten 胡 | 0.458 ± 0.001 | 0.515 ± 0.003 | 0.619 ± 0.004 |
-| Two players, ten 胡 | 0.549 ± 0.002 | 0.647 ± 0.005 | 0.792 ± 0.006 |
-| Four players, 八胡 | 0.358 ± 0.001 | 0.383 ± 0.003 | 0.463 ± 0.003 |
+| Four players, 10 胡 | 0.383 ± 0.001 | 0.406 ± 0.002 | 0.480 ± 0.003 |
+| Three players, 10 胡 | 0.458 ± 0.001 | 0.515 ± 0.003 | 0.619 ± 0.004 |
+| Two players, 10 胡 | 0.549 ± 0.002 | 0.647 ± 0.005 | 0.792 ± 0.006 |
+| Four players, 8 胡 | 0.358 ± 0.001 | 0.383 ± 0.003 | 0.463 ± 0.003 |
 
 - **The gate is passed: all four tables are below 0.85.**  Lower still than
   the half to six tenths worked back from the win rates.
 - **ρ is roughly the share of a segment's cards that are drawn.**  In the
-  table for four players at ten 胡 within the gate it is 0.40 to 0.46 with 1
+  table for four players at 10 胡 within the gate it is 0.40 to 0.46 with 1
   to 12 draws left and falls to 0.28 to 0.36 with 20 or more: early on a
   segment has 2 to 3 public cards, most of them other seats' discards.  The
   last segment (0 draws left) has only discards, and ρ is 0.
@@ -232,7 +232,7 @@ THRESHOLD=8 cargo run --release --example outlook -- 20000 1795364857 0
   card the seat is about to discard as a public card too, so batch 2 uses
   the column that includes its own discards.
 
-The table for four players at ten 胡 within the gate, by draws left (from 0;
+The table for four players at 10 胡 within the gate, by draws left (from 0;
 a segment with fewer than 500 cards takes the nearest):
 
 ```text
@@ -290,8 +290,8 @@ that moved the most have been traced.
 
 ### What batch 2 measured
 
-`Outlook::generals` is batch 1's table for four players at ten 胡 within the
-gate, used only at four players and ten 胡; other tables have `[1.0]` and no
+`Outlook::generals` is batch 1's table for four players at 10 胡 within the
+gate, used only at four players and 10 胡; other tables have `[1.0]` and no
 change to play.  `examples/overspend`, 20,000 rounds, seed base 1795366613,
 base `a9e194e` plus this change, fixed before the run (34 minutes).
 
@@ -348,7 +348,7 @@ unseen cards are spread evenly: the chance that a public card is a given
 card is its unseen copies ÷ N.  Batch 1 rebuilds the cards each seat has not
 seen, and while at it extends ρ to every rank: the times a public card is of
 the rank ÷ the expectation under an even spread.  The same cards as batch 1:
-four players at ten 胡, `HeuristicBot` self-play of 20,000 rounds, seed base
+four players at 10 胡, `HeuristicBot` self-play of 20,000 rounds, seed base
 1795364857, base `74e99e2`, within the gate, the seat's own discards
 included, ± one standard error:
 
@@ -379,7 +379,7 @@ Without the seat's own discards, generals are 0.47 to 0.49, soldiers 0.76,
 ### Draws and discards apart
 
 Public cards have two sources: draws from the pile and the other seats'
-discards.  `examples/outlook` tells the two apart; four players at ten 胡,
+discards.  `examples/outlook` tells the two apart; four players at 10 胡,
 `HeuristicBot` self-play of 20,000 rounds, seed base 1795370029, base
 `a9e194e`, within the gate, without the seat's own discards:
 
@@ -508,7 +508,7 @@ several models at once (a temporary trace, not kept).  Estimate − actual
   `own` is 0.  It would need a smaller h to come level, and h is measured:
   there is no reason to tune it again.
 - **So the A/B's candidate becomes the rates with h × 1** (`ExpectBot::new`
-  at four players and ten 胡), other tables unchanged.  This candidate was
+  at four players and 10 胡), other tables unchanged.  This candidate was
   settled after seeing the calibration and has not played a calibration of
   its own; the verdict is left to the A/B.  The `Eval` tables were learnt
   under the even draw and h × 1.5, so the leaves are still the old ones;
@@ -568,15 +568,15 @@ Declared (2026-11-23, written before the run; base and control are both
 `3423521`):
 
 - **Labelling:** `EXPECT=1 eval label 2000 1796250000`, 2,000 rounds.
-  `EXPECT=1` is the `Outlook` of `ExpectBot::new` at four players and ten 胡
+  `EXPECT=1` is the `Outlook` of `ExpectBot::new` at four players and 10 胡
   (rates, h × 1).  From batch 3's 8,466 seconds the estimate is about 2.5
   hours; detach.
 - **Training:** `eval train labels eval 20 1 4 16`, as before; of the three
   D, the table with the smallest validation RMSE goes in.
-- **Only four players at ten 胡 changes.**  The table of three and 八胡 read
+- **Only four players at 10 胡 changes.**  The table of three and 8 胡 read
   `Eval::default` too, but their `Outlook` is still the even draw with
   h × 1.5, consistent with the old table; the new table is stored apart, and
-  `Eval::of` reads it only at four players and ten 胡.
+  `Eval::of` reads it only at four players and 10 胡.
 - **The offline loss table is not run.**  Batch 3's gate has already been
   passed; this is only a change of table, and the verdict is left to the
   A/B.
@@ -601,7 +601,7 @@ and so are the timings (the web, 60,000 deals in 1.6 hours; the desktop,
 | Web | `EXPECT=new GATE_CARDS=10 SHALLOW=0 BASELINE_EXPECT=1 BASELINE_SHALLOW=0` | 60,000 | 1795429248 |
 | Desktop | `EXPECT=new GATE_CARDS=14 SHALLOW=17 BASELINE_EXPECT=1 BASELINE_GATE=14 BASELINE_SHALLOW=17` | 20,000 | 1796429248 |
 
-The new table is compiled in only if both win (at four players and ten 胡
+The new table is compiled in only if both win (at four players and 10 胡
 only).
 
 Result (2026-11-24): neither is a win; the table is not replaced and this
@@ -618,9 +618,9 @@ batch is dropped.
 - **It is dropped because it is not worth measuring further.**  Both
   settings' estimates are around +0.02; if that is the true size, the web
   needs some 360,000 deals (about 14 hours) before the CI leaves 0, and what
-  that buys is a table only four players at ten 胡 read.
+  that buys is a table only four players at 10 胡 read.
 - **The inconsistency at the leaves stays.**  The `Eval` of four players at
-  ten 胡 is still the table learnt under the even draw and h × 1.5, while
+  10 胡 is still the table learnt under the even draw and h × 1.5, while
   the graph uses the rates and h × 1.  Batch 2b's win was measured on just
   this inconsistency.
 - The new table stays in `target/generals-3/eval-16.bin` and did not go into
@@ -702,7 +702,7 @@ document is updated.
   `Outlook`'s business.
 - **No guessing how many generals the other seats hold.**  ρ is a table and
   does not look at what the other seats ate or ponged this round.
-- **The tables of two and three players and of 八胡 do not follow along.**
+- **The tables of two and three players and of 8 胡 do not follow along.**
   Each one's ρ can be measured in passing, but each changes only on an A/B
   of its own, as is the rule of `Outlook::new` now.
 

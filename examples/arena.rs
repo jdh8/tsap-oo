@@ -205,6 +205,6 @@ fn main() {
             );
         }
         let total = |hu: &[u32]| per_win(hu.iter().sum());
-        println!("  合計  {:.2}  {:.2}", total(&meld_hu), total(&dealt_hu));
+        println!("  total  {:.2}  {:.2}", total(&meld_hu), total(&dealt_hu));
     }
 }

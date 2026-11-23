@@ -148,7 +148,7 @@ impl Strategy for Logged {
         let draws = view.pile_len().saturating_sub(rules.dead());
         // The DP's chance to win from here, where the bot plays by it whole
         let chance = if hand.len() <= 14 {
-            // `ExpectBot::new`'s at four players and ten 胡
+            // `ExpectBot::new`'s at four players and 10 胡
             let outlook = Outlook::default();
             let graph = Graph::new(rules, live, &[(hand, base)], Prune::default());
             graph.values(&outlook, draws, Payoff::Win)[graph.roots()[0]]

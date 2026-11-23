@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from its dealt hand and the events, by draws left; and the same ratio
   for every rank.  `HeuristicBot` self-play, 20,000 rounds a table, seed
   base 1795364857, base `74e99e2`, seats with 10 concealed cards or fewer:
-  ρ is 0.406 ± 0.002 at four seats and ten 胡, 0.515 at three, 0.647 at
-  two and 0.383 at 八胡, under the 0.85 gate.  `Graph` takes a public card
+  ρ is 0.406 ± 0.002 at four seats and 10 胡, 0.515 at three, 0.647 at
+  two and 0.383 at 8 胡, under the 0.85 gate.  `Graph` takes a public card
   for a general more than twice as often as it is one.  Discarded ranks
   (士象車馬包) come up 16 to 33% more often than an even spread, 兵卒
   32% less early in the round.  Measurement only: `ab/run.sh 20000`
@@ -73,11 +73,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A/Bs are in `research/outlook.md`, "Tables of two and three", and no
   longer hold.
 
-- `Outlook::new` picks the table model by `Rules::threshold`: at 八胡 one
+- `Outlook::new` picks the table model by `Rules::threshold`: at 8 胡 one
   measured from 10,000 rounds of `HeuristicBot` self-play at eight to win,
-  seed 800 (`research/outlook.md`, 八胡).  `examples/outlook.rs` and `ab/`'s
+  seed 800 (`research/outlook.md`, 8 胡).  `examples/outlook.rs` and `ab/`'s
   `EXPECT` candidate take it; `examples/outlook.rs` takes `THRESHOLD`.
-  `ExpectBot::new` still plays the ten-胡 table: A/B of the 八胡 table at
+  `ExpectBot::new` still plays the 10-胡 table: A/B of the 8 胡 table at
   `THRESHOLD=8` against `c922a91`, `RESHUFFLE=8`, h × 1.5 on both sides: on
   the web's settings +0.022 ± 0.013 points a deal, 95% CI [−0.004, +0.048],
   40,000 deals, seed base 1795400000; on the desktop's +0.005 ± 0.024, 95%
@@ -94,13 +94,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   also values, not in the discards (+0.02 ± 0.08 a split).  Play is left
   as it is.
 
-- `doc/variants.md`: what 八胡 and tables of two and three still lack.  The
+- `doc/variants.md`: what 8 胡 and tables of two and three still lack.  The
   rules are complete; the bots' constants, `Outlook` and `Eval` come from
-  four players at ten 胡 and are used as they are.
+  four players at 10 胡 and are used as they are.
 
 - `ab/` takes `THRESHOLD`, the 胡 to win on both sides (default 10), to
-  measure a bot at 八胡.  At 八胡 `ExpectBot` plays past its gate by the
-  shallow graph on the ten-胡 `Eval` tables, which had not been measured.
+  measure a bot at 8 胡.  At 8 胡 `ExpectBot` plays past its gate by the
+  shallow graph on the 10-胡 `Eval` tables, which had not been measured.
   A/B at `THRESHOLD=8` against `09eb4c4`, `RESHUFFLE=8`, the control
   playing past the same gate as `HeuristicBot`: on the web's settings
   +0.006 ± 0.074 points a deal, 95% CI [−0.138, +0.151], 10,000 deals, seed
@@ -211,7 +211,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Graph` weighs each public card to come by its rank's rate
   (`Outlook::drawn` for a segment's draw, `Outlook::discarded` for the
   other seats' discards, by phase, 士象 and 車馬炮 pooled) where it took
-  every unseen card as alike, and at four players and ten 胡
+  every unseen card as alike, and at four players and 10 胡
   `ExpectBot::new` plays by the measured h unscaled in place of
   `END_SCALE`; other tables keep the even draw and `END_SCALE`
   (`doc/generals.md`, batch 2b).  Calibrated on `examples/overspend`,
@@ -260,7 +260,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the deal on at a smaller table too, every round starting within
   `eval::DRAWS`.
 
-- Two players at ten 胡 play by tables of their own.  `ExpectBot::new`
+- Two players at 10 胡 play by tables of their own.  `ExpectBot::new`
   takes that table's `Outlook`, measured anew under `Rules::dead` (10,000
   rounds, seed 210; h × 1.3 by its calibration), and `Eval::of(&Rules)`
   picks tables labelled with it (`src/eval-16-2.bin`, 359 KB, from
@@ -289,16 +289,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     deals, seed base 1800300000; desktop −0.095 ± 0.061, [−0.215, +0.025],
     6,000 deals, seed base 1800500000.  Both insufficient data: three
     players keep the tables of four, and theirs are not built in.
-  - Two players at 八胡 by the ten-胡 tables of two against those of four:
+  - Two players at 8 胡 by the 10-胡 tables of two against those of four:
     web +0.302 ± 0.040, [+0.224, +0.380], 10,000 deals, seed base
     1800600000, win; desktop +0.048 ± 0.056, [−0.061, +0.158], 4,000 deals,
     seed base 1800700000, insufficient data.  Declared as both or neither,
-    so 八胡 at two keeps the tables of four.
+    so 8 胡 at two keeps the tables of four.
 
   Every other table plays as before: against `07d5602` no deal parts in
-  2,000 on the web's settings at four, at three, at 八胡 of two, three and
+  2,000 on the web's settings at four, at three, at 8 胡 of two, three and
   four (seed bases 1800800000 to 1801200000) or in 500 on the desktop's at
-  four, three and 八胡 of two (1801300000 to 1801500000).  The web's wasm
+  four, three and 8 胡 of two (1801300000 to 1801500000).  The web's wasm
   grows from 620 KB to 982 KB.  `examples/eval` takes `PLAYERS` and
   `EXPECT`, and `ab/` takes `EVAL`, a file of tables for the candidate, and
   `EXPECT=new`, the bot as it ships.
@@ -523,9 +523,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   window; `WebGame::searching` seats the searching opponents.  The browser
   page deals and plays as before.
 
-- `HeuristicBot::shanten`, the 向聽數: how many claims a hand is from
+- `HeuristicBot::shanten`: how many claims a hand is from
   waiting once the seat has answered, searched up to a limit, since a count
-  of melds and 搭子 cannot see the ten 胡 a win needs.  A hand that eating
+  of melds and 搭子 cannot see the 10 胡 a win needs.  A hand that eating
   or ponging the offer would leave waiting counts as waiting;
   `View::claim_options` is public for that.  It is not a term of the grade,
   and `MonteCarloBot::gated` uses it: a `MonteCarloBot` that searches only
@@ -706,7 +706,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of putting it in the middle as a Taiwanese mahjong table does.
   Display only.
 - The web hand puts its loose soldiers last, all colours together: beside a
-  炮 they make nothing, but with soldiers of other colours they make 三色卒.
+  炮 they make nothing, but with soldiers of other colours they make 三色兵卒.
   Display only; the hint and the bots are untouched.
 - `HeuristicBot` does not discard by danger: two trials did not win and
   play is unchanged (`ab/run.sh 20000`, control 0b5d48f, seed base
@@ -733,7 +733,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `HeuristicBot` still claims out of a wait: one trial did not win and play
   is unchanged.  A hand that waits ponged or ate whenever that graded
   higher, though it left fewer unseen cards to win on: 帥帥將將將 炮炮 兵卒
-  at its eight 胡 ponged the 炮 and went from eight waiting cards to three.
+  at its 8 胡 ponged the 炮 and went from eight waiting cards to three.
   Grading such a claim below passing, on 200000 paired deals against
   fc6ca57 (seed base 1794828275, 3607 differ): +0.007 ± 0.011 points a
   deal, 95% CI [−0.014, +0.029], winning 24.23% of rounds for 24.19%.
@@ -835,9 +835,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `Rules::eight`: 八胡, the same table with eight to win (and eight for a
+- `Rules::eight`: 8 胡, the same table with eight to win (and eight for a
   相公), at the same four seats and deal.
-- `web/`: a 設定 dialog (or the `s` key) to choose 十胡 or 八胡.  Applying it
+- `web/`: a 設定 dialog (or the `s` key) to choose 10 胡 or 8 胡.  Applying it
   starts a new game; the choice is kept in the browser.  The game is still
   titled 十胡; the how-to-play sheet and the 相公 message follow the table
   in play.
@@ -924,7 +924,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`Event::Keep`), generals are never ponged or eaten into a pair, and they
   cannot be discarded while the hand holds anything else
   (`RoundError::General`, `discardable`).
-- 相公: a seat left with nothing to discard ends the round and pays ten 胡
+- 相公: a seat left with nothing to discard ends the round and pays 10 胡
   to each other seat (`Event::Foul`, `RoundResult::foul`).  Claims that
   would lead there are not allowed and are listed in
   `ClaimOptions::blocked`; the web front end shows them as disabled

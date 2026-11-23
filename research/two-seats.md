@@ -21,7 +21,7 @@ more computing on the same information does not.**
 
 - **A table of two is ready-made.**  Change `Seat::COUNT` from 4 to 2 and
   the library deals, plays out and settles with no further change; the rules
-  are as before (20 cards each, 21 to the dealer, 6 dead cards, ten 胡).
+  are as before (20 cards each, 21 to the dealer, 6 dead cards, 10 胡).
   This is the same as Board Game Arena's table of two: its rules do not
   change with the number of players ([`prior-art.md`](prior-art.md), section
   C).

@@ -1,4 +1,4 @@
-# How many melds a hand has room for: the ブロック理論 of 十胡
+# How many melds a hand has room for: the block theory of 十胡
 
 Measured 2026-11-18.  The question: the concealed cards of 十胡 only go
 down, never up, so what shape a hand can end in, and how many 胡 it can
@@ -55,7 +55,7 @@ The cards outside the melds, plus the winning card, split exactly into
 three-card melds and pairs.  Hence:
 
 - **At most (O + 1) ÷ 3 three-card melds, rounded down.**  21 cards make at
-  most 7 melds: that is the ブロック limit of 十胡.
+  most 7 melds: that is the block limit of 十胡.
 - **The cards left over must be even in number.**  When O is a multiple of
   3, O + 1 leaves a remainder of 1 on division by 3; that one card cannot
   make a pair, so the limit drops by 1 more.  "A 搭子 and a lone card"
@@ -329,9 +329,9 @@ First 20,000 deals: 10,645 deals part, −1.416 ± 0.043 points a deal.
 - **The opponents are the same bot.**  The control and the other two seats
   are all `HeuristicBot`.
 - **The "strict" patch makes one test fail.**  `heuristic::tests::shanten`
-  ends by checking that every 向聽數 came up in its three rounds; with play
+  ends by checking that every shanten came up in its three rounds; with play
   changed, "two away" did not come up.  That is a check on the sample, not a
-  wrong 向聽數.
+  wrong shanten.
 
 ## Not yet tried
 

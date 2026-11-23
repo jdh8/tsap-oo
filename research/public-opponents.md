@@ -36,7 +36,7 @@ to be judged separately.
   heuristic.**  The Python Medium bot decides by the fewest loose cards and
   the count of cards already public, and has entry points for eating and
   for discarding; but the original game's winning condition is "no loose
-  cards", without this engine's ten-胡 threshold, and no stated licence was
+  cards", without this engine's 10-胡 threshold, and no stated licence was
   found.
   [bot][canh-bot], [rules implementation][canh-rules],
   [project settings][canh-project]
@@ -66,7 +66,7 @@ ground for thinking it better suited as a strong opponent.
 ## The yardstick: what this engine needs
 
 This project plays Taiwanese 十胡: four players, 112 cards, 21 to the
-dealer and 20 to the others, a threshold of ten 胡, six dead cards; a
+dealer and 20 to the others, a threshold of 10 胡, six dead cards; a
 public draw does not go into the concealed hand.  Wins and kongs are forced
 by `Round`, and a strategy only answers eat / pong / pass and the discard;
 generals may not be discarded, the card just eaten is locked, a concealed
@@ -204,7 +204,7 @@ restricted by type.  The evaluation code read uses the seat's own hand and
 `public_seen`; if it is plugged in, a restricted input should still be
 built anew, and the other hands must not be passed over.
 The original rules' `is_win` checks only that the loose cards are zero, and
-`score_round` adds one win to the winner, with no ten-胡 scoring; the
+`score_round` adds one win to the winner, with no 10-胡 scoring; the
 default `training_basic` says outright that it is a practice rule set,
 which allows splitting a Khạp, has no forced eat into a pair, and is an
 exhausted round only when the pile is used up, and the house-rule profile
@@ -214,7 +214,7 @@ is not verified Taiwanese 十胡 either.
 
 The minimal hookup should extract the loose-card analysis / the ordering of
 actions and let `Round` decide the set of what can be eaten and discarded.
-If a 胡 target is put back in for the ten-胡 threshold, it should be
+If a 胡 target is put back in for the 10-胡 threshold, it should be
 labelled "a rewritten strategy", and the original project's name can no
 longer be used to suggest an unmodified original opponent.  A stated
 licence is still to be resolved.
@@ -269,7 +269,7 @@ comparable original bot is at hand.
 ### Zizuixixiang/cedarduet: a clear Python NPC, under a restricted licence
 
 `BgaTenHu.choose_local_npc_action(state, actor, participants)` first looks
-for winning options of at least ten 胡 and chooses the one with the most
+for winning options of at least 10 胡 and chooses the one with the most
 胡; otherwise among eats, pongs and kongs it first chooses the combination
 that uses the most cards from the hand, then compares the combinations' 胡;
 for the discard it prefers the card with the fewest duplicates in its own
@@ -333,10 +333,10 @@ This is a single-file web page for family use; `index.html` has
 The default is four players and 20 cards, but with `openDraw: false`,
 `pairs: false`, `kaiAdd: true`, `minPts: 0`; 將士象 scores 1, 卒 of four
 colours 4 and four of a kind 6, and `pickDiscard` itself does not exclude
-generals.  These differences from the ten-胡 threshold, the face-up draw,
-no 加槓 and `discardable` mean that it cannot become a legal opponent just
-by being wrapped in a JSON shell.  No licence file was found this time, and
-its technical priority is below chunhua's.
+generals.  These differences from the 10-胡 threshold, the face-up draw,
+no adding to a pong and `discardable` mean that it cannot become a legal
+opponent just by being wrapped in a JSON shell.  No licence file was found
+this time, and its technical priority is below chunhua's.
 [default rules and AI][sise-ai], [repo tree][sise-tree]
 
 ### Huno705 and hongde88: a playable multiplayer game is not a computer opponent
@@ -397,7 +397,7 @@ time**.
    IDs of the legal actions, and the other side replies with one ID.
 3. **Keep `Round` the only rules authority.**  Forced wins, forced kongs,
    generals that must be eaten, locked cards, concealed triplets, the 相公
-   restriction and the ten-胡 threshold all go by the options this engine
+   restriction and the 10-胡 threshold all go by the options this engine
    gives.  When extracting an original strategy, its original grade may be
    kept at first to observe the gap in rules, with an adjusted version
    listed separately; do not pool the results of the two.

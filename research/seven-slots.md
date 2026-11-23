@@ -17,7 +17,7 @@ statistics.  No change to play; the base is `6d5a2a8`.
   four `HeuristicBot`s, and k is a whole number on every one of them.
 - **k is almost always 0 or +1.**  56.4% of wins have as many singles as
   pairs, 35.2% three more.  A quarter of the wins with k = +1 (9.1% of all)
-  would be short of ten 胡 without those 2 胡.
+  would be short of 10 胡 without those 2 胡.
 - **A winning hand holds 2.76 lone generals and 2.12 pairs on average.**
   0.70 of the generals were drawn, and 1.13 of the pairs were eaten.
 - **Eating a pair is the commonest negative term.**  Pairs pull a hand down
@@ -78,7 +78,7 @@ eaten.
 
 By k:
 
-| k | Wins | Short of ten 胡 without the 2k |
+| k | Wins | Short of 10 胡 without the 2k |
 | ---: | ---: | ---: |
 | −2 | 0.01% | 0 |
 | −1 | 5.54% | 0 |

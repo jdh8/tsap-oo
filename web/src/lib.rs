@@ -1,4 +1,4 @@
-//! Browser front end for 十胡 and 八胡: one human against one to three greedy
+//! Browser front end for 十胡: one human against one to three greedy
 //! bots.
 //!
 //! The engine holds the whole game; JS is a thin renderer that calls one
@@ -51,7 +51,7 @@ fn name(players: usize, seat: Seat) -> &'static str {
 #[derive(Deserialize)]
 #[serde(default)]
 struct Settings {
-    /// 胡 to win: 10 for 十胡, 8 for 八胡
+    /// 胡 to win: 10 or 8
     threshold: u32,
     /// Players at the table, the human among them
     players: usize,
@@ -166,7 +166,7 @@ fn exposed(round: &Round, seat: Seat) -> Vec<Vec<CardJson>> {
 /// No melds are set apart: but for the soldiers, a card only ever melds
 /// with its own colour, so the colours already read like the suits of a
 /// bridge hand.  Soldiers go together because across colours they make
-/// 三色卒.
+/// 三色兵卒.
 fn arrange(hand: Hand) -> Vec<CardJson> {
     let (soldiers, others): (Vec<Card>, Vec<Card>) =
         hand.iter().partition(|card| card.rank == Rank::Soldier);

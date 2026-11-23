@@ -127,10 +127,10 @@ standing in their melds.  Batch 3 verifies it with the exact DP: interchange
 the colours or the kinds of card of the hand and `live` as in the table
 above, and the roots' values do not change.
 
-Whatever the eval cannot see is fixed at training: `Rules` (十胡) and
-`Outlook` (h × 1.5).  Change either and the tables must be retrained.  八胡
-has no tables of its own yet and uses the ten-胡 tables beyond the gate;
-measured, and it cannot be told better from worse ("八胡: the ten-胡 tables
+Whatever the eval cannot see is fixed at training: `Rules` (10 胡) and
+`Outlook` (h × 1.5).  Change either and the tables must be retrained.  8 胡
+has no tables of its own yet and uses the 10-胡 tables beyond the gate;
+measured, and it cannot be told better from worse ("8 胡: the 10-胡 tables
 beyond the gate").
 
 ### Labels
@@ -819,7 +819,7 @@ and the candidate's leaves read the table in the file.
   (three players), with the same `PLAYERS` and `EXPECT`, 300 rounds each
   (500 rounds in batch 3; the time is kept for the A/B).  A report only,
   with no gate: the verdict is the A/B's.
-- **A/B:** control `07d5602`, `RESHUFFLE=8`, 十胡, the other seats all
+- **A/B:** control `07d5602`, `RESHUFFLE=8`, 10 胡, the other seats all
   `HeuristicBot`.  The candidate is that table's `Outlook` times its
   multiplier, that table's `Eval`, and the shallow graph on as the setting
   has it.  The control is the play that table should now be compared with:
@@ -1019,17 +1019,17 @@ binary.  This is not "as good": X's interval admits −0.07 to +0.03, and Z's
 −0.22 to +0.03.  The candidate changed two things at once (`Outlook` and
 `Eval`), and these two runs cannot tell which of them failed to help.
 
-### 八胡 at two players
+### 8 胡 at two players
 
-What won at a table of two is 十胡.  `Outlook::new` does not look at the
-threshold at a table of two, and the two-player `Eval` is labelled at 十胡
-as well; 八胡 at a table of two now (`07d5602`) uses the four-player ten-胡
-`Outlook` and `Eval`.  Whether to change 八胡 along with it cannot rest on
+What won at a table of two is 10 胡.  `Outlook::new` does not look at the
+threshold at a table of two, and the two-player `Eval` is labelled at 10 胡
+as well; 8 胡 at a table of two now (`07d5602`) uses the four-player 10-胡
+`Outlook` and `Eval`.  Whether to change 8 胡 along with it cannot rest on
 inference alone.
 
 Declaration (2026-11-22, written before the run; control `07d5602`,
 `RESHUFFLE=8`, `PLAYERS=2 THRESHOLD=8`, the other seat `HeuristicBot`).  The
-candidate is the two-player ten-胡 `Outlook` times 1.3 and the two-player
+candidate is the two-player 10-胡 `Outlook` times 1.3 and the two-player
 `Eval`; the control is the present play:
 
 | | Setting | Candidate | Control | Deals | seed base |
@@ -1038,7 +1038,7 @@ candidate is the two-player ten-胡 `Outlook` times 1.3 and the two-player
 | Y8 | Desktop | `EXPECT=1.3 GATE_CARDS=14 SHALLOW=17 EVAL=…` | `BASELINE_EXPECT=1 BASELINE_GATE=14 BASELINE_SHALLOW=17` | 4,000 | 1800700000 |
 
 Verdict: if both runs are wins, a table of two uses its own tables whatever
-the threshold.  Otherwise 八胡 at a table of two stays with the present play
+the threshold.  Otherwise 8 胡 at a table of two stays with the present play
 (`ExpectBot::new` and the place that picks the table look at the threshold
 as well), and a loss first has the deals that moved the most traced.
 
@@ -1047,8 +1047,8 @@ as well), and a loss first has the deals that moved the most traced.
 | W8 | 10,000 | 7,776 | 48.15% → 49.19% | +0.302 ± 0.040 | [+0.224, +0.380] | win |
 | Y8 | 4,000 | 2,849 | 50.47% → 50.34% | +0.048 ± 0.056 | [−0.061, +0.158] | insufficient data |
 
-1,951 seconds and 4,893 seconds.  **Not both runs are wins, so 八胡 at a
-table of two keeps the four-player ten-胡 tables as before.**  The web
+1,951 seconds and 4,893 seconds.  **Not both runs are wins, so 8 胡 at a
+table of two keeps the four-player 10-胡 tables as before.**  The web
 setting alone is a win and goes unused: the declaration tied the two
 settings together, and the rule for the verdict is not changed once the data
 are in.  To use it, `bot()` in `web/src/lib.rs` would have to pick the table
@@ -1056,10 +1056,10 @@ by its own setting, with a separate declaration and a separate measurement.
 
 ### Wired into the code
 
-- **`Eval::of(&Rules)`**: two players at ten 胡 is `src/eval-16-2.bin`
+- **`Eval::of(&Rules)`**: two players at 10 胡 is `src/eval-16-2.bin`
   (which is `target/eval-2-16.bin`, 359 KB), and the rest is
   `Eval::default`.  The three-player table is not compiled into the binary.
-- **`ExpectBot::new`**: two players at ten 胡 use `Outlook::new` times 1.3,
+- **`ExpectBot::new`**: two players at 10 胡 use `Outlook::new` times 1.3,
   and the rest is `Outlook::default` times `END_SCALE` as before.
 - **`bot()` in `web/src/lib.rs`** uses `Eval::of(rules)`, shared by the web
   page and the desktop app.  The wasm goes from 620 KB to 982 KB (782 KB
@@ -1077,30 +1077,30 @@ by its own setting, with a separate declaration and a separate measurement.
 
 | Setting | Table | Deals | seed base | Part |
 | --- | --- | ---: | ---: | ---: |
-| Web | four players, ten 胡 | 2,000 | 1800800000 | 0 |
-| Web | three players, ten 胡 | 2,000 | 1800900000 | 0 |
-| Web | two players, 八胡 | 2,000 | 1801000000 | 0 |
-| Web | four players, 八胡 | 2,000 | 1801100000 | 0 |
-| Web | three players, 八胡 | 2,000 | 1801200000 | 0 |
-| Desktop | four players, ten 胡 | 500 | 1801300000 | 0 |
-| Desktop | three players, ten 胡 | 500 | 1801400000 | 0 |
-| Desktop | two players, 八胡 | 500 | 1801500000 | 0 |
+| Web | four players, 10 胡 | 2,000 | 1800800000 | 0 |
+| Web | three players, 10 胡 | 2,000 | 1800900000 | 0 |
+| Web | two players, 8 胡 | 2,000 | 1801000000 | 0 |
+| Web | four players, 8 胡 | 2,000 | 1801100000 | 0 |
+| Web | three players, 8 胡 | 2,000 | 1801200000 | 0 |
+| Desktop | four players, 10 胡 | 500 | 1801300000 | 0 |
+| Desktop | three players, 10 胡 | 500 | 1801400000 | 0 |
+| Desktop | two players, 8 胡 | 500 | 1801500000 | 0 |
 
-What is wired in for two players at ten 胡 is the very bot W measured: W's
+What is wired in for two players at 10 胡 is the very bot W measured: W's
 first 1,000 deals (seed base 1800200000) were run once with `EXPECT=new` and
 once with `EXPECT=1.3 EVAL=target/eval-2-16.bin`, and the output is the same
 word for word (836 deals part, +0.232 ± 0.133).  Only tests and comments
 have been touched since.
 
-## 八胡: the ten-胡 tables beyond the gate
+## 8 胡: the 10-胡 tables beyond the gate
 
-"Shape" says that until 八胡 has tables of its own, it is `HeuristicBot`
+"Shape" says that until 8 胡 has tables of its own, it is `HeuristicBot`
 beyond the gate as before.  The code is not so: `bot()` in `web/src/lib.rs`
 does not look at the threshold, and `ExpectBot::depth` only stops on the
-count of public cards, so since batch 4 a table of four at 八胡 plays the
-shallow graph on the ten-胡 tables beyond the gate.  This play has not been
+count of public cards, so since batch 4 a table of four at 8 胡 plays the
+shallow graph on the 10-胡 tables beyond the gate.  This play has not been
 measured.  The wins inside the graph and the ceiling pruning go by the
-threshold of `Rules` and are right; the leaf values are 十胡's, and a hand 2
+threshold of `Rules` and are right; the leaf values are 10 胡's, and a hand 2
 胡 short of winning is taken for one 4 胡 short.
 
 `ab/` gains one switch: `THRESHOLD` is the threshold on both sides, 10 by
@@ -1135,15 +1135,15 @@ Declaration (2026-11-20, written before the run; control `09eb4c4`,
 | Desktop | 20,000 | 15,330 | 24.96% → 25.14% | +0.080 ± 0.049 | [−0.015, +0.175] | insufficient data |
 
 - **Both settings straddle 0, and play is left alone.**  A table of four at
-  八胡 goes on playing the shallow graph on the ten-胡 tables beyond the
+  8 胡 goes on playing the shallow graph on the 10-胡 tables beyond the
   gate.  This is not "no loss": the web's interval admits −0.14, and the
   desktop's −0.02.
 - **The minus signs of the trial run did not recur.**  The −0.798 ± 0.341 of
   400 deals (web) is +0.006 at 10,000 deals; the desktop's −0.113 became
   +0.080.
-- **Compared with 十胡, no benefit of the tables was measured at 八胡.**
-  The same settings at 十胡 are +0.191 ± 0.046 (web) and +0.204 ± 0.052
-  (desktop), both wins.  八胡's own tables (application D) are still a
+- **Compared with 10 胡, no benefit of the tables was measured at 8 胡.**
+  The same settings at 10 胡 are +0.191 ± 0.046 (web) and +0.204 ± 0.052
+  (desktop), both wins.  8 胡's own tables (application D) are still a
   candidate.
 - If the desktop really is +0.08, telling it apart with 80% confidence would
   take about 60,000 deals in all, 15 hours (an estimate); not scheduled.
@@ -1198,7 +1198,7 @@ After batch 4 has one win.  Those that change play each run their own A/B.
 | A | The hint marks points throughout | No, with batch 4 (done) | Batch 4 is a win |
 | B | k = 0 for Monte Carlo's playouts and leaves (`expectation.md` application H) | Candidate | Batch 4 is a win |
 | C | The hint shows the chance to win: one more output of the same table, labelled with `Payoff::Win` | No | Batch 1's calibration passes |
-| D | Tables for 八胡 | Candidate | The web is to give 八胡 the same opponents |
+| D | Tables for 8 胡 | Candidate | The web is to give 8 胡 the same opponents |
 | E | Opponent inference: `live` replaced by inferred counts, the pattern key unchanged | Candidate | Route 1 has an inference to plug in |
 
 ## Known approximations

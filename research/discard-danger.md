@@ -74,7 +74,7 @@ Four `HeuristicBot`s play 20,000 rounds under `Rules::new()`, seed base
 
 A win is decided as `Round` decides it: the meld the winning card makes
 scores as exposed and the rest of the concealed hand as concealed, and with
-the melds already exposed they must reach ten 胡.  "Next seat can eat" asks
+the melds already exposed they must reach 10 胡.  "Next seat can eat" asks
 only whether the next seat could eat the card into a run, not whether it
 would want to.
 

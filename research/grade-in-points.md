@@ -184,7 +184,7 @@ stretches.
 
 ## An example of a claim
 
-八胡, 3 胡 on the table, and in hand five generals (將帥), red 炮 red 炮,
+8 胡, 3 胡 on the table, and in hand five generals (將帥), red 炮 red 炮,
 yellow 兵 and green 卒; the 8 胡 are already there, and it waits on red 兵
 and white 卒, 8 cards at most.  The next seat draws a red 炮.  The web
 page's hint: pong is the pick, and pass is about 77 behind.

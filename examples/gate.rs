@@ -17,7 +17,7 @@ use tsap_oo::{
     Table, View,
 };
 
-/// One decision: concealed cards once discarded, 向聽數 up to 1, the
+/// One decision: concealed cards once discarded, shanten up to 1, the
 /// microseconds the search took, and whether it overrode the greedy choice
 type Decision = (usize, Option<u32>, u128, bool);
 
