@@ -426,9 +426,10 @@ point is [where the four seats' bots are built](../examples/arena.rs).
 
 ## Search scope and caveats
 
-Starting from the candidates of the existing
-[research on how other implementations lay out a hand](hand-layout-and-general-marks.md),
-the sources were checked again; in addition `十胡`, `四色牌`,
+Starting from the candidates of an earlier survey of how other
+implementations lay out a hand (since removed; `git show
+09a35a3:research/hand-layout-and-general-marks.md`), the sources were
+checked again; in addition `十胡`, `四色牌`,
 `four-color-cards`, `Four Color Cards`, `Si Se Pai`, `Tứ Sắc`, `Tu Sac` and
 `tusac` were searched for, using search engines and GitHub repository
 search to find repos, then reading the authors' READMEs, code, licence
