@@ -50,15 +50,15 @@ Each batch is about one session.  Update this table when a batch is done.
 
 ## Terms
 
-- **完成形**: a hand that waits on every general not yet seen.  A general is
-  a meld by itself, so this is the same as the other 20 cards all being in
-  groups (melds, pairs, lone generals) with the hand no more than 1 胡 short.
-- **Extension**: the other cards a 完成形 waits on, each adding one card to a
-  meld in hand: a pair ponged into a triplet, a concealed triplet konged,
-  soldiers of three colours eaten into four.  A meld exposed on the table
-  takes no card.  Whenever a general wins, an extension card wins as well,
-  since an extension too brings at least 1 胡 more.  A hand that extends 0
-  is one kind of 完成形, not a class apart.
+- **Fully melded**: a hand with no loose cards (雜牌) and no more than 1 胡
+  short: its 20 cards are all in melds, pairs and lone generals.  A general
+  is a meld by itself, so such a hand waits on every general not yet seen.
+- **Extension**: the other cards a fully melded hand waits on, each adding one
+  card to a meld in hand: a pair ponged into a triplet, a concealed triplet
+  konged, soldiers of three colours eaten into four.  A meld exposed on the
+  table takes no card.  Whenever a general wins, an extension card wins as
+  well, since an extension too brings at least 1 胡 more.  A hand that extends
+  0 is one kind of fully melded hand, not a class apart.
 - **Overspend**: after a pair is eaten, `ceiling(generals = 0)` falls short
   of the threshold while `ceiling(generals = 1)` reaches it.  Extensions
   count within `generals = 0`, so only a general makes an overspent hand
@@ -79,7 +79,7 @@ cargo run --release --example overspend -- 20000 1797200000 > pairs.csv 2> waiti
 python3 research/overspend.py pairs.csv waiting.csv
 ```
 
-### How good a wait 完成形 is
+### How good a wait a fully melded hand is
 
 Hands waiting after their discard, 14 cards or fewer (the range `Graph`
 expands whole).  Each cell is the actual win rate and its standard error,
@@ -88,11 +88,11 @@ parentheses:
 
 | | 15 draws or more | 8–14 draws | 0–7 draws |
 | --- | ---: | ---: | ---: |
-| 完成形, extends 0 | 50% ± 4 (65%, 168) | 39% ± 3 (58%, 236) | 23% ± 4 (43%, 129) |
-| 完成形, extends 1 | 67% ± 4 (67%, 159) | 47% ± 4 (61%, 189) | 45% ± 8 (49%, 40) |
-| 完成形, extends 2 | 62% ± 3 (70%, 363) | 61% ± 3 (63%, 329) | 32% ± 5 (48%, 101) |
-| 完成形, extends 3 | 74% ± 3 (72%, 293) | 61% ± 4 (64%, 146) | 48% ± 7 (53%, 50) |
-| 完成形, extends 4 or more | 80% ± 1 (77%, 1,079) | 70% ± 2 (68%, 409) | 44% ± 7 (58%, 50) |
+| Fully melded, extends 0 | 50% ± 4 (65%, 168) | 39% ± 3 (58%, 236) | 23% ± 4 (43%, 129) |
+| Fully melded, extends 1 | 67% ± 4 (67%, 159) | 47% ± 4 (61%, 189) | 45% ± 8 (49%, 40) |
+| Fully melded, extends 2 | 62% ± 3 (70%, 363) | 61% ± 3 (63%, 329) | 32% ± 5 (48%, 101) |
+| Fully melded, extends 3 | 74% ± 3 (72%, 293) | 61% ± 4 (64%, 146) | 48% ± 7 (53%, 50) |
+| Fully melded, extends 4 or more | 80% ± 1 (77%, 1,079) | 70% ± 2 (68%, 409) | 44% ± 7 (58%, 50) |
 | 搭子, waits on 1 | 38% ± 3 (30%, 285) | 26% ± 3 (22%, 174) | 17% ± 5 (13%, 65) |
 | 搭子, waits on 2 | 44% ± 3 (39%, 339) | 40% ± 3 (30%, 212) | 24% ± 5 (16%, 62) |
 | 搭子, waits on 3 | 55% ± 1 (46%, 1,346) | 36% ± 2 (35%, 558) | 17% ± 3 (24%, 123) |
@@ -100,7 +100,7 @@ parentheses:
 | 搭子, waits on 5 or more | 60% ± 1 (55%, 1,300) | 47% ± 3 (44%, 382) | 33% ± 6 (32%, 64) |
 | 士象 waiting for its own general | 33% ± 2 (40%, 523) | 24% ± 3 (30%, 217) | 11% ± 4 (20%, 56) |
 
-- **A 完成形 that extends 0 is overestimated by 15 to 20 percentage
+- **A fully melded hand that extends 0 is overestimated by 15 to 20 percentage
   points.**  In fact it does about as well as a 搭子 that waits on 2 to 4
   cards; `Graph` takes it for 20 percentage points better than a 搭子 that
   waits on 4.
@@ -110,8 +110,8 @@ parentheses:
   percentage points.
 - **The more extensions, the closer the estimate.**  With 3 or more and 8
   draws or more left it is within 4 percentage points; with 1 or 2 it still
-  runs up to 14 percentage points high.  Over all 完成形 the estimate is 67%
-  against an actual 64%.
+  runs up to 14 percentage points high.  Over all fully melded hands the
+  estimate is 67% against an actual 64%.
 
 ### When the engine overspends
 
@@ -124,10 +124,10 @@ The 51,317 decisions where a pair could be eaten:
 | B2: one short already before eating | 1,629 | 616 | −0.66 |
 | A: short even with one more drawn | 5,826 | 243 | −2.31 |
 
-Of the 1,135 decisions that are 完成形 after eating, 984 have extensions to
-wait on, all of them in C: the extension is the pair's way out, with no need
-of a general.  Those that extend 0 and overspend are 39 in B1 (35 eaten) and
-42 in B2 (32 eaten), both by its own estimate 10.7 points better than
+Of the 1,135 decisions that are fully melded after eating, 984 have extensions
+to wait on, all of them in C: the extension is the pair's way out, with no
+need of a general.  Those that extend 0 and overspend are 39 in B1 (35 eaten)
+and 42 in B2 (32 eaten), both by its own estimate 10.7 points better than
 passing.  By what passing waits on (the 70 of C included):
 
 | If it passes | Decisions | Eaten | Own estimate, eat − pass (points) |
@@ -136,15 +136,15 @@ passing.  By what passing waits on (the 70 of C included):
 | 士象 waiting for its own general | 23 | 23 | +11.4 |
 | 搭子 waits on 1 to 2 | 10 | 10 | +15.2 |
 | 搭子 waits on 3 or more | 47 | 45 | +10.4 |
-| Already 完成形 | 25 | 0 | −1.8 |
+| Already fully melded | 25 | 0 | −1.8 |
 
-- **Moving to 完成形 from not waiting, from 士象, or from a 搭子 that waits
+- **Moving to fully melded from not waiting, from 士象, or from a 搭子 that waits
   on 1 to 2 cards holds up**: in the table before, the actual win rate of
-  完成形 is higher or level as well.
+  fully melded hands is higher or level as well.
 - **Moving from a 搭子 that waits on 3 cards or more, the 10 points of its
   own estimate come from the overestimate**: the actual win rates are level
   to slightly worse.
-- **B1 is almost all not yet waiting** (only 39 of the 4,176 are 完成形
+- **B1 is almost all not yet waiting** (only 39 of the 4,176 are fully melded
   after eating).  The 1,039 eaten are mostly marginal decisions, only 0 to 2
   points better by its own estimate.  If generals are overestimated these
   most likely lose, but these statistics cannot tell.
@@ -193,9 +193,9 @@ The gate:
 
 - **Overall ρ within the gate is below 0.85**: do batch 2.
 - **Otherwise**: the overestimate has another cause.  First see where the
-  完成形 hands that extend 0 lose (the other seats winning first more often
-  than h says?  the generals gathered in the other seats' hands?); this line
-  stops here and is written up in `research/`.
+  fully melded hands that extend 0 lose (the other seats winning first more
+  often than h says?  the generals gathered in the other seats' hands?); this
+  line stops here and is written up in `research/`.
 
 ### What batch 1 measured
 
@@ -265,8 +265,8 @@ fixed in `expand`; building the graph does not change.
 Calibrate first, then A/B:
 
 1. **Calibration.**  Rerun `examples/overspend` on a fresh seed and read the
-   table of waiting hands above.  The gate: in the three cells of 完成形
-   that extends 0, the estimated win rate falls within ± 2 standard errors
+   table of waiting hands above.  The gate: in the three cells of fully melded
+   hands that extend 0, the estimated win rate falls within ± 2 standard errors
    of the actual, and no 搭子 row gets worse.  If it fails, go back to the
    shape of ρ (split within and past the gate?  split by who drew?) and run
    no A/B.
@@ -299,8 +299,8 @@ Estimate − actual (percentage points), batch 0 → batch 2:
 
 | | 15 draws or more | 8–14 draws | 0–7 draws |
 | --- | ---: | ---: | ---: |
-| 完成形, extends 0 | +15 → −3 | +19 → −5 | +20 → −2 |
-| 完成形, extends 4 or more | −3 → −14 | −2 → −9 | +14 → −2 |
+| Fully melded, extends 0 | +15 → −3 | +19 → −5 | +20 → −2 |
+| Fully melded, extends 4 or more | −3 → −14 | −2 → −9 | +14 → −2 |
 | 搭子, waits on 1 | −8 → −16 | −4 → −6 | −4 → −2 |
 | 搭子, waits on 2 | −5 → −13 | −10 → −13 | −8 → −11 |
 | 搭子, waits on 3 | −9 → −13 | −1 → −6 | +7 → +5 |
@@ -320,9 +320,9 @@ rerun on the same seed base, each hand estimated both with ρ and with ρ = 1
 
 | | Actual | ρ | ρ = 1 | Hands |
 | --- | ---: | ---: | ---: | ---: |
-| 完成形, extends 0 | 53% ± 8 | 43% | 64% | 38 |
-| 完成形, extends 2 | 72% ± 5 | 54% | 70% | 71 |
-| 完成形, extends 4 or more | 79% ± 2 | 67% | 77% | 296 |
+| Fully melded, extends 0 | 53% ± 8 | 43% | 64% | 38 |
+| Fully melded, extends 2 | 72% ± 5 | 54% | 70% | 71 |
+| Fully melded, extends 4 or more | 79% ± 2 | 67% | 77% | 296 |
 | 搭子, waits on 1 | 41% ± 5 | 27% | 32% | 103 |
 | 搭子, waits on 3 | 55% ± 3 | 42% | 47% | 321 |
 | 搭子, waits on 4 | 53% ± 3 | 45% | 46% | 333 |
@@ -444,7 +444,7 @@ The gates and the method are batch 2's:
    more complete fix.  The control is the `main` HEAD of the time; if batch
    2 did not go in, the generals' row is measured along with the rest.
 2. **Calibration.**  Rerun `examples/overspend` on a fresh seed; the gate is
-   that the 搭子 rows of the waiting table improve and no 完成形 row gets
+   that the 搭子 rows of the waiting table improve and no fully melded row gets
    worse.  If it fails, no A/B is run.
 3. **A/B.**  Candidate and control are both `ExpectBot`,
    `BASELINE_EXPECT=1`, the deal count fixed before any score is seen.
@@ -471,19 +471,19 @@ several models at once (a temporary trace, not kept).  Estimate − actual
 
 | | Actual | Even draw, h × 1.5 (current) | Rates, h × 1.5 (candidate) | Rates, h × 1 | Rates, own discards taken off, h × 1 | Hands |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 15 draws or more: 完成形, extends 0 | 49% ± 4 | +17 | −7 | +3 | +3 | 126 |
-| 完成形, extends 2 | 65% ± 3 | +5 | −12 | −3 | −4 | 354 |
-| 完成形, extends 4 or more | 78% ± 1 | −1 | −13 | −5 | −7 | 1,108 |
+| 15 draws or more: fully melded, extends 0 | 49% ± 4 | +17 | −7 | +3 | +3 | 126 |
+| Fully melded, extends 2 | 65% ± 3 | +5 | −12 | −3 | −4 | 354 |
+| Fully melded, extends 4 or more | 78% ± 1 | −1 | −13 | −5 | −7 | 1,108 |
 | 搭子, waits on 1 | 36% ± 2 | −6 | −10 | −1 | −5 | 371 |
 | 搭子, waits on 3 | 55% ± 1 | −9 | −13 | −3 | −8 | 1,400 |
 | 搭子, waits on 4 | 55% ± 1 | −9 | −9 | 0 | −5 | 1,490 |
 | 搭子, waits on 5 or more | 58% ± 1 | −4 | −9 | 0 | −4 | 1,269 |
 | 士象 waiting for its own general | 35% ± 2 | +5 | −11 | −3 | −4 | 367 |
-| 8–14 draws: 完成形, extends 0 | 42% ± 4 | +15 | −6 | +3 | +3 | 159 |
-| 完成形, extends 4 or more | 67% ± 2 | +1 | −11 | −1 | −2 | 409 |
+| 8–14 draws: fully melded, extends 0 | 42% ± 4 | +15 | −6 | +3 | +3 | 159 |
+| Fully melded, extends 4 or more | 67% ± 2 | +1 | −11 | −1 | −2 | 409 |
 | 搭子, waits on 3 | 38% ± 2 | −3 | −5 | +4 | +1 | 568 |
 | 搭子, waits on 4 | 40% ± 2 | −3 | −3 | +6 | +3 | 404 |
-| 0–7 draws: 完成形, extends 0 | 22% ± 4 | +20 | +3 | +7 | +7 | 87 |
+| 0–7 draws: fully melded, extends 0 | 22% ± 4 | +20 | +3 | +7 | +7 | 87 |
 | 搭子, waits on 3 | 25% ± 4 | −2 | −2 | +3 | +1 | 117 |
 | All 33 cells, mean absolute miss weighted by hands | | 5.9 | 9.4 | 2.4 | 4.5 | 12,419 |
 | All, win rate | 52.3% | 50.1% | 43.0% | 51.9% | 48.9% | |
@@ -501,9 +501,9 @@ several models at once (a temporary trace, not kept).  Estimate − actual
   need to scale: with the rates and the measured h the miss over the 33
   cells is 2.4 percentage points against 5.9 for the current model, and
   51.9% overall against an actual 52.3%.
-- **The misses that remain**: 完成形 and hands waiting for generals with 0–7
-  draws left are still 5 to 9 percentage points high, and a 搭子 that waits
-  on 4 with 8–14 draws left is 6 high.
+- **The misses that remain**: fully melded hands and those waiting for
+  generals with 0–7 draws left are still 5 to 9 percentage points high, and a
+  搭子 that waits on 4 with 8–14 draws left is 6 high.
 - **Taking off the seat's own discards makes it worse instead** (4.5), so
   `own` is 0.  It would need a smaller h to come level, and h is measured:
   there is no reason to tune it again.
@@ -635,18 +635,18 @@ fresh seed:
 - **The share of B1 that is eaten falls below 10%**: with the overestimate
   fixed the engine stops eating by itself, and this line ends.
 - **Otherwise go back to the appearance rates first**: whichever cell of the
-  waiting table is still off shows which rate is not yet fixed.  Only when
-  the table is accurate and the engine still eats is the probe made.  Read
-  the probe as a diagnosis first: the group it wins in is where `Graph` is
-  still wrong.  As in batch 2 of `doc/hu-ceiling.md`: the candidate
-  `ExpectBot` does not eat a B1 pair unless the hand is 完成形 after eating.
-  The groups declared beforehand:
+  waiting table is still off shows which rate is not yet fixed.  Only when the
+  table is accurate and the engine still eats is the probe made.  Read the
+  probe as a diagnosis first: the group it wins in is where `Graph` is still
+  wrong.  As in batch 2 of `doc/hu-ceiling.md`: the candidate `ExpectBot` does
+  not eat a B1 pair unless the hand is fully melded after eating.  The groups
+  declared beforehand:
 
   | Group | Condition | Expected |
   | --- | --- | --- |
-  | I | Not 完成形 after eating, and not waiting if it passes | Passing is better |
-  | II | 完成形 after eating; passing leaves a 搭子 that waits on 3 or more | Passing is slightly better or level |
-  | III | 完成形 after eating, otherwise | Eating is better (the probe does not block it; a control only) |
+  | I | Not fully melded after eating, and not waiting if it passes | Passing is better |
+  | II | Fully melded after eating; passing leaves a 搭子 that waits on 3 or more | Passing is slightly better or level |
+  | III | Fully melded after eating, otherwise | Eating is better (the probe does not block it; a control only) |
 
   The probe and the trace are saved as a patch and do not go into `main`.
   Commit only on an overall win; if only a group's CI lies above 0, narrow
@@ -663,7 +663,7 @@ general as `WAIT` like any other card it waits on.  Multiplying generals by
 「吃對子是在湊張數」 and 「把搭子吃成對子」 (Eating a 搭子 into a pair),
 `src/seven.md` (lone cards and pairs differ by a multiple of 3) and
 `src/generals.md` (the safety line).  The book no longer teaches people to
-count a limit, so the terms extension, 完成形 and overspend stay out of it.
+count a limit, so the terms extension, fully melded and overspend stay out.
 By the `AGENTS.md` over there, what play measures is written as a direction
 only, without numbers.  What is left to change is in `material.md`:
 
@@ -714,9 +714,9 @@ document is updated.
 - **One table may not be enough.**  ρ may differ by whether the seat or
   another drew the general, and within and past the gate.  One table first;
   split if the calibration fails.
-- **The payoff may be too small to measure.**  A 完成形 hand that extends 0
-  comes up only about 0.03 times a round; the effect comes mostly from the
-  decisions a few steps before it, and its size is unknown.
+- **The payoff may be too small to measure.**  A fully melded hand that
+  extends 0 comes up only about 0.03 times a round; the effect comes mostly
+  from the decisions a few steps before it, and its size is unknown.
 - **The statistics come from one seat of `ExpectBot` against three
   `HeuristicBot`s.**  With `ExpectBot` in all four seats, generals may stay
   in hand differently.

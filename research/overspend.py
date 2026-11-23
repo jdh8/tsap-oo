@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tables from `examples/overspend.rs`: python3 research/overspend.py pairs.csv waiting.csv
 
-A hand is 完成形 when it wins on every general not yet seen: its twenty
+A hand is fully melded when it wins on every general not yet seen: its twenty
 cards are all in melds, pairs and lone generals.  Its other waits extend a
 concealed meld: a pong, a kong, a fourth colour of soldiers.
 """
@@ -50,7 +50,7 @@ def group(r):
 
 def passing(r):
     if r["pass_g"] == r["kings"]:
-        return "0 Already 完成形"
+        return "0 Already fully melded"
     if r["pass_o"] > 0:
         return f"2 搭子 waits on {min(int(r['pass_o']), 5)}" + (" or more" if r["pass_o"] >= 5 else "")
     return "1 士象 waiting for its own general" if r["pass_g"] > 0 else "3 Not waiting"
@@ -63,15 +63,15 @@ decisions = (
 print(f"{len(pairs)} pair decisions, {len(waiting)} waiting hands")
 table("Decisions where a pair can be eaten, by the ceiling after eating", decisions[0], group, pairs, decisions[1])
 full = [r for r in pairs if r["kings"] > 0 and r["eat_g"] == r["kings"]]
-table("Those 完成形 after eating, by ceiling and extension", decisions[0],
+table("Those fully melded after eating, by ceiling and extension", decisions[0],
       lambda r: group(r)[:2].strip() + (", with extensions to wait on" if r["eat_o"] > 0 else ", extends 0"), full, decisions[1])
-table("Those 完成形 after eating that extend 0, by what passing waits on", decisions[0], passing,
+table("Those fully melded after eating that extend 0, by what passing waits on", decisions[0], passing,
       [r for r in full if r["eat_o"] == 0], decisions[1])
 
 
 def wait(r):
     if r["kings"] > 0 and r["generals"] == r["kings"]:
-        return f"0 完成形, extends {min(int(r['others']), 4)}" + (" or more" if r["others"] >= 4 else "")
+        return f"0 Fully melded, extends {min(int(r['others']), 4)}" + (" or more" if r["others"] >= 4 else "")
     if r["generals"] > 0:
         return "2 士象 waiting for its own general"
     return f"1 搭子, waits on {min(int(r['others']), 5)}" + (" or more" if r["others"] >= 5 else "")
