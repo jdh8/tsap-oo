@@ -46,7 +46,7 @@ Each batch is about one session.  Update this table when a batch is done.
 | 2b | Every rank's appearance rate into `Graph`, calibration, A/B | Yes | Batch 2's calibration passed; the A/B runs only once its own calibration passes; commit only on a win | Done, win on both the web and the desktop |
 | 3 | Relearn the `Eval` table under the new `Outlook`, A/B | Yes | Batch 2 or 2b has won and 2b has its verdict; commit only on a win | Dropped: the CIs of the web and the desktop both straddle 0; the table is not replaced |
 | 4 | Overspending before the hand is waiting: rerun the statistics, check whether the appearance rates are fixed well enough | Candidate | See batch 4 | Statistics done: 18.8% of B1 eaten, the 10% gate not passed, the waiting table within 3.3 percentage points; the probe is skipped and the line ends.  The A/B of `waits` is insufficient data and reverted |
-| 5 | Revision of the book | No | Batches 2, 2b and 4 have their verdicts | Not started |
+| 5 | Revision of the book | No | Batches 2, 2b and 4 have their verdicts | Done: rule 2 of `material.md` keeps its assumption, now with the reason batch 2b measured; nothing on whether the B1 pairs still eaten pay |
 
 ## Terms
 
@@ -774,6 +774,22 @@ only, without numbers.  What is left to change is in `material.md`:
   seven groups is enough".**  For instance, if batch 4 measures that pairs
   made good by generals mostly lose, add a sentence to that passage not to
   count on later generals; if they are measured to hold up, leave it alone.
+
+### What batch 5 changed
+
+`../tsap-oo-book` `src/material.md`, 2026-11-24, directions only:
+
+- The three rules of 「對子該不該吃」 are named as `HeuristicBot`'s.
+- Rule 2's "assuming no general is drawn afterwards" stays, and a paragraph
+  after the rules says why it holds: generals are drawn but never
+  discarded, so counting the unseen ones overcounts the generals to come.
+  `ExpectBot` counted that way, valued hands that wait only on generals too
+  high, played better once the rates were fixed (batch 2b), and eats fewer
+  pairs a general short (batch 4).  It still eats some, close calls by its
+  own estimate, and the book says whether they pay was not measured.
+- The summary adds "do not count on later generals".  Batch 4 did not
+  measure that pairs made good by generals lose; the sentence rests on
+  the appearance rates alone.
 
 ## Closing each batch
 
