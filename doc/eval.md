@@ -1391,3 +1391,11 @@ After batch 4 has one win.  Those that change play each run their own A/B.
 - ~~Can nine added vectors learn the threshold?  How large must D be?~~
   Batch 3: they can, validation RMSE 0.78 at D = 16; D = 1 is not enough.
 - How far off are the labels at 18 cards or more, taken from `Loose` graphs?
+- Whom should the tables of two be measured against?  They are measured
+  from `HeuristicBot` self-play, and at two players the bot that ships is
+  `ExpectBot` with these tables: the hint advises a player whose opponent
+  is that bot.  `examples/outlook.rs` seats only `HeuristicBot`.  Seat the
+  bot that ships; if h or e moves by a tenth, relabel `Eval` under the new
+  `Outlook`.  The A/B needs the other seat settable first: against
+  `HeuristicBot`, as `ab/` seats it, a table measured against `ExpectBot`
+  has nothing to show.  (Raised 2026-11-25, not started.)

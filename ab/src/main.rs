@@ -15,7 +15,9 @@
 //! `GATE_CARDS` (default 10), and with `SHALLOW` as well playing past the
 //! gate by `ExpectBot::shallow` with that many cards two claims deep, its
 //! leaves read from the tables in the file `EVAL` names (an absolute path:
-//! `run.sh` runs in `ab/`) in place of `Eval::default`.  Set
+//! `run.sh` runs in `ab/`) in place of `Eval::default`; and with `ORACLE`
+//! (`live`, `waits`, `cards` or `danger`) that `ExpectBot` with one input
+//! read off the other hands, or `cards` off their counts (`oracle.rs`).  Set
 //! `BASELINE_SAMPLES` to seat the control's
 //! `MonteCarloBot` of that many samples in seat 1 on the control side, gated
 //! at `GATE_CARDS` (default 10), in place of its `HeuristicBot`: a head to
@@ -35,6 +37,8 @@
 //! decision saw only cards already turned up, so the pile's order is still
 //! uniform there: the estimate stays unbiased.  A deal that never parts
 //! counts 0, as it does in the plain estimate.
+#[cfg(feature = "peek")]
+mod oracle;
 #[cfg(feature = "peek")]
 mod peeker;
 
@@ -117,6 +121,11 @@ fn candidate_bot(rules: &new::Rules, seed: u64) -> Box<dyn new::Strategy> {
                 |path| new::Eval::from_bytes(&std::fs::read(path).unwrap()).unwrap(),
             );
             bot = bot.shallow(eval, deep);
+        }
+        #[cfg(feature = "peek")]
+        if let Ok(kind) = std::env::var("ORACLE") {
+            let (kind, rng) = (oracle::Kind::parse(&kind), SmallRng::seed_from_u64(!seed));
+            return Box::new(oracle::Oracle::new(rules, bot, kind, rng));
         }
         return Box::new(bot);
     }

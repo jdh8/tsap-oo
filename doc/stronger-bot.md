@@ -315,6 +315,11 @@ be decided before this layer is built.
 
 ### Directions not yet tried
 
+Added 2026-11-25: the plan that takes these up at a table of two, an oracle
+for each channel before any inference, is in [`opponents.md`](opponents.md).
+The Peeker's number below was measured before the hands of the empty seats
+were dead, and is void.
+
 Reading the opponents is not only for dodging deal-ins.  The following use
 the same public information, to win faster oneself or to make the opponents
 win slower:

@@ -624,6 +624,8 @@ pub struct ExpectBot {
     /// Past the gate: the tables that value a leaf, and the most cards a
     /// graph two claims deep is built for, one deep beyond
     shallow: Option<(Eval, usize)>,
+    /// Unseen cards taken for gone: see [`gone_mut`](Self::gone_mut)
+    gone: Hand,
 }
 
 impl ExpectBot {
@@ -659,7 +661,27 @@ impl ExpectBot {
             outlook,
             cards: 10,
             shallow: None,
+            gone: Hand::EMPTY,
         }
+    }
+
+    /// The table model, to read or to change between decisions
+    #[must_use]
+    pub const fn outlook_mut(&mut self) -> &mut Outlook {
+        &mut self.outlook
+    }
+
+    /// Unseen cards the bot takes for gone, never to come up: none unless
+    /// set here, before each decision
+    ///
+    /// For the oracles in `ab/`, which read them off the other hands
+    /// (`doc/opponents.md`); hidden and behind the `peek` feature like
+    /// [`View::peek`].
+    #[cfg(feature = "peek")]
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn gone_mut(&mut self) -> &mut Hand {
+        &mut self.gone
     }
 
     /// The same bot with another table model
@@ -724,15 +746,16 @@ impl ExpectBot {
         self.depth(view, cards).is_some()
     }
 
-    /// The cards `view`'s seat has not seen, and the 胡 of its exposed melds
-    fn table(view: &View<'_>) -> (Hand, u32) {
+    /// The cards `view`'s seat has not seen, less the ones taken for gone,
+    /// and the 胡 of its exposed melds
+    fn table(&self, view: &View<'_>) -> (Hand, u32) {
         let shown = Seat::ALL
             .into_iter()
             .flat_map(|seat| view.exposed(seat))
             .flat_map(|meld| meld.cards())
             .chain(view.discards().iter().map(|&(_, card)| card))
             .chain(view.offer().map(|offer| offer.card));
-        let live = shown.fold(Hand::FULL - view.hand(), Hand::without);
+        let live = shown.fold(Hand::FULL - view.hand(), Hand::without) - self.gone;
         let rules = view.rules();
         let base = view
             .exposed(view.seat())
@@ -807,7 +830,7 @@ impl ExpectBot {
                 claims.push(claim);
             }
         }
-        let (live, base) = Self::table(view);
+        let (live, base) = self.table(view);
         let exposed = view.rules().exposed;
         let groups: Vec<Vec<(Hand, u32)>> = claims
             .iter()
@@ -840,7 +863,7 @@ impl ExpectBot {
                 .map(|(card, grade)| (card, f64::from(grade)))
                 .collect();
         };
-        let (live, base) = Self::table(view);
+        let (live, base) = self.table(view);
         let cards: Vec<Card> = graded.into_iter().map(|(card, _)| card).collect();
         let groups: Vec<_> = cards
             .iter()

@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `doc/opponents.md` plans reading the opponent at a table of two: an
+  oracle for each channel before any inference is written.  `ORACLE=live`,
+  `waits` or `danger` in `ab/` seats `ExpectBot` as it ships with one input
+  read off the other hand (`ab/src/oracle.rs`): the cards the opponent
+  keeps taken out of `live`, h bent by its waits, each discard's value less
+  what the card gives away.  `ORACLE=cards` bends h by the opponent's count
+  of concealed cards, which is public.  `cargo run --release --example
+  hazard -- [rounds] [seed]` measures the two bends: how often another seat
+  wins on a card by how many draws on it comes, over the same at decisions
+  with as many draws left.  At two players, 20,000 rounds, seed 400: 0.21
+  times on the next cards of a seat that is not waiting, 3.0 times of one
+  that waits on four copies or more; 0.29 to 1.44 times by the count of
+  cards.  The runs are declared in the document and their verdicts are not
+  in yet.  No bot changes.
+
+- `ExpectBot::outlook_mut` gives the bot's table model, to read or to change
+  between decisions.
+
 - `Outlook::new` has a table for two players at 8 胡, measured from 10,000
   rounds of `HeuristicBot` self-play (`PLAYERS=2 THRESHOLD=8 outlook 10000
   280`): within the gate h is 0.0694 a card against 0.0544 at 10 胡, L
