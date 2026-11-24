@@ -23,9 +23,10 @@
 //! cargo run --release --example eval -- loss [rounds] [seed base] [tables...]
 //! ```
 //!
-//! `PLAYERS` (default 4) is the table's size, and `EXPECT` (default 1.5)
-//! what the h of that table's [`Outlook::new`] is scaled by: tables for a
-//! table of two are labelled with `PLAYERS=2 EXPECT=1.3`.
+//! `PLAYERS` (default 4) is the table's size, `THRESHOLD` (default 10) the
+//! 胡 to win, and `EXPECT` (default 1.5) what the h of that table's
+//! [`Outlook::new`] is scaled by: tables for a table of two are labelled
+//! with `PLAYERS=2 EXPECT=1.3`.
 use rand::rngs::SmallRng;
 use rand::{RngExt as _, SeedableRng as _};
 use std::cell::RefCell;
@@ -232,9 +233,12 @@ fn spread<T: Send>(rounds: u64, base: u64, f: impl Fn(u64) -> T + Sync) -> Vec<T
     out.into_iter().map(|x| x.1).collect()
 }
 
-/// The table: [`Rules::new`] with `PLAYERS` seats
+/// The table: [`Rules::new`] with `PLAYERS` seats and `THRESHOLD` to win
 fn rules() -> Rules {
     let mut rules = Rules::new();
+    if let Ok(threshold) = std::env::var("THRESHOLD") {
+        rules.threshold = threshold.parse().expect("THRESHOLD is a number");
+    }
     if let Ok(players) = std::env::var("PLAYERS") {
         rules.players = players.parse().expect("PLAYERS is a number");
     }

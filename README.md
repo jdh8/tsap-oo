@@ -77,8 +77,8 @@ allow two to five.  A smaller table deals and scores the same: twenty cards
 each, one more to the dealer, the rest to the pile, and a win or a 相公
 settled with each other seat.  The five-player game 8 胡 is often named for
 is not modelled (`Seat::COUNT` is four).  The bots were tuned at four and
-at 10 胡; `ExpectBot` has tables of its own for two players at 10 胡, and
-plays three players and 8 胡 by those of four:
+at 10 胡; `ExpectBot` has tables of its own for two players, at 10 and at
+8 胡, and plays three players and four players' 8 胡 by those of four at 10:
 [`doc/variants.md`](doc/variants.md) lists what is missing.
 
 Open questions, played provisionally:

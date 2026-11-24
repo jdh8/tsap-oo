@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Outlook::new` has a table for two players at 8 胡, measured from 10,000
+  rounds of `HeuristicBot` self-play (`PLAYERS=2 THRESHOLD=8 outlook 10000
+  280`): within the gate h is 0.0694 a card against 0.0544 at 10 胡, L
+  −11.32, e 0.727; its h calibrates at × 1.3 (seed 283).
+  `examples/eval.rs` takes `THRESHOLD`, and `BASELINE_EXPECT=new` in `ab/`
+  has the control read its own `Eval::of` past the gate, where any other
+  `BASELINE_EXPECT` reads its `Eval::default`.
+
 - `cargo run --release --example away -- CLONE [deals] [seed]` is the
   return match of `guest`: `ExpectBot` at chunhua1972/four-color-game's
   table (`ee33cf0`), where `node` runs their own engine from a clone
@@ -252,6 +260,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so it runs on macOS.
 
 ### Changed
+
+- Two players at 8 胡 play by tables of their own, as two players at 10 胡
+  do.  `ExpectBot::new` takes the `Outlook` measured at 8 胡 (h × 1.3), and
+  `Eval::of(&Rules)` picks tables labelled under it
+  (`src/eval-16-2-8.bin`, 359 KB, from `PLAYERS=2 THRESHOLD=8 EXPECT=1.3
+  eval label 2000 1801600000`; held-out RMSE 0.40 points); the web and
+  desktop clients' hint and opponents use both, and the hint's points past
+  the gate are now 8 胡's.  Until now this table played by the tables of
+  four players at 10 胡, where a hand 2 胡 short of winning is taken for
+  one 4 胡 short.  A/Bs against `1433f27` playing so, `RESHUFFLE=8`, deal
+  counts and the table judged (D = 16) declared before the labels
+  (`doc/eval.md`, "An `Eval` for two players at 8 胡"):
+
+  - Web settings: +0.445 ± 0.040 points a deal, 95% CI [+0.367, +0.522],
+    10,000 deals, 7,858 part, seed base 1801700000, win.
+  - Desktop settings: +0.154 ± 0.037, [+0.081, +0.226], 8,000 deals, 5,504
+    part, seed base 1801800000, win.
+  - Every other table reads 0 deals that part against `1433f27`: on the
+    web's settings four, three and two players at 10 胡 and four and three
+    at 8 胡, 2,000 deals each, seed bases 1802000000 to 1802400000; on the
+    desktop's four, three and two players at 10 胡, 500 deals each, seed
+    bases 1802500000 to 1802700000.  Before the table was wired in, two
+    players at 8 胡 read 0 of 2,000 too (seed base 1801900000).
+
+  The wasm grows from 982 KB to 1,344 KB (782 KB to 1,116 KB gzipped).
 
 - This repository is English throughout.  The design docs in `doc/` and the
   measurements in `research/` were Chinese and are translated in place:

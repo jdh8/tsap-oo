@@ -112,23 +112,27 @@ impl Default for Eval {
 }
 
 impl Eval {
-    /// The tables a table of `rules` plays by: its own for two players at
-    /// 10 胡, learnt from `PLAYERS=2 EXPECT=1.3 eval label 2000 1799800000`
-    /// (held-out RMSE 0.53 points), and [`Eval::default`] for any other
+    /// The tables a table of `rules` plays by: two players have their own,
+    /// learnt from `PLAYERS=2 EXPECT=1.3 eval label 2000 1799800000` at 10 胡
+    /// (held-out RMSE 0.53 points) and from `PLAYERS=2 THRESHOLD=8 EXPECT=1.3
+    /// eval label 2000 1801600000` at 8 胡 (0.40 points); any other table
+    /// has [`Eval::default`]
     ///
     /// The two players' tables go with the outlook
     /// [`ExpectBot::new`](crate::ExpectBot::new) gives them, which counts 36
-    /// public cards a round: their rows beyond are not learnt.
-    // ponytail: three players' own tables and two players' at 8 胡 measured
-    // insufficient data against the four-player ones (`doc/eval.md`,
-    // "Tables for two and three players"), so they stay out of the binary.
+    /// public cards a round at 10 胡 and 35 at 8: their rows beyond are not
+    /// learnt.
+    // ponytail: three players' own tables measured insufficient data against
+    // the four-player ones (`doc/eval.md`, "Tables for two and three
+    // players"), so they stay out of the binary.
     #[must_use]
     pub fn of(rules: &crate::Rules) -> Self {
-        if (rules.players, rules.threshold) == (2, 10) {
-            Self::from_bytes(include_bytes!("eval-16-2.bin")).expect("the tables built in")
-        } else {
-            Self::default()
-        }
+        let bytes: &[u8] = match (rules.players, rules.threshold) {
+            (2, 10) => include_bytes!("eval-16-2.bin"),
+            (2, 8) => include_bytes!("eval-16-2-8.bin"),
+            _ => return Self::default(),
+        };
+        Self::from_bytes(bytes).expect("the tables built in")
     }
 
     /// How many parameters tables of width `dim` have
@@ -371,18 +375,24 @@ mod tests {
         assert_eq!(Eval::default().dim(), 16);
     }
 
-    /// Only two players at 10 胡 have tables of their own
+    /// Only two players have tables of their own, one for each threshold
     #[test]
-    fn two_at_ten_has_its_own_tables() {
+    fn two_have_their_own_tables() {
         for rules in [Rules::new(), Rules::eight()] {
             for players in 2..=4 {
                 let mut rules = rules;
                 rules.players = players;
-                let own = (players, rules.threshold) == (2, 10);
-                assert_eq!(Eval::of(&rules) != Eval::default(), own);
+                assert_eq!(Eval::of(&rules) != Eval::default(), players == 2);
                 assert_eq!(Eval::of(&rules).dim(), 16);
             }
         }
+        let two = |rules: Rules| {
+            Eval::of(&Rules {
+                players: 2,
+                ..rules
+            })
+        };
+        assert!(two(Rules::new()) != two(Rules::eight()));
     }
 
     /// A row no label reached keeps its initial bias, 0, and a round longer

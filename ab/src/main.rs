@@ -23,7 +23,9 @@
 //! control's `ExpectBot::new` there instead, gated as it ships whatever
 //! `GATE_CARDS` says, or at `BASELINE_GATE`: a wider gate against the one in
 //! place; with `BASELINE_SHALLOW` it plays past its gate as `SHALLOW` has
-//! the candidate.  `PLAYERS` (default 4) is the table's size on both sides, and
+//! the candidate, its leaves read from the control's `Eval::default`, or
+//! with `BASELINE_EXPECT=new` from its `Eval::of`: the control as it ships.
+//! `PLAYERS` (default 4) is the table's size on both sides, and
 //! `THRESHOLD` (default 10) the 胡 to win: 8 is `Rules::eight`.
 //!
 //! Set `RESHUFFLE` to K to average out the luck after the two first part
@@ -141,7 +143,13 @@ fn baseline_bot(rules: &old::Rules, seed: u64) -> Option<Box<dyn old::Strategy>>
             bot = bot.gated(cards.parse().unwrap());
         }
         if let Ok(deep) = std::env::var("BASELINE_SHALLOW") {
-            bot = bot.shallow(old::Eval::default(), deep.parse().unwrap());
+            // `BASELINE_EXPECT=new` reads the control's `Eval::of` too.
+            let eval = if std::env::var("BASELINE_EXPECT").is_ok_and(|s| s == "new") {
+                old::Eval::of(rules)
+            } else {
+                old::Eval::default()
+            };
+            bot = bot.shallow(eval, deep.parse().unwrap());
         }
         return Some(Box::new(bot));
     }

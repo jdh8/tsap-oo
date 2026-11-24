@@ -20,11 +20,11 @@ five is not implemented.
 | Dealing, eats and pongs, settlement | Yes | Yes | Yes | No |
 | The rules have a source | Yes | Yes | Only "can be played" | Yes; not implemented |
 | `HeuristicBot`'s constants | Measured | Used as they are, not measured | Used as they are, not measured | |
-| `Outlook` (the table model) | Measured | Measured; 10 胡's is used, insufficient data | Measured; two players at 10 胡 use their own (win), the rest four players' | |
-| `Eval` (the table past the gate) | Trained, win | 10 胡's is used, insufficient data | Trained; two players at 10 胡 use their own (win), three players are insufficient data and use four players' | |
-| The points the hint shows | Throughout | Throughout; past the gate they are 10 胡's values | Throughout; at two players and 10 胡 that table's values, elsewhere four players' | |
-| A/Bs that count | Every change | Two | Eight under the new rules (M, N, W to Z, W8, Y8) | |
-| Measuring tools in `examples/` | Yes | `outlook` only | `outlook` and `eval` | |
+| `Outlook` (the table model) | Measured | Measured; at four players 10 胡's is used, insufficient data | Measured; two players use their own at 10 and at 8 胡 (wins), three players four players' | |
+| `Eval` (the table past the gate) | Trained, win | At four players 10 胡's is used, insufficient data | Trained; two players use their own at 10 and at 8 胡 (wins), three players are insufficient data and use four players' | |
+| The points the hint shows | Throughout | Throughout; past the gate they are 10 胡's values, but at two players 8 胡's | Throughout; at two players that table's values, at three four players' | |
+| A/Bs that count | Every change | Two | Ten under the new rules (M, N, W to Z, W8, Y8, W8′, Y8′) | |
+| Measuring tools in `examples/` | Yes | `outlook` and `eval` | `outlook` and `eval` | |
 
 ## What is there
 
@@ -162,23 +162,28 @@ picked.
    +0.022 ± 0.013, 95% CI [−0.004, +0.048], 40,000 deals, seed base
    1795400000; desktop +0.005 ± 0.024, [−0.041, +0.052], 20,000 deals, seed
    base 1795500000.  Insufficient data; `ExpectBot::new` keeps 10 胡's
-   table.
+   table at four players.  Two players at 8 胡 have their own, measured at
+   8 胡 (item 2 of "What tables of two and three lack").
 2. **`Eval` is 10 胡's table.**  The shallow graph past the gate uses it
    for the values of its leaves, so a hand 2 胡 from winning is taken for
    one 4 胡 away.  The A/B against "playing as `HeuristicBot` past the gate"
    (control `09eb4c4`) straddles 0 on both settings: web +0.006 ± 0.074, 95%
    CI [−0.138, +0.151], 10,000 deals, seed base 1795200000; desktop +0.080 ±
    0.049, [−0.015, +0.175], 20,000 deals, seed base 1795300000.
-   Insufficient data; play is unchanged (`eval.md`, "8 胡").
-3. **The points the hint shows past the gate are 10 胡's values.**  The
-   ordering was not measured to be worse than `HeuristicBot`'s, but the
-   numbers themselves are not expected scores at 8 胡.
+   Insufficient data; play is unchanged (`eval.md`, "8 胡").  That is four
+   players; two players at 8 胡 have a table labelled at 8 胡, a win on
+   both settings.
+3. **At four and three players the points the hint shows past the gate are
+   10 胡's values.**  The ordering was not measured to be worse than
+   `HeuristicBot`'s, but the numbers themselves are not expected scores at
+   8 胡.
 4. **`HeuristicBot`'s constants have not been measured at 8 胡.**  The
    weights of lone cards, 搭子 and waits were all set on A/Bs at four
    players and 10 胡.
-5. **Most measuring tools hard-code 10 胡.**  Of the 13 programs in
-   `examples/` only `outlook` takes `THRESHOLD`; the rest use `Rules::new()`
-   and must be made to take a threshold before 8 胡 can be measured.
+5. **Most measuring tools hard-code 10 胡.**  Of the 16 programs in
+   `examples/` only `outlook` and `eval` take `THRESHOLD`; the rest use
+   `Rules::new()` and must be made to take a threshold before 8 胡 can be
+   measured.
 
 ## What tables of two and three lack
 
@@ -188,8 +193,8 @@ picked.
    the same as Board Game Arena; the dead cards are our own decision ("The
    dead cards of a small table").  At a table of two the only opponent is
    both the previous seat and the next.
-2. **Two players at 10 胡 have their own `Outlook` and `Eval`; the other
-   small tables do not.**  Under the new rules both tables had `Outlook`
+2. **Two players have their own `Outlook` and `Eval`, at 10 and at 8 胡;
+   three players do not.**  Under the new rules both tables had `Outlook`
    measured anew (`research/outlook.md`, "Empty seats' hands are dead": e is
    0.74 at two and 0.42 at three, 0.28 at four), and each labelled and
    trained an `Eval` with it (`eval.md`, "Tables for two and three
@@ -206,12 +211,17 @@ picked.
    - Two players at 8 胡, the tables of two players at 10 胡 against those
      of four players at 10 胡: web +0.302 ± 0.040, win; desktop +0.048 ±
      0.056, insufficient data.  The declaration was to switch only if both
-     win, so four players' tables are used as they are.  **The web setting
-     alone is a win and is not yet in use.**
-3. **Only at two players and 10 胡 are the points the hint shows that
-   table's values.**  Three players and two players at 8 胡 are shown the
-   values of four players at 10 胡: 1 point low on average at three, 3
-   points low at two (measured at 10 胡).
+     win, so they were not adopted.
+   - Two players at 8 胡, own `Outlook` measured at 8 胡 (times 1.3) and an
+     `Eval` labelled under it, against the tables of four players at 10 胡
+     (control `1433f27`): web +0.445 ± 0.040, 95% CI [+0.367, +0.522],
+     10,000 deals, seed base 1801700000; desktop +0.154 ± 0.037, [+0.081,
+     +0.226], 8,000 deals, seed base 1801800000; both wins.
+     `ExpectBot::new` and `Eval::of` use them at two players and 8 胡
+     (`eval.md`, "An `Eval` for two players at 8 胡").
+3. **Only at two players are the points the hint shows that table's
+   values.**  Three players are shown the values of four players at 10 胡,
+   1 point low on average (measured at 10 胡).
 4. **At three it cannot be told whether it was `Outlook` or `Eval` that did
    not help.**  The candidate changed both at once; three players' table
    with four players' `Outlook` was not measured (the table was labelled
@@ -225,11 +235,11 @@ picked.
    known to differ at a small table: not feeding the next seat (`FEED` 4)
    was a win at a table of two under the old rules (+0.007 ± 0.003) and
    insufficient data at four, so it was not adopted (`stronger-bot.md`).
-7. **Most measuring tools hard-code four players.**  Only `outlook` takes
-   `PLAYERS`; the rest as in item 5 of 8 胡.
+7. **Most measuring tools hard-code four players.**  Only `outlook` and
+   `eval` take `PLAYERS`; the rest as in item 5 of 8 胡.
 
-8 胡 at a table of two or three can be chosen; it lacks what both lack, and
-has no measurement at all.
+8 胡 at a table of three can be chosen; it lacks what both lack, and has no
+measurement at all.  8 胡 at a table of two has its own tables.
 
 ## A table of five
 
