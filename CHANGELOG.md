@@ -21,8 +21,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with as many draws left.  At two players, 20,000 rounds, seed 400: 0.21
   times on the next cards of a seat that is not waiting, 3.0 times of one
   that waits on four copies or more; 0.29 to 1.44 times by the count of
-  cards.  The runs are declared in the document and their verdicts are not
-  in yet.  No bot changes.
+  cards.  The runs are declared in the document.  On the web setting at two
+  players and 10 胡, 10,000 deals each against `1430e6b`, `RESHUFFLE=8`:
+  `danger` +0.984 ± 0.046 points a deal, 95% CI [+0.893, +1.074], 7,679
+  deals part, seed base 1803600000, win; `live` +0.107 ± 0.036, [+0.037,
+  +0.178], 7,610 part, seed base 1803500000, win; `waits` +0.011 ± 0.018,
+  [−0.024, +0.047], 2,320 part, seed base 1803300000, and `cards` −0.009 ±
+  0.015, [−0.039, +0.020], 1,660 part, seed base 1803400000, both
+  insufficient data and closed: neither CI reaches +0.1.  The zero runs of
+  the hooks part on no deal (2,000, 2,000 and 500 deals, seed bases
+  1803000000 to 1803200000).  The desktop runs of the two winners, the
+  Peeker and the baselines are not in yet.  No bot changes.
 
 - `ExpectBot::outlook_mut` gives the bot's table model, to read or to change
   between decisions.

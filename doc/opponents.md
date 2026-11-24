@@ -39,10 +39,10 @@ Update this table when a batch is done.
 
 | Batch | Output | Changes play | Gate | Status |
 | --- | --- | --- | --- | --- |
-| 0 | `examples/hazard.rs`, `ab/src/oracle.rs`, `ExpectBot::outlook_mut`, this document | No; owes zero deals that part | None | Code written; the zero runs are queued |
-| 1 | The oracles and the Peeker at two players, and the bot that ships against `HeuristicBot` | No: oracles never ship | None | Queued 2026-11-25 |
-| 2 | h by the fewest concealed cards into `Outlook` | Yes | `cards` wins on the web and on the desktop | Waits on batch 1 |
-| 3 | An inference for each open channel, largest first | Yes | Its oracle wins on both settings; a gatekeeper is in place | Waits on batch 1 |
+| 0 | `examples/hazard.rs`, `ab/src/oracle.rs`, `ExpectBot::outlook_mut`, this document | No; owes zero deals that part | None | Done: zero deals part in all three runs |
+| 1 | The oracles and the Peeker at two players, and the bot that ships against `HeuristicBot` | No: oracles never ship | None | A to D are in: `danger` and `live` win on the web, `waits` and `cards` are closed.  P, the H runs, C′ and D′ are in flight |
+| 2 | h by the fewest concealed cards into `Outlook` | Yes | `cards` wins on the web and on the desktop | Not started: B did not win |
+| 3 | An inference for each open channel, largest first | Yes | Its oracle wins on both settings; a gatekeeper is in place | Waits on C′ and D′ |
 
 ## The oracles
 
@@ -164,9 +164,9 @@ The zero runs (declared 2026-11-25 before any data; control `1430e6b`,
 
 | Setting | Table | Control | Deals | seed base | Part |
 | --- | --- | --- | ---: | ---: | ---: |
-| Web | two players, 10 胡 | `BASELINE_EXPECT=new BASELINE_SHALLOW=0` | 2,000 | 1803000000 | |
-| Web | four players, 10 胡 | `BASELINE_EXPECT=1 BASELINE_SHALLOW=0` | 2,000 | 1803100000 | |
-| Desktop | two players, 10 胡 | `BASELINE_EXPECT=new BASELINE_GATE=14 BASELINE_SHALLOW=17` | 500 | 1803200000 | |
+| Web | two players, 10 胡 | `BASELINE_EXPECT=new BASELINE_SHALLOW=0` | 2,000 | 1803000000 | 0 |
+| Web | four players, 10 胡 | `BASELINE_EXPECT=1 BASELINE_SHALLOW=0` | 2,000 | 1803100000 | 0 |
+| Desktop | two players, 10 胡 | `BASELINE_EXPECT=new BASELINE_GATE=14 BASELINE_SHALLOW=17` | 500 | 1803200000 | 0 |
 
 Web is `GATE_CARDS=10 SHALLOW=0` and desktop `GATE_CARDS=14 SHALLOW=17`, as
 in [`eval.md`](eval.md).
@@ -185,10 +185,10 @@ seat.
 
 | Run | `ORACLE` | seed base | Part | Candidate − control | 95% CI | Verdict |
 | --- | --- | ---: | ---: | ---: | --- | --- |
-| A | `waits` | 1803300000 | | | | |
-| B | `cards` | 1803400000 | | | | |
-| C | `live` | 1803500000 | | | | |
-| D | `danger` | 1803600000 | | | | |
+| A | `waits` | 1803300000 | 2,320 | +0.011 ± 0.018 | [−0.024, +0.047] | insufficient data; closed |
+| B | `cards` | 1803400000 | 1,660 | −0.009 ± 0.015 | [−0.039, +0.020] | insufficient data; closed |
+| C | `live` | 1803500000 | 7,610 | +0.107 ± 0.036 | [+0.037, +0.178] | win |
+| D | `danger` | 1803600000 | 7,679 | +0.984 ± 0.046 | [+0.893, +1.074] | win |
 
 **The same on the desktop setting**, 8,000 deals each, `RESHUFFLE=8`,
 `GATE_CARDS=14 SHALLOW=17` against `BASELINE_GATE=14 BASELINE_SHALLOW=17`.
@@ -197,8 +197,8 @@ Each runs only if its web run is a win (`pueue add --after`, as
 
 | Run | `ORACLE` | seed base | Part | Candidate − control | 95% CI | Verdict |
 | --- | --- | ---: | ---: | ---: | --- | --- |
-| A′ | `waits` | 1804100000 | | | | |
-| B′ | `cards` | 1804200000 | | | | |
+| A′ | `waits` | 1804100000 | | | | not run: A is not a win |
+| B′ | `cards` | 1804200000 | | | | not run: B is not a win |
 | C′ | `live` | 1804300000 | | | | |
 | D′ | `danger` | 1804400000 | | | | |
 
