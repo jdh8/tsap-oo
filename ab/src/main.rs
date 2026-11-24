@@ -16,9 +16,8 @@
 //! gate by `ExpectBot::shallow` with that many cards two claims deep, its
 //! leaves read from the tables in the file `EVAL` names (an absolute path:
 //! `run.sh` runs in `ab/`) in place of `Eval::default`; and with `ORACLE`
-//! (`live`, `waits`, `cards` or `danger`) that `ExpectBot` with one input
-//! read off the other hands, or `cards` off their counts (`oracle.rs`).  Set
-//! `BASELINE_SAMPLES` to seat the control's
+//! (`live` or `danger`) that `ExpectBot` with one input read off the other
+//! hands (`oracle.rs`).  Set `BASELINE_SAMPLES` to seat the control's
 //! `MonteCarloBot` of that many samples in seat 1 on the control side, gated
 //! at `GATE_CARDS` (default 10), in place of its `HeuristicBot`: a head to
 //! head of two bots that each beat it.  Set `BASELINE_EXPECT` to seat the

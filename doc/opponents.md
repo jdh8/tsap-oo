@@ -52,7 +52,9 @@ in that one input is worth to the DP as it is built.  Only the Peeker
 bounds every inference from above, and it has its own flaw (it also removes
 the search's fault of deciding separately in each sampled deal).
 
-They live in `ab/src/oracle.rs` and are seated with `ORACLE=`.  Each reads
+They live in `ab/src/oracle.rs` and are seated with `ORACLE=`: `live` and
+`danger` still, `waits` and `cards` only in `01f98fd`, since both were taken
+out once their web runs read zero (batch 1).  Each reads
 the other hands through `View::peek` and never the pile's order, so
 `RESHUFFLE` stays unbiased: up to the first choice the control would not
 make, every decision saw hands and cards already turned up, and the pile
@@ -156,7 +158,8 @@ discard the opponent kongs counts as safe.
 
 - `ExpectBot::outlook_mut`, and `ExpectBot::gone_mut` behind `peek`.  Both
   leave play alone and owe zero deals that part.
-- `examples/hazard.rs` and the two tables it printed, in `ab/src/oracle.rs`.
+- `examples/hazard.rs` and the two tables it printed, in `ab/src/oracle.rs`
+  until `waits` and `cards` were taken out.
 - `ab/src/oracle.rs` and `ORACLE=` in `ab/src/main.rs`.
 
 The zero runs (declared 2026-11-25 before any data; control `1430e6b`,
@@ -189,6 +192,12 @@ seat.
 | B | `cards` | 1803400000 | 1,660 | −0.009 ± 0.015 | [−0.039, +0.020] | insufficient data; closed |
 | C | `live` | 1803500000 | 7,610 | +0.107 ± 0.036 | [+0.037, +0.178] | win |
 | D | `danger` | 1803600000 | 7,679 | +0.984 ± 0.046 | [+0.893, +1.074] | win |
+
+`danger` is nine times `live`.  `waits` and `cards` are closed by the rule
+below: bending h by the opponent as it stands, read off its hand or off its
+public count, is worth under +0.05 points a deal to the web bot.  Both were
+then taken out of `ab/src/oracle.rs`; `01f98fd` has them, and
+`examples/hazard.rs` still prints their tables.
 
 **The same on the desktop setting**, 8,000 deals each, `RESHUFFLE=8`,
 `GATE_CARDS=14 SHALLOW=17` against `BASELINE_GATE=14 BASELINE_SHALLOW=17`.
@@ -240,6 +249,9 @@ force.  Candidate `EXPECT=new`, control the default seat, `RESHUFFLE=8`.
 
 ## Batch 2: h by the fewest concealed cards
 
+**Not started: B did not win**, and neither did A, which reads the hand
+that the count stands in for.  What follows is the plan as it was declared.
+
 Only if B and B′ both win.  The table moves into `Outlook` (a bend of `end`
 by lead and by the count), measured at each table it is to ship at, and
 `ExpectBot::new` reads it.  The library's version owes a replay of B's
@@ -258,7 +270,7 @@ What is known before:
   (`View::safe` holds the proof for wins; the same events say what it did
   not eat or pong), what it discarded and what it exposed.
 - **`waits`** would need the same evidence turned into a chance of
-  waiting; `cards` is its public floor.
+  waiting; `cards` is its public floor.  Both are closed (A and B).
 - **`danger`** is layers 1 to 3 of `stronger-bot.md` with a price in
   points; none of the three won at four players, where the cost is shared
   among three seats.
@@ -281,9 +293,9 @@ updated.
   cheat; `gone_mut` is the one hook, and it is shut without `peek`.
 - **No tuning on the verdict deals.**  The oracles have no constant to
   tune; the two tables are measured on other deals (`hazard`, seed 400).
-- **No four-player or 8-胡 oracles yet.**  The tables are measured at two
-  players and 10 胡 and `Oracle::new` refuses another table, but for
-  `live`.
+- **No four-player or 8-胡 oracles yet.**  `danger` asks one other seat and
+  is measured at two players and 10 胡; `Oracle::new` refuses another table,
+  but for `live`.
 - **No oracle that sees the pile.**  It would bias `RESHUFFLE`, and nothing
   public says anything about the pile's order.
 

@@ -31,7 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   insufficient data and closed: neither CI reaches +0.1.  The zero runs of
   the hooks part on no deal (2,000, 2,000 and 500 deals, seed bases
   1803000000 to 1803200000).  The desktop runs of the two winners, the
-  Peeker and the baselines are not in yet.  No bot changes.
+  Peeker and the baselines are not in yet.  `ORACLE=waits` and
+  `ORACLE=cards` were then taken out of `ab/`, leaving `live` and `danger`;
+  `01f98fd` has them.  No bot changes.
 
 - `ExpectBot::outlook_mut` gives the bot's table model, to read or to change
   between decisions.
