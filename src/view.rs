@@ -137,6 +137,27 @@ impl<'a> View<'a> {
         safe
     }
 
+    /// The cards `seat` has discarded from its hand, a rejected draw not
+    /// among them
+    ///
+    /// A hand only shrinks, so what it had no use for then it has none for
+    /// now, a habit of whoever sits there and no proof.
+    #[must_use]
+    pub fn thrown(&self, seat: Seat) -> Hand {
+        let events = self.round.events();
+        let mut thrown = Hand::EMPTY;
+        for (i, &event) in events.iter().enumerate() {
+            // A rejected draw is logged as its drawer's discard too.
+            if let Event::Discard { seat: s, card } = event
+                && s == seat
+                && !(i > 0 && events[i - 1] == (Event::Draw { seat, card }))
+            {
+                thrown.insert(card);
+            }
+        }
+        thrown
+    }
+
     /// A round that looks the same from this seat, with the cards it cannot
     /// see — the other hands and the pile — dealt afresh
     ///

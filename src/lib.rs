@@ -6,6 +6,7 @@ pub mod driver;
 pub mod eval;
 pub mod expect;
 pub mod game;
+pub mod giveaway;
 pub mod heuristic;
 #[cfg(feature = "rand")]
 pub mod montecarlo;
@@ -19,6 +20,7 @@ pub use driver::{Step, Table};
 pub use eval::Eval;
 pub use expect::{Discards, ExpectBot, Graph, Outlook, Payoff, Prune};
 pub use game::Game;
+pub use giveaway::{Evidence, Giveaway};
 pub use heuristic::{HeuristicBot, Terms};
 #[cfg(feature = "rand")]
 pub use montecarlo::MonteCarloBot;

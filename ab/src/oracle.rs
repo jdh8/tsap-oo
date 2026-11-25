@@ -20,6 +20,10 @@ pub enum Kind {
     Live,
     /// A discard's value less what the card gives the other seat
     Danger,
+    /// [`Kind::Danger`]'s half for the card the other seat wins on
+    Win,
+    /// [`Kind::Danger`]'s half for the card the other seat claims
+    Claim,
 }
 
 impl Kind {
@@ -28,7 +32,9 @@ impl Kind {
         match name {
             "live" => Self::Live,
             "danger" => Self::Danger,
-            _ => panic!("ORACLE is live or danger"),
+            "win" => Self::Win,
+            "claim" => Self::Claim,
+            _ => panic!("ORACLE is live, danger, win or claim"),
         }
     }
 }
@@ -47,8 +53,8 @@ pub struct Oracle<R> {
 impl<R: Rng> Oracle<R> {
     /// # Panics
     ///
-    /// For [`Kind::Danger`] away from a table of two at 10 胡: it asks one
-    /// other seat, and was measured there.
+    /// For [`Kind::Danger`] and its halves away from a table of two at
+    /// 10 胡: they ask one other seat, and were measured there.
     pub fn new(rules: &Rules, bot: ExpectBot, kind: Kind, rng: R) -> Self {
         assert!(
             kind == Kind::Live || (rules.players, rules.threshold) == (2, 10),
@@ -90,16 +96,22 @@ impl<R: Rng> Oracle<R> {
     /// point of this seat's.
     // ponytail: a discard the other seat kongs counts as safe.  It is rare
     // and has no pass to value the kong against.
-    fn kept(&mut self, world: &Round, seat: Seat, card: Card, value: f64) -> f64 {
+    pub fn kept(&mut self, world: &Round, seat: Seat, card: Card, value: f64) -> f64 {
         let mut round = world.clone();
         round.discard(seat, card).expect("a legal discard");
         let next = round.events().get(world.events().len() + 1);
         if let Some(&Event::Win { seat: winner, .. }) = next
             && winner != seat
         {
+            if self.kind == Kind::Claim {
+                return value;
+            }
             let mut game = Game::new(*round.rules(), round.dealer());
             game.settle(round.result().expect("the round is finished"));
             return value.min(f64::from(game.scores()[seat.index()]));
+        }
+        if self.kind == Kind::Win {
+            return value;
         }
         // The round may have drawn on, into a pile shuffled for the peek.
         let (Phase::Claim(other), Some(offer)) = (round.phase(), round.offer()) else {
@@ -149,7 +161,7 @@ impl<R: Rng> Strategy for Oracle<R> {
     fn claim(&mut self, view: &View<'_>, options: &ClaimOptions) -> Claim {
         self.read(view);
         let ranked = self.bot.claims(view, options);
-        if self.kind != Kind::Danger || !self.bot.searches(view, view.hand().len()) {
+        if self.kind == Kind::Live || !self.bot.searches(view, view.hand().len()) {
             return ranked[0].0;
         }
         // A claim is worth less by what its best discard gives away.
@@ -176,7 +188,7 @@ impl<R: Rng> Strategy for Oracle<R> {
 
     fn discard(&mut self, view: &View<'_>) -> Card {
         self.read(view);
-        if self.kind != Kind::Danger {
+        if self.kind == Kind::Live {
             return self.bot.discard(view);
         }
         let world = view.peek(&mut self.rng);

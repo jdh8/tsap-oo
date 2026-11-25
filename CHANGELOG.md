@@ -43,6 +43,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ORACLE=cards` were then taken out of `ab/`, leaving `live` and `danger`;
   `01f98fd` has them.  No bot changes.
 
+- `Giveaway` reads what a discard gives the next seat off the public
+  cards, and `ExpectBot::wary` discards by each card's value less its
+  `Giveaway::cost`; it is off unless asked for, and no bot that ships asks
+  yet.  A card's `Evidence` is whether the next seat threw a copy from its
+  hand (`View::thrown`), let one go (a copy on the pile, or `View::safe`),
+  or neither, and then how many kinds of the card's run it threw and how
+  many copies of them are unseen.  `cargo run --release --example giveaway
+  -- [rounds] [seed]` measures the costs: the web page's bot against
+  `HeuristicBot` at a table of two, every card it could discard played as
+  the `danger` oracle plays it.  Over 4,500 rounds each way, seed 600,
+  `HeuristicBot` claims 41.2% of the cards it has shown nothing about, 7.7%
+  of those whose run it threw a kind of, 2.3% of those it let go and none
+  it threw; the costs run from 0.002 to 1.236 points.  `ORACLE=win` and
+  `ORACLE=claim` in `ab/` are the two halves of `danger`, and `WARY=1`
+  seats `ExpectBot::wary`.  The design and the runs declared for it are
+  batch 3 of `doc/opponents.md`.  At two players and 10 胡 on the web
+  setting, control `6a61a3e`, `RESHUFFLE=8`: the bots as they ship part on
+  0 of 2,000 deals (seed base 1804500000); `ORACLE=win` is +0.471 ± 0.025
+  points a deal, 95% CI [+0.422, +0.521], over 10,000 deals (1804600000),
+  a win; `ORACLE=claim` is +0.246 ± 0.043, [+0.162, +0.330], over 10,000
+  (1804700000), a win; `WARY=1` is −0.061 ± 0.016, [−0.092, −0.030], over
+  40,000 (1804800000), a loss, so `wary` stays off and its desktop run was
+  not made.  The trace of that run closes the tables as fitted: the deal
+  pays 0.315 ± 0.042 for a card eaten where the oracle, one card ahead,
+  charges 1.747, and a card ponged is the better one to throw.
+
+- `TRACE=FILE` has `ab/` write a line for each deal that parts: its seed,
+  the mean and spread of the difference among its shuffles, where the two
+  parted and on which acts; and for two discards of an `EXPECT` bot at a
+  table of two at 10 胡, each card's value, `Evidence`, `Giveaway::cost`,
+  what the `danger` oracle keeps of it and what the other seat does with
+  it.  Sorted by the mean it is the deals that moved the most, which a
+  loss is owed before it is called dead.  No bot changes.
+
 - `ExpectBot::outlook_mut` gives the bot's table model, to read or to change
   between decisions.
 

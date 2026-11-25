@@ -7,7 +7,9 @@
 # the clock, fresh for each experiment; set it to replay one.  RESHUFFLE
 # (default 8) is how often the pile is reshuffled where the two part, 0 for
 # the plain paired estimate.  PLAYERS (default 4) is the table's size and
-# THRESHOLD (default 10) the 胡 to win.
+# THRESHOLD (default 10) the 胡 to win.  TRACE names a file (an absolute
+# path) for a line on each deal that parts: sort it by the mean for the
+# deals that moved the most.
 # Declare the deal count before the data and do not rebuild while this runs
 # (CLAUDE.md).
 set -eu

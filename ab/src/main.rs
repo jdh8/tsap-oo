@@ -16,8 +16,9 @@
 //! gate by `ExpectBot::shallow` with that many cards two claims deep, its
 //! leaves read from the tables in the file `EVAL` names (an absolute path:
 //! `run.sh` runs in `ab/`) in place of `Eval::default`; and with `ORACLE`
-//! (`live` or `danger`) that `ExpectBot` with one input read off the other
-//! hands (`oracle.rs`).  Set `BASELINE_SAMPLES` to seat the control's
+//! (`live`, `danger`, or its halves `win` and `claim`) that `ExpectBot`
+//! with one input read off the other hands (`oracle.rs`); and with `WARY`
+//! `ExpectBot::wary`.  Set `BASELINE_SAMPLES` to seat the control's
 //! `MonteCarloBot` of that many samples in seat 1 on the control side, gated
 //! at `GATE_CARDS` (default 10), in place of its `HeuristicBot`: a head to
 //! head of two bots that each beat it.  Set `BASELINE_EXPECT` to seat the
@@ -36,6 +37,17 @@
 //! decision saw only cards already turned up, so the pile's order is still
 //! uniform there: the estimate stays unbiased.  A deal that never parts
 //! counts 0, as it does in the plain estimate.
+//!
+//! Set `TRACE` to a file's path (absolute: `run.sh` runs in `ab/`) for a
+//! line there on each deal that parts, tab-separated under a header: the
+//! deal's seed and dealer, the mean and the standard deviation of the
+//! difference among its shuffles, the two win rates, the decisions before
+//! the split, the cards left in the pile, and the two acts.  Where they are
+//! two discards of an `EXPECT` bot at a table of two at 10 胡, each is
+//! instead the card, the bot's value of it, its `Evidence` and
+//! `Giveaway::cost`, what the `danger` oracle keeps of the value, and what
+//! the other seat does with the card.  Sort by the mean for the deals that
+//! moved the most.
 #[cfg(feature = "peek")]
 mod oracle;
 #[cfg(feature = "peek")]
@@ -45,6 +57,9 @@ use new::susik::Card;
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom as _;
+use std::fmt::Write as _;
+use std::io::Write as _;
+use std::sync::{Mutex, OnceLock};
 
 const CANDIDATE: usize = 1;
 
@@ -88,38 +103,48 @@ enum Outcome {
     Split(Split),
 }
 
-fn candidate_bot(rules: &new::Rules, seed: u64) -> Box<dyn new::Strategy> {
+/// `EXPECT`'s bot, before `WARY` and `ORACLE`
+fn expect_bot(rules: &new::Rules) -> Option<new::ExpectBot> {
     let gate = |name| std::env::var(name).ok().map(|s| s.parse().unwrap());
     // `EXPECT` puts an ExpectBot in the candidate seat, h scaled by it.
-    if let Ok(scale) = std::env::var("EXPECT") {
-        // `EXPECT=new` is the bot as it ships: `ExpectBot::new`'s outlook
-        // and `Eval::of`'s tables.
-        let ships = scale == "new";
-        let mut bot = new::ExpectBot::new(rules);
-        if !ships {
-            let scale: f64 = scale.parse().unwrap();
-            let mut outlook = if std::env::var_os("FOUR").is_some() {
-                new::Outlook::default()
-            } else {
-                new::Outlook::new(rules)
-            };
-            outlook.end.iter_mut().for_each(|h| *h *= scale);
-            bot = bot.with_outlook(outlook);
-        }
-        bot = bot.gated(gate("GATE_CARDS").unwrap_or(10));
-        if let Some(deep) = gate("SHALLOW") {
-            // `EVAL` reads the tables from a file: ones not built in yet.
-            let eval = std::env::var("EVAL").map_or_else(
-                |_| {
-                    if ships {
-                        new::Eval::of(rules)
-                    } else {
-                        new::Eval::default()
-                    }
-                },
-                |path| new::Eval::from_bytes(&std::fs::read(path).unwrap()).unwrap(),
-            );
-            bot = bot.shallow(eval, deep);
+    let scale = std::env::var("EXPECT").ok()?;
+    // `EXPECT=new` is the bot as it ships: `ExpectBot::new`'s outlook
+    // and `Eval::of`'s tables.
+    let ships = scale == "new";
+    let mut bot = new::ExpectBot::new(rules);
+    if !ships {
+        let scale: f64 = scale.parse().unwrap();
+        let mut outlook = if std::env::var_os("FOUR").is_some() {
+            new::Outlook::default()
+        } else {
+            new::Outlook::new(rules)
+        };
+        outlook.end.iter_mut().for_each(|h| *h *= scale);
+        bot = bot.with_outlook(outlook);
+    }
+    bot = bot.gated(gate("GATE_CARDS").unwrap_or(10));
+    if let Some(deep) = gate("SHALLOW") {
+        // `EVAL` reads the tables from a file: ones not built in yet.
+        let eval = std::env::var("EVAL").map_or_else(
+            |_| {
+                if ships {
+                    new::Eval::of(rules)
+                } else {
+                    new::Eval::default()
+                }
+            },
+            |path| new::Eval::from_bytes(&std::fs::read(path).unwrap()).unwrap(),
+        );
+        bot = bot.shallow(eval, deep);
+    }
+    Some(bot)
+}
+
+fn candidate_bot(rules: &new::Rules, seed: u64) -> Box<dyn new::Strategy> {
+    let gate = |name| std::env::var(name).ok().map(|s| s.parse().unwrap());
+    if let Some(mut bot) = expect_bot(rules) {
+        if std::env::var_os("WARY").is_some() {
+            bot = bot.wary();
         }
         #[cfg(feature = "peek")]
         if let Ok(kind) = std::env::var("ORACLE") {
@@ -280,6 +305,119 @@ fn done(outcome: Outcome) -> (i32, bool) {
     }
 }
 
+/// `TRACE`'s file, its header written
+fn trace() -> Option<&'static Mutex<std::fs::File>> {
+    static TRACE: OnceLock<Option<Mutex<std::fs::File>>> = OnceLock::new();
+    TRACE
+        .get_or_init(|| {
+            let mut file = std::fs::File::create(std::env::var_os("TRACE")?).unwrap();
+            let card = |side: &str| {
+                ["card", "value", "evidence", "cost", "kept", "answer"]
+                    .map(|name| format!("\t{side}_{name}"))
+                    .concat()
+            };
+            writeln!(
+                file,
+                "seed\tdealer\tmean\tsd\tcontrol_wins\tcandidate_wins\tdecisions\tpile\thand{}{}",
+                card("control"),
+                card("candidate")
+            )
+            .unwrap();
+            Some(Mutex::new(file))
+        })
+        .as_ref()
+}
+
+/// What the other seat does with `card`, discarded by `seat` in `round`:
+/// `win`, `kong`, `HeuristicBot`'s `eat`, `pong` or `pass`, or `none` when
+/// it is not asked
+#[cfg(feature = "peek")]
+fn answer(round: &new::Round, seat: new::Seat, card: Card) -> &'static str {
+    use new::Strategy as _;
+    let mut next = round.clone();
+    next.discard(seat, card).unwrap();
+    match next.events().get(round.events().len() + 1) {
+        Some(&new::Event::Win { seat: other, .. }) if other != seat => return "win",
+        Some(&new::Event::Kong { seat: other, .. }) if other != seat => return "kong",
+        _ => {}
+    }
+    let (new::Phase::Claim(other), Some(offer)) = (next.phase(), next.offer()) else {
+        return "none";
+    };
+    if other == seat || offer.drawn || offer.source != seat {
+        return "none";
+    }
+    let view = new::View::new(&next, other);
+    match new::HeuristicBot::new(round.rules()).claim(&view, &next.claim_options(other)) {
+        new::Claim::Pass => "pass",
+        new::Claim::Pong => "pong",
+        new::Claim::Eat(_) => "eat",
+    }
+}
+
+/// `TRACE`'s columns for a split between two discards of an `EXPECT` bot
+/// at a table of two at 10 胡: the candidate's concealed cards, and for
+/// each discard what the module's documentation lists
+#[cfg(feature = "peek")]
+fn discards(deck: &[Card], dealer: usize, split: &Split) -> Option<String> {
+    let (Act::Discard(control), Act::Discard(candidate)) = (split.control, split.candidate) else {
+        return None;
+    };
+    let mut rules = new::Rules::new();
+    (rules.players, rules.threshold) = (players(), threshold());
+    if (rules.players, rules.threshold) != (2, 10) {
+        return None;
+    }
+    let mut bot = expect_bot(&rules)?;
+    let mut round = new::Round::from_pile(rules, new::Seat::ALL[dealer], deck.to_vec()).unwrap();
+    for &act in &split.script {
+        match (round.phase(), act) {
+            (new::Phase::Claim(seat), Act::Claim(claim)) => {
+                round.claim(seat, claim).unwrap();
+            }
+            (new::Phase::Discard(seat), Act::Discard(card)) => {
+                round.discard(seat, card).unwrap();
+            }
+            step => panic!("the script fell out of step: {step:?}"),
+        }
+    }
+    let seat = new::Seat::ALL[CANDIDATE];
+    let view = new::View::new(&round, seat);
+    let ranked = bot.discards(&view);
+    let giveaway = new::Giveaway::new(&view);
+    // The oracle reads the hands as they are; its rng is for a pile it
+    // never shuffles here.
+    let rng = SmallRng::seed_from_u64(0);
+    let mut oracle = oracle::Oracle::new(&rules, bot, oracle::Kind::Danger, rng);
+    let mut out = view.hand().len().to_string();
+    for card in [control, candidate] {
+        let value = ranked
+            .iter()
+            .find(|&&(ranked, _)| ranked == card)
+            .map_or(f64::NAN, |&(_, value)| value);
+        write!(
+            out,
+            "\t{card}\t{value:.3}\t{:?}\t{:.3}\t{:.3}\t{}",
+            giveaway.evidence(card),
+            giveaway.cost(card),
+            oracle.kept(&round, seat, card, value),
+            answer(&round, seat, card)
+        )
+        .unwrap();
+    }
+    Some(out)
+}
+
+/// `TRACE`'s columns for a split, after the pile's
+fn detail(deck: &[Card], dealer: usize, split: &Split) -> String {
+    #[cfg(feature = "peek")]
+    if let Some(columns) = discards(deck, dealer, split) {
+        return columns;
+    }
+    let _ = (deck, dealer);
+    format!("\t{:?}\t{:?}", split.control, split.candidate)
+}
+
 /// Sums over the deals of the score difference `d`, its square and the two
 /// win rates; how many differ (or part, with reshuffles); and over the deals
 /// that part, the sums of `d`, `d²` and the variance among the shuffles
@@ -320,6 +458,7 @@ fn deal(seed: u64, dealer: usize, reshuffles: usize) -> (f64, f64, f64, Option<f
     let (mut c, mut t) = (split.script.clone(), split.script.clone());
     c.push(split.control);
     t.push(split.candidate);
+    let detail = trace().map(|_| detail(&deck, dealer, &split));
     let mut deck = deck;
     let (mut sum, mut squares, mut cw, mut tw) = (0.0, 0.0, 0.0, 0.0);
     for _ in 0..reshuffles {
@@ -339,6 +478,18 @@ fn deal(seed: u64, dealer: usize, reshuffles: usize) -> (f64, f64, f64, Option<f
     } else {
         0.0
     };
+    if let (Some(file), Some(detail)) = (trace(), detail) {
+        writeln!(
+            file.lock().unwrap(),
+            "{seed}\t{dealer}\t{mean:.4}\t{:.3}\t{:.3}\t{:.3}\t{}\t{}\t{detail}",
+            within.sqrt(),
+            cw / k,
+            tw / k,
+            split.script.len(),
+            split.left
+        )
+        .unwrap();
+    }
     (mean, cw / k, tw / k, Some(within))
 }
 

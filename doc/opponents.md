@@ -42,7 +42,7 @@ Update this table when a batch is done.
 | 0 | `examples/hazard.rs`, `ab/src/oracle.rs`, `ExpectBot::outlook_mut`, this document | No; owes zero deals that part | None | Done: zero deals part in all three runs |
 | 1 | The oracles and the Peeker at two players, and the bot that ships against `HeuristicBot` | No: oracles never ship | None | Done: `danger` and `live` win on the web and on the desktop; `waits` and `cards` are closed |
 | 2 | h by the fewest concealed cards into `Outlook` | Yes | `cards` wins on the web and on the desktop | Not started: B did not win |
-| 3 | An inference for each open channel, largest first | Yes | Its oracle wins on both settings; a gatekeeper is in place | `danger` and `live` are open, `danger` first; not started |
+| 3 | An inference for each open channel, largest first | Yes | Its oracle wins on both settings; a gatekeeper is in place | `danger` first: its halves `win` and `claim` both win (W, X), and `ExpectBot::wary` on `Giveaway`'s tables loses on the web (T), so it stays off; T's trace closes `Giveaway` as fitted: the oracle's price one card ahead is not what the deal pays.  `live` is next |
 
 ## The oracles
 
@@ -53,8 +53,9 @@ bounds every inference from above, and it has its own flaw (it also removes
 the search's fault of deciding separately in each sampled deal).
 
 They live in `ab/src/oracle.rs` and are seated with `ORACLE=`: `live` and
-`danger` still, `waits` and `cards` only in `01f98fd`, since both were taken
-out once their web runs read zero (batch 1).  Each reads
+`danger` still, with `win` and `claim`, the two halves of `danger` (batch
+3); `waits` and `cards` only in `01f98fd`, since both were taken out once
+their web runs read zero (batch 1).  Each reads
 the other hands through `View::peek` and never the pile's order, so
 `RESHUFFLE` stays unbiased: up to the first choice the control would not
 make, every decision saw hands and cards already turned up, and the pile
@@ -290,6 +291,191 @@ What is known before:
   `stronger-bot.md` asks for a second opponent that must not regress
   before any such layer; the `guest` example's host
   (chunhua1972/four-color-game's Normal AI) is the one at hand.
+
+### `danger`: what the public cards say a discard gives away
+
+Designed 2026-11-25, base `6a61a3e`.  The oracle plays each discard on the
+round it peeks at; an inference has to say the same of a card from what
+every seat can see of it.
+
+**Where the oracle's gain lies.**  `examples/giveaway.rs` plays the web
+page's bot against `HeuristicBot` at a table of two, each deal once in
+either seat, and at every discard valued in points it plays every card the
+seat could put down as the oracle plays it.  4,500 rounds, seed 600: 40,384
+discards and 376,363 cards.  One card ahead, in the oracle's own values, the
+oracle keeps 2.86 points a round over the bot's choice, 0.71 by the cards
+the other seat wins on and 2.17 by the cards it claims; the first move one
+discard in sixty, the second one in four.  It is a measure of where the
+choices lie, not of points won: the A/B has the whole oracle at +0.984.
+
+**What is public about a card.**  A concealed hand only shrinks, since
+nothing drawn enters it.  So what the other seat let go it has still no use
+for, and a card it threw from its hand says the hand held nothing to go
+with it: no second copy, and none of the kinds that make a run with it.
+Of the same rows:
+
+| The card | Cards | The other seat wins on it | Claims it |
+| --- | ---: | ---: | ---: |
+| It threw a copy from its hand | 11,325 | 0.05% | 0.0% |
+| A copy lies on the pile, or `View::safe` holds the card | 9,160 | 0.13% | 2.3% |
+| Neither, and it threw two kinds of the card's run | 221 | 0.45% | 0.9% |
+| Neither, and it threw one kind of the card's run | 35,132 | 1.96% | 7.7% |
+| Neither, and none | 320,525 | 1.06% | 41.2% |
+
+**The inference** is `Giveaway` (`src/giveaway.rs`): a card's `Evidence` is
+the row above, and for the last three the copies of its run's kinds the seat
+has not seen, by twos (the walls of layer 3).  `Giveaway::cost` is the
+mean, over the cards of that evidence, of what the oracle takes off: the
+fall to the settled score when the other seat wins on the card, and the
+DP's value of `HeuristicBot`'s claim over a pass in that seat.  0.002 for a
+thrown card, 0.051 for one let go, 0.109 to 1.236 for a fresh one.
+`ExpectBot::wary` discards by each card's value less its cost, wherever the
+bot values discards in points.  It is off unless asked for; `WARY=1` asks
+in `ab/`.
+
+Fitted on the first two thirds of those rounds and read on the rest, the
+tables keep 0.46 of the oracle's 2.86 points a round, one card ahead, and
+move 26% of the discards.  Thrown or let go alone keeps 0.11, and the run's
+thrown kinds with it 0.34.
+
+Approximations and what is left out:
+
+- **Claims are as before.**  The oracle charges a claim for the discard it
+  forces.  The measured h already holds the average of what discards give
+  away, so only a choice among discards is free of counting it twice.
+- **One table for every stage and both settings.**  The other seat's count
+  of concealed cards and its exposed 胡 added nothing once the evidence was
+  in; the costs are the web bot's, read by the desktop bot too.
+- **It learns `HeuristicBot`.**  That a hand only shrinks is a rule; that
+  a card let go or thrown was of no use is a habit.  A person may throw
+  from a pair.
+- **A hand dealt from the unseen cards is no model.**  The oracle run on 8
+  such hands in place of the true one took 479 seconds for 300 smoke deals
+  and changed 276 of them for nothing to be seen; a hand kept through a
+  round is not a random one.  That code is not kept.
+
+**The runs**, declared 2026-11-25 before any data; two players at 10 胡,
+control `6a61a3e`, `RESHUFFLE=8`, queued through pueue from one frozen copy
+of the working tree.  The smoke runs were on seed base 7 and give no
+verdict; the tables are measured on other deals (`giveaway`, seed 600).
+
+On the web setting, `EXPECT=new GATE_CARDS=10 SHALLOW=0` against
+`BASELINE_EXPECT=new BASELINE_SHALLOW=0`:
+
+| Run | Candidate | Deals | seed base | Part | Candidate − control | 95% CI | Verdict |
+| --- | --- | ---: | ---: | ---: | ---: | --- | --- |
+| Z | as it ships: owes zero deals that part | 2,000 | 1804500000 | 0 | +0.000 ± 0.000 | [+0.000, +0.000] | zero deals part |
+| W | `ORACLE=win` | 10,000 | 1804600000 | 755 | +0.471 ± 0.025 | [+0.422, +0.521] | win |
+| X | `ORACLE=claim` | 10,000 | 1804700000 | 7,347 | +0.246 ± 0.043 | [+0.162, +0.330] | win |
+| T | `WARY=1` | 40,000 | 1804800000 | 26,409 | −0.061 ± 0.016 | [−0.092, −0.030] | loss |
+
+On the desktop setting, `GATE_CARDS=14 SHALLOW=17` against
+`BASELINE_GATE=14 BASELINE_SHALLOW=17`, only if T is a win:
+
+| Run | Candidate | Deals | seed base | Part | Candidate − control | 95% CI | Verdict |
+| --- | --- | ---: | ---: | ---: | ---: | --- | --- |
+| T′ | `WARY=1` | 16,000 | 1804900000 | | | | not run: T is not a win |
+
+Read 2026-11-26.  The two halves of `danger` both win, and the smaller
+count is the larger gain: the cards the other seat wins on move one deal in
+thirteen for +0.471, +6.2 points on a deal that parts, and the cards it
+claims move three deals in four for +0.246.  `wary` parts on two deals in
+three and loses 0.061 points a deal; its seat wins 49.77% of the deals
+against the control's 50.27%.  It stays off, nothing ships, and the
+gatekeeper is not built.
+
+**The trace of T**, read 2026-11-26.  The same 40,000 deals, run again with
+`TRACE=` from a frozen copy of the working tree, give T's line again: 26,409
+deals part for −0.061 ± 0.016, so the dump leaves play alone.  A row is a
+deal's first split: the two discards, the bot's value of each, its
+`Evidence` and cost, what the oracle keeps of it one card ahead, and how
+`HeuristicBot` would answer the card in the other seat.  That is the answer
+the oracle prices; the seat itself holds the control.
+
+The tables do what they were fitted to do.  At the split `wary` gives up
+0.075 points of the bot's value for a card the tables cost 0.364 less, and
+the oracle, with the hand in sight, costs it 0.349 less (0.833 for the
+control's card, 0.484 for the candidate's).  One card ahead that is +0.274
+on a deal that parts.  The deal pays −0.092:
+
+| The oracle on the candidate's card | Deals | One card ahead | Candidate − control |
+| --- | ---: | ---: | ---: |
+| better than the control's | 9,482 | +1.820 | +0.293 ± 0.044 |
+| the same | 1,365 | 0 | −0.163 ± 0.070 |
+| worse | 15,562 | −0.644 | −0.321 ± 0.029 |
+
+So the price is wrong, not the reading of the cards.  A least-squares fit of
+a deal's difference on the value given up and on the two answers, the
+candidate's card's less the control's, prices an answer by what the rest of
+the deal makes of it; a card the other seat is not asked about is 0:
+
+| Answer to the card | Cards | The oracle takes off | The tables | The deal |
+| --- | ---: | ---: | ---: | ---: |
+| Not asked | 21,561 | 0 | 0.674 | 0 |
+| Pass | 11,062 | 0 | 0.831 | −0.099 ± 0.046 |
+| Eat | 15,922 | 1.747 | 0.933 | 0.315 ± 0.042 |
+| Pong | 3,568 | 1.387 | 0.831 | −0.339 ± 0.070 |
+| Kong | 489 | 0 | 0.729 | −0.233 ± 0.177 |
+| Win | 216 | 9.355 | 0.783 | 2.704 ± 0.267 |
+
+A point of value given up costs 0.729 ± 0.172, and a deal that parts loses
+0.085 ± 0.028 more that its first split does not account for: the later
+discards, made the same way, and whatever the fit misses.
+
+- **An eat costs a sixth of the oracle's price, a win under a third.**  It
+  is the approximation named under the oracle: a card kept is as wanted
+  next turn, and the seat denied it draws instead.  X showed it already,
+  2.17 points a round one card ahead for +0.246 a deal.
+- **A pong has the wrong sign.**  The candidate loses 0.459 ± 0.097 over
+  the 1,685 deals where only the control's card would be ponged and gains
+  0.381 ± 0.101 over the 1,641 where only its own would; a card passed
+  leans the same way.  The trace holds no hands, so this is a reading and
+  not a measurement: a card the other seat holds copies or mates of is
+  deader to this seat than the DP's `live` knows, and `wary` keeps those
+  and throws the ones nobody wants.  That is `live` pulling against
+  `danger` on the same evidence.
+- **The tables hardly tell the cards apart**: 0.67 for a card not asked
+  about against 0.93 for one eaten, and 0.78 for one won on.  `wary` cuts
+  the cards eaten from 37.8% to 22.5% of the first splits, which at 0.315
+  is +0.048, against 0.055 for the value given up.  Cards won on fall from
+  0.50% to 0.32%, +0.005.
+- **Where it loses.**  On the 9,987 deals where neither card would be
+  taken the candidate is −0.184 ± 0.031, which is −0.046 of the −0.061.
+  By the stage, −0.052 of the −0.061 is from the deals that part with 70
+  cards or more in the pile.  The 3,030 ties,
+  where `wary` gives up nothing, are +0.016 ± 0.062.  First splits with 13
+  concealed cards or fewer lean the other way, +0.169 ± 0.092 over 1,766
+  deals, which is +0.0075 a deal and one cut picked among many.
+- **The deals that moved the most** say nothing a table does not: the 15
+  each way are 16 to 24 points on a gap of 0.00 to 1.04, 21 of the 30
+  between two cards the other seat has shown nothing about and 19 with 70
+  cards or more in the pile.  The hands stay as dealt through the
+  reshuffles, so that is their luck.
+
+`Giveaway` is dead as fitted, and not for want of deals.  Priced at what the
+deal pays, its costs fall to a fifth and part only discards within 0.2 of
+each other, and T's ties and its splits within 0.1 show nothing (+0.016 ±
+0.062 and −0.037 ± 0.029 a deal that parts); and the half that pays, the
+win, is the one the evidence cannot see, at 2% of the cards at most.  `danger` waits for
+a reading of when the other seat is waiting, which `waits` and `cards` did
+not give.  `live` is next: it is open on both settings, and the pong says
+the same public cards are worth more there.
+
+How they are read:
+
+- **W and X gate nothing.**  They say which half of `danger` an inference
+  should go after next; the two need not add up to D.
+- **T is 40,000 deals** because a part of the oracle's +0.984 is what is
+  looked for: the smoke run parted on two deals in three, which puts the
+  standard error near 0.016.
+- **`wary` ships at two players and 10 胡** if T and T′ both win and the
+  gatekeeper below does not lose.  A straddling CI is insufficient data:
+  one rerun at four times the deals on a fresh seed base.  A loss is traced
+  first, by the deals that moved the most.
+- **The gatekeeper is not built yet.**  It is the `guest` example's host at
+  a table of two: `ExpectBot` with and without `wary` against the guest on
+  paired deals.  It is built only if T wins, and before anything ships.
+- **8 胡 and the larger tables** each owe their own tables and A/B.
 
 ## Closing each batch
 

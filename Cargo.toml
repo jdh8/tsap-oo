@@ -65,6 +65,10 @@ name = "gate"
 required-features = ["rand"]
 
 [[example]]
+name = "giveaway"
+required-features = ["rand"]
+
+[[example]]
 name = "guest"
 required-features = ["rand"]
 

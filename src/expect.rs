@@ -12,7 +12,9 @@
 //! card to come.
 
 use crate::ceiling::reach;
-use crate::{Claim, ClaimOptions, Eval, HeuristicBot, Rules, Seat, Strategy, View, discardable};
+use crate::{
+    Claim, ClaimOptions, Eval, Giveaway, HeuristicBot, Rules, Seat, Strategy, View, discardable,
+};
 use std::collections::HashMap;
 use susik::{Card, Hand, Meld, Rank, Solver, locked_completions};
 
@@ -626,6 +628,8 @@ pub struct ExpectBot {
     shallow: Option<(Eval, usize)>,
     /// Unseen cards taken for gone: see [`gone_mut`](Self::gone_mut)
     gone: Hand,
+    /// Whether a discard is worth less by its [`Giveaway::cost`]
+    wary: bool,
 }
 
 impl ExpectBot {
@@ -662,6 +666,7 @@ impl ExpectBot {
             cards: 10,
             shallow: None,
             gone: Hand::EMPTY,
+            wary: false,
         }
     }
 
@@ -709,6 +714,22 @@ impl ExpectBot {
     #[must_use]
     pub fn shallow(mut self, eval: Eval, deep: usize) -> Self {
         self.shallow = Some((eval, deep));
+        self
+    }
+
+    /// The same bot discarding by each card's value less its
+    /// [`Giveaway::cost`], what the public cards say it gives the next
+    /// seat, wherever it values discards in points; its claims are as
+    /// before
+    ///
+    /// The costs are measured at a table of two at 10 胡
+    /// (`doc/opponents.md`, batch 3).
+    // ponytail: a claim is not charged for the discard it forces.  The
+    // measured h already holds the average of what discards give away, so
+    // only a choice among discards is free of counting it twice.
+    #[must_use]
+    pub const fn wary(mut self) -> Self {
+        self.wary = true;
         self
     }
 
@@ -886,7 +907,20 @@ impl Strategy for ExpectBot {
     }
 
     fn discard(&mut self, view: &View<'_>) -> Card {
-        self.discards(view)[0].0
+        let ranked = self.discards(view);
+        if !self.wary || !self.searches(view, view.hand().len() - 1) {
+            return ranked[0].0;
+        }
+        let giveaway = Giveaway::new(view);
+        // The first of equals, as `rank` leaves them.
+        let mut best = (ranked[0].0, f64::NEG_INFINITY);
+        for (card, value) in ranked {
+            let kept = value - giveaway.cost(card);
+            if kept > best.1 {
+                best = (card, kept);
+            }
+        }
+        best.0
     }
 
     fn name(&self) -> &str {
@@ -1036,7 +1070,7 @@ impl Build<'_> {
 }
 
 /// Whether two loose cards wait on a third to make a meld
-fn mates(a: Card, b: Card) -> bool {
+pub(crate) fn mates(a: Card, b: Card) -> bool {
     let court = |rank| matches!(rank, Rank::General | Rank::Advisor | Rank::Elephant);
     match (a.rank, b.rank) {
         (Rank::Soldier, Rank::Soldier) => a.color != b.color,

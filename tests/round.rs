@@ -268,7 +268,8 @@ mod playouts {
     use rand::rngs::SmallRng;
     use susik::Meld;
     use tsap_oo::{
-        Eval, Event, ExpectBot, Game, HeuristicBot, Phase, Rules, Seat, Step, Strategy, Table, View,
+        Eval, Event, Evidence, ExpectBot, Game, Giveaway, HeuristicBot, Phase, Round, Rules, Seat,
+        Step, Strategy, Table, View,
     };
 
     /// Bots play out whole rounds; cards are conserved after every step,
@@ -306,6 +307,56 @@ mod playouts {
                 scope.spawn(move || game(rules, 4052 + seed, 4, true));
             }
         });
+    }
+
+    /// A wary `ExpectBot` plays a table of two out.  What a seat threw is
+    /// what left its hand but into its melds, a rejected draw never among
+    /// it, and the next seat reads every card on the pile as let go.
+    #[test]
+    fn thrown_cards_left_the_hand() {
+        let mut rules = Rules::new();
+        rules.players = 2;
+        let mut rng = SmallRng::seed_from_u64(1125);
+        for _ in 0..8 {
+            let round = Round::deal(rules, FIRST, &mut rng);
+            let dealt = Seat::ALL.map(|seat| round.hand(seat));
+            let mut bots =
+                Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as Box<dyn Strategy>));
+            bots[1] = Some(Box::new(
+                ExpectBot::new(&rules).shallow(Eval::of(&rules), 0).wary(),
+            ));
+            let mut table = Table::new(round, bots);
+            while table.step().unwrap() != Step::Finished {
+                let round = table.round();
+                for &seat in &Seat::ALL[..2] {
+                    let view = View::new(round, seat.next(2));
+                    let thrown = view.thrown(seat);
+                    let mut left = round.hand(seat) + thrown;
+                    for &event in round.events() {
+                        let (meld, card) = match event {
+                            Event::Eat {
+                                seat: s,
+                                meld,
+                                card,
+                            } if s == seat => (meld, card),
+                            Event::Pong { seat: s, card } if s == seat => {
+                                (Meld::Triplet(card), card)
+                            }
+                            Event::Kong { seat: s, card } if s == seat => (Meld::Quad(card), card),
+                            _ => continue,
+                        };
+                        left += meld.cards().without(card);
+                    }
+                    assert_eq!(left, dealt[seat.index()]);
+                    let giveaway = Giveaway::new(&view);
+                    for &(_, card) in round.discards() {
+                        let evidence = giveaway.evidence(card);
+                        assert_eq!(evidence == Evidence::Thrown, thrown.contains(card));
+                        assert!(matches!(evidence, Evidence::Thrown | Evidence::Passed));
+                    }
+                }
+            }
+        }
     }
 
     /// Eight games of 25 rounds, a thread each
