@@ -2,7 +2,7 @@
 # The queue's power switch on a Mac: how much of the machine pueue may use.
 #
 #   ab/cores.sh 0    stop: pause the queue and the run in flight
-#   ab/cores.sh 1    E-cores only: slower, but less energy for the same run
+#   ab/cores.sh 1    E-cores only: cooler and quieter, not cheaper
 #   ab/cores.sh 2    every core
 #
 # 1 puts pueued and everything under it in background QoS, which keeps a

@@ -88,9 +88,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ab/cores.sh 0|1|2` is the queue's power switch on a Mac: 0 pauses the
   queue and the run in flight, 1 keeps pueue and its tasks on the E-cores
   (background QoS, set on the running process tree and inherited by tasks
-  that start later), 2 gives every core back.  On battery, 1 finishes a
-  run with less energy, about five times slower.  A fresh pueued starts
-  at 2.
+  that start later), 2 gives every core back.  1 runs cooler and quieter
+  but about five times slower, and is not cheaper: the rest of the machine
+  stays awake all that time.  A fresh pueued starts at 2.
 
 - `AFTER=ID ab/queue.sh ...` queues a run behind pueue task ID and runs
   it only if that task's log says `Verdict: win`; otherwise the task
