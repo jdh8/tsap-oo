@@ -47,7 +47,9 @@ const twoTaps = () => (settings.tap ? settings.tap === 2 : touch);
 function openSettings() {
   const form = id('settings').querySelector('form');
   for (const [name, value] of Object.entries(settings)) {
-    if (form.elements[name]) form.elements[name].value = value;
+    const el = form.elements[name];
+    if (el?.type === 'checkbox') el.checked = !!value;
+    else if (el) el.value = value;
   }
   id('settings').showModal();
 }
@@ -55,11 +57,14 @@ function openSettings() {
 function applySettings(e) {
   // ponytail: every setting is a number; parse per control when one is not
   settings = Object.fromEntries([...new FormData(e.target)].map(([k, v]) => [k, Number(v)]));
+  // An unticked box is not in the form's data.
+  for (const box of e.target.querySelectorAll('[type=checkbox]')) settings[box.name] = Number(box.checked);
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   } catch {} // still applies to this visit
   // Scores under different tables do not add up; the rest is the page's own.
-  if (settings.threshold !== state.threshold || settings.players !== state.seats.length) newGame();
+  const table = ['threshold', 'base', 'flower'].some((k) => settings[k] !== Number(state[k]));
+  if (table || settings.players !== state.seats.length) newGame();
   else render();
 }
 
@@ -202,6 +207,11 @@ function render() {
 
   // The threshold in force, in the help sheet.
   for (const el of document.querySelectorAll('.threshold')) el.textContent = state.threshold;
+  // And the settlement in force.
+  for (const el of document.querySelectorAll('.foul')) el.textContent = state.foul;
+  for (const el of document.querySelectorAll('.pay')) {
+    el.textContent = state.base ? `底 ${state.base} 加超過 ${state.threshold} 胡的部分` : '自己的胡數';
+  }
   for (const el of document.querySelectorAll('.dead')) el.textContent = state.dead;
 
   // Header: scores, the dealer marked.
@@ -375,8 +385,16 @@ function render() {
       hand.classList.add('held');
       if (r.winning_card) hand.append(meldEl([r.winning_card]));
       result.append(h2, meldsEl(r.exposed), hand);
+      // What each seat pays, where it is not simply the 胡.
+      if (r.flower || r.pays !== r.hu) {
+        const pay = document.createElement('div');
+        pay.className = 'pays';
+        if (r.flower) pay.append('點花 ', meldEl([r.flower]), ` 花胡 ${r.flower_hu}，`);
+        pay.append(`每家付 ${r.pays}`);
+        result.append(pay);
+      }
     } else if (r.foul != null) {
-      h2.textContent = `${name(r.foul)}相公：沒有牌可打，賠每家 ${state.threshold} 胡`;
+      h2.textContent = `${name(r.foul)}相公：沒有牌可打，賠每家 ${r.pays} 胡`;
       result.append(h2);
     } else {
       h2.textContent = '流局';

@@ -8,7 +8,8 @@ measured anew and their `Eval` retrained (`eval.md`, "Tables for two and
 three players").
 
 The default is four players at 10 胡 (`Rules::new`).  The other choices are
-8 胡 (`Rules::eight`) and tables of two and three (`Rules::players`), all of
+8 胡 (`Rules::eight`), tables of two and three (`Rules::players`), and since
+2026-11-26 a 底 and a 點花 at the settlement ("底 and 點花" below), all of
 them offered under 「設定」 (Settings) on the web page and in the desktop app.
 **The rules engine is complete for these variants; the bots are not:**
 nearly all of the bots' constants, tables and measurements come from four
@@ -151,6 +152,47 @@ picked.
   and playing by it past the gate loses to playing as `HeuristicBot`
   (−0.184 ± 0.045); the table of two's own table is a win.  See "What
   tables of two and three lack" below.
+
+## 底 and 點花
+
+Added 2026-11-26, base `8173c01`.  Two settlement rules, both off in
+`Rules::new` and both under 「設定」 on the web page and in the desktop app
+(「結算」, 「點花」).  **The rules engine has them; no bot knows of
+either, and nothing has been measured under them.**
+
+| Rule | Field | What it does | Source |
+| --- | --- | --- | --- |
+| 底 | `Rules::base`, `None` or the 底 | Each seat pays the 底 and the 胡 above the threshold in place of the whole 胡 (`Rules::pays`): at a 底 of 1, 13 胡 is paid 1 + 3.  A 相公 pays the threshold and the 底 (`Rules::foul`), 11 | Board Game Arena's Chinese help: 「跟所有其他玩家收取胡數減去門檻的點數」, with 「1 點押點」 added to every win and loss, and a 相公 at 「扣 11 點」 |
+| 點花 | `Rules::flower` | At a win the top card of the pile is turned where it lies (`RoundResult::flower`); each card like it in the winner's layout, in colour and face, is one 花胡 (`RoundResult::flower_hu`), one 胡 more from each seat, three at most | The same page: 「從牌庫抽最上方的牌作為點花，若與玩家持有的牌相同，一張可多得一胡，稱為花胡」 |
+
+The sources, quoted and dated, and the other schemes the write-ups have
+(five cards turned, a card a player, a flat 底) are in
+`../tsap-oo-book/research/settlement.md`.  The page offers a 底 of 1 only,
+Board Game Arena's figure; the field takes any.
+
+- **What our reading adds.**  The 花胡 are paid on top of the 胡 and do not
+  count toward the threshold: the card is turned after the win.  "The same
+  card" is the same colour and face, which is what makes three the most.
+  A 相公 pays 11 to each seat; the English help can be read as 10 once and
+  1 to each.
+- **What is left out.**  With the pile empty Board Game Arena turns the
+  round's first discard; here a win always leaves the dead cards, so the
+  pile is never empty (`dead_tail` 0 turns no card).  The 點花 is not an
+  `Event`: no seat acts after it.
+- **The bots.**  `ExpectBot` prices a win at the whole 胡 from each seat
+  and a 相公 at the threshold (`src/expect.rs`, `Payoff::Points`), and its
+  `Outlook` and `Eval` were fitted to rounds paid that way; `HeuristicBot`'s
+  weights were tuned on them too.  With a 底 of 1 a win of 12 胡 collects 3
+  a seat and one of 13 collects 4, so a 胡 more is worth a third more, not
+  a twelfth: the trade between a bigger hand and a faster one moves, and by
+  how much is not measured.  The points the hint shows are still those of
+  the whole 胡.  The 點花 is drawn after the round and is the same in
+  expectation for any hand of singles, so it should move play little; that
+  is not measured either.
+- **`ab/`** has no switch for either yet: the control is `main` HEAD's own
+  crate, which must have the fields first.  After that, `BASE` and
+  `FLOWER` set on both sides, as `THRESHOLD` and `PLAYERS` are, and every
+  change to how a bot plays under a 底 is its own run.
 
 ## What 8 胡 lacks
 

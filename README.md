@@ -72,6 +72,15 @@ modelled; all values are fields of `Rules`.
 8 胡 is `Rules::eight()`: the same table with eight to win, and so eight for
 a 相公.
 
+Two settlement rules are fields of `Rules`, both off in `Rules::new`.  With
+a 底 (`Rules::base`) each seat pays the 底 and the 胡 above the threshold
+instead of the whole 胡: at a 底 of 1, 13 胡 is paid 1 + 3, and a 相公 pays
+the threshold and the 底, 11.  With 點花 (`Rules::flower`) the top card of
+the pile is turned at a win, and each card like it in the winner's layout,
+in colour and face, is one 花胡: one 胡 more from each seat, three at most.
+Both are as Board Game Arena's Chinese help has them.  The bots do not
+know either rule yet ([`doc/variants.md`](doc/variants.md), "底 and 點花").
+
 The table is `Rules::players`, two to four, four by default; the write-ups
 allow two to five.  A smaller table deals and scores the same: twenty cards
 each, one more to the dealer, the rest to the pile, and a win or a 相公

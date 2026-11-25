@@ -164,8 +164,8 @@ pub enum Event {
 pub struct RoundResult {
     /// The winner, or `None` for an exhausted pile or a foul
     pub winner: Option<Seat>,
-    /// The seat left with nothing to discard (相公), who pays the threshold
-    /// to each other seat
+    /// The seat left with nothing to discard (相公), who pays
+    /// [`Rules::foul`] to each other seat
     pub foul: Option<Seat>,
     /// The winner's 胡
     pub hu: u32,
@@ -178,6 +178,21 @@ pub struct RoundResult {
     /// Who put the winning card on the table, if not the winner: the
     /// discarder, or another seat's draw
     pub from: Option<Seat>,
+    /// The 點花: the top card of the pile, turned where it lies at a win
+    /// under [`Rules::flower`]
+    pub flower: Option<Card>,
+}
+
+impl RoundResult {
+    /// 花胡: the cards of the winner's layout like the 點花, each paid as
+    /// one 胡 more; three at most, the 點花 being the fourth
+    #[must_use]
+    pub fn flower_hu(&self) -> u32 {
+        self.flower.map_or(0, |flower| {
+            let cards = self.layout.iter().map(|meld| meld.cards().count(flower));
+            cards.map(u32::from).sum()
+        })
+    }
 }
 
 /// An action the round rejected; the round is unchanged
@@ -762,6 +777,9 @@ impl Round {
             (None, Some(seat)) => Event::Foul { seat },
             (None, None) => Event::Exhausted,
         });
+        // ponytail: an empty pile, only at `dead_tail` 0, turns no 點花;
+        // Board Game Arena takes the round's first discard then.
+        let flower = self.pile.last().copied();
         self.result = Some(RoundResult {
             winner,
             foul,
@@ -769,6 +787,7 @@ impl Round {
             layout,
             winning_card,
             from,
+            flower: flower.filter(|_| winner.is_some() && self.rules.flower),
         });
         self.offer = None;
         self.queue.clear();

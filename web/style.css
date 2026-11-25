@@ -297,6 +297,7 @@ button.action.claim:enabled:hover { background: rgba(255, 255, 255, 0.12); }
 .result h2 { margin: 0; font-size: 1.1rem; }
 .result .melds { justify-content: center; }
 .result .meld { background: rgba(0, 0, 0, 0.06); }
+.result .pays { display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
 /* The winner's hand is no meld; only the winning card to its right is boxed. */
 .result .held .meld:first-child { background: none; padding-inline: 0; }
 .result .meld .card { --card-w: var(--small-w); --card-h: var(--small-h); font-size: var(--small-font); }

@@ -8,6 +8,13 @@ from every seat, and a 相公 pays every seat 10 胡) is what the README calls
 the mainstream Taiwanese rule; this note records the layers it does not
 model.
 
+Added 2026-11-26: Board Game Arena's help, which this note had not read,
+pays "the 胡 less the threshold" with a stake of 1 and turns a 點花 for
+花胡; a 2009 blog post has a 底 of NT$5 and a 台 of NT$1, a card drawn for
+each player.  Both rules of Board Game Arena are now in `Rules` (`base`,
+`flower`; `doc/variants.md`, "底 and 點花"), and the quotes are in
+`../tsap-oo-book/research/settlement.md`.
+
 ## Answer
 
 **All the write-ups agree only that all three seats pay.  How much they pay

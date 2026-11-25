@@ -28,6 +28,12 @@
           <option value="10">十胡（滿 10 胡）</option>
           <option value="8">八胡（滿 8 胡）</option>
         </select></label></div>
+      <div class="setting"><label>結算
+        <select name="base">
+          <option value="0">每家付贏家的胡數</option>
+          <option value="1">底 1：每家付 1，加超過門檻的胡數</option>
+        </select></label></div>
+      <div class="setting"><label><input type="checkbox" name="flower" value="1"> 點花</label></div>
       <div class="setting"><label>人數
         <select name="players">
           <option value="4">4 人</option>
@@ -40,11 +46,12 @@
           <option value="1">點一下就打出</option>
           <option value="2">先點選，再點一次打出</option>
         </select></label></div>
-      <p>換玩法或人數會開新局。</p>
+      <p>換玩法、結算、點花或人數會開新局。</p>
       <button class="action">套用</button>
     </form>
   </dialog>
-  <!-- The values mirror `Rules::new`; app.js fills in the threshold. -->
+  <!-- The values mirror `Rules::new`; app.js fills in the threshold and the
+       settlement. -->
   <dialog id="rules" class="rules" closedby="any">
     <h2>玩法</h2>
     <ul>
@@ -53,9 +60,10 @@
       <li><b>碰</b>：手上有一對，誰都可以碰。
         <b>吃</b>：只有摸牌的人和下家，湊成下表的組合或一對。吃碰進來的牌，這一回合不能打。</li>
       <li><b>將帥</b>摸到必吃，不能碰，也不能打。</li>
-      <li>沒有牌可打就是<b>相公</b>，賠每家 <span class="threshold">10</span> 胡；會相公的按鈕是灰的。</li>
-      <li>手牌全部排成組合、滿 <b><span class="threshold">10</span> 胡</b>就胡牌：向其他每家各收自己的胡數，並當莊。
+      <li>沒有牌可打就是<b>相公</b>，賠每家 <span class="foul">10</span> 胡；會相公的按鈕是灰的。</li>
+      <li>手牌全部排成組合、滿 <b><span class="threshold">10</span> 胡</b>就胡牌：向其他每家各收<span class="pay">自己的胡數</span>，並當莊。
         牌堆剩 <span class="dead">6</span> 張時流局，莊家連莊：尾 6 張是廢牌，三人桌、兩人桌再加空位的 20 張、40 張，每一桌都摸 25 張。</li>
+      <li><b>點花</b>（在設定裡開關）：胡牌後翻開牌堆最上面一張，贏家的牌裡每有一張相同的牌（同色同字）就是 1 <b>花胡</b>，每家多付 1 胡，最多 3 胡。</li>
     </ul>
     <p>細節在書裡：<a href="https://jdh8.github.io/tsap-oo-book/play.html" target="_blank">流程</a>、<a
       href="https://jdh8.github.io/tsap-oo-book/generals.html" target="_blank">將帥</a>、<a

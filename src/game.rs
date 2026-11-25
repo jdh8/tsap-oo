@@ -6,9 +6,10 @@ use susik::Card;
 
 /// Scores and the dealer across rounds
 ///
-/// The winner collects their 胡 from each other seat and deals next; after an
-/// exhausted pile the same dealer deals again, as after a foul (相公), whose
-/// seat pays the threshold to each other seat.
+/// The winner collects [`Rules::pays`] of their 胡, and any 花胡, from each
+/// other seat and deals next; after an exhausted pile the same dealer deals
+/// again, as after a foul (相公), whose seat pays [`Rules::foul`] to each
+/// other seat.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Game {
     rules: Rules,
@@ -67,10 +68,13 @@ impl Game {
     /// Record a finished round: pay the winner and pass them the deal, or
     /// collect a foul's penalty
     pub fn settle(&mut self, result: &RoundResult) {
-        // The winner collects their 胡; a foul "collects" minus the threshold.
+        // The winner collects their 胡; a foul "collects" minus its penalty.
         let (collector, hu) = match (result.winner, result.foul) {
-            (Some(winner), _) => (winner, to_i32(result.hu)),
-            (None, Some(foul)) => (foul, -to_i32(self.rules.threshold)),
+            (Some(winner), _) => {
+                let hu = self.rules.pays(result.hu) + result.flower_hu();
+                (winner, to_i32(hu))
+            }
+            (None, Some(foul)) => (foul, -to_i32(self.rules.foul())),
             (None, None) => return,
         };
         let players = self.rules.players;

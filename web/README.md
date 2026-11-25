@@ -49,7 +49,9 @@ out of the 胡 to win (3/10 胡).
 Once a round is over the bots' hands are shown and counted too, and the
 winner shows the winning count.
 
-設定 (or the `s` key) picks the table: 10 胡 to win, or 8.
+設定 (or the `s` key) picks the table: 10 胡 to win, or 8; under 結算, the
+whole 胡 from each seat or a 底 of 1 and the 胡 above the threshold; and
+whether a 點花 is turned at a win for 花胡.
 Changing it starts a new game, and the choice is remembered in the browser.
 
 On a touch screen a discard takes two taps: the first picks the card and

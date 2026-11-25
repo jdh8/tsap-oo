@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Two settlement rules, both off in `Rules::new`.  `Rules::base` is a 底:
+  each seat pays the 底 and the 胡 above the threshold in place of the
+  whole 胡 (`Rules::pays`; at a 底 of 1, 13 胡 is paid 1 + 3), and a 相公
+  pays the threshold and the 底 (`Rules::foul`).  `Rules::flower` is 點花:
+  at a win the top card of the pile is turned where it lies
+  (`RoundResult::flower`), and each card like it in the winner's layout is
+  one 花胡, one 胡 more from each seat (`RoundResult::flower_hu`).  Both
+  are as Board Game Arena's Chinese help has them; the sources are in
+  `../tsap-oo-book/research/settlement.md`.  `web/` and the desktop app
+  offer them under 「設定」 as 「結算」 and 「點花」, and the result sheet
+  shows the 點花, the 花胡 and what each seat pays.  No bot knows either
+  rule and nothing is measured under them (`doc/variants.md`, "底 and
+  點花"); the hint's points are still those of the whole 胡.
+
 - `doc/opponents.md` plans reading the opponent at a table of two: an
   oracle for each channel before any inference is written.  `ORACLE=live`,
   `waits` or `danger` in `ab/` seats `ExpectBot` as it ships with one input

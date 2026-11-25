@@ -55,6 +55,10 @@ struct Settings {
     threshold: u32,
     /// Players at the table, the human among them
     players: usize,
+    /// 底, or 0 for none: each seat pays the winner's whole 胡
+    base: u32,
+    /// 點花: 1 to turn the top of the pile at a win, 0 not to
+    flower: u32,
 }
 
 impl Default for Settings {
@@ -63,6 +67,8 @@ impl Default for Settings {
         Self {
             threshold: rules.threshold,
             players: rules.players,
+            base: rules.base.unwrap_or(0),
+            flower: rules.flower.into(),
         }
     }
 }
@@ -76,6 +82,8 @@ impl Settings {
     fn rules(&self) -> Rules {
         let mut rules = Rules::new();
         rules.threshold = self.threshold;
+        rules.base = (self.base > 0).then_some(self.base);
+        rules.flower = self.flower != 0;
         // Stored settings are the page's to edit; a table the engine cannot
         // deal is the nearest one it can.
         rules.players = self.players.clamp(2, Seat::COUNT);
@@ -288,6 +296,11 @@ struct ResultJson {
     hand: Vec<CardJson>,
     winning_card: Option<CardJson>,
     from: Option<usize>,
+    /// The 點花 and the 花胡 it makes
+    flower: Option<CardJson>,
+    flower_hu: u32,
+    /// What each other seat pays the winner, or the 相公 each other seat
+    pays: u32,
 }
 
 #[derive(Serialize)]
@@ -298,6 +311,11 @@ struct Snapshot {
     dealer: usize,
     /// 胡 to win, for the page's wording
     threshold: u32,
+    /// The 底, 0 for none, whether a 點花 is turned, and what a 相公 pays
+    /// each seat: for the page's wording too
+    base: u32,
+    flower: bool,
+    foul: u32,
     pile: usize,
     /// The cards at the bottom of the pile that are never drawn
     dead: usize,
@@ -369,6 +387,9 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
         human: HUMAN.index(),
         dealer: round.dealer().index(),
         threshold: game.rules().threshold,
+        base: game.rules().base.unwrap_or(0),
+        flower: game.rules().flower,
+        foul: game.rules().foul(),
         pile: round.pile_len(),
         dead: game.rules().dead(),
         scores: game.scores()[..players].to_vec(),
@@ -443,6 +464,12 @@ fn snapshot(game: &Game, round: &Round) -> Snapshot {
                 .map_or_else(Vec::new, |seat| arrange(round.hand(seat))),
             winning_card: result.winning_card.map(CardJson::from),
             from: result.from.map(Seat::index),
+            flower: result.flower.map(CardJson::from),
+            flower_hu: result.flower_hu(),
+            pays: match result.winner {
+                Some(_) => game.rules().pays(result.hu) + result.flower_hu(),
+                None => game.rules().foul(),
+            },
         }),
     }
 }
@@ -677,6 +704,21 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&core.snapshot()).unwrap();
         assert_eq!(value["threshold"], 8);
         assert_eq!(core.game.rules(), &Rules::eight());
+    }
+
+    /// A 底 and a 點花 are off unless the settings turn them on.
+    #[test]
+    fn settings_pick_the_settlement() {
+        let rules = Settings::parse("{}").rules();
+        assert_eq!((rules.base, rules.flower), (None, false));
+        let core = Core::new(7, &Settings::parse(r#"{"base":1,"flower":1}"#), false);
+        let rules = core.game.rules();
+        assert_eq!((rules.base, rules.flower), (Some(1), true));
+        let value: serde_json::Value = serde_json::from_str(&core.snapshot()).unwrap();
+        assert_eq!(
+            (&value["base"], &value["flower"], &value["foul"]),
+            (&1.into(), &true.into(), &11.into())
+        );
     }
 
     /// A table of three shows three seats and is dealt to three; a table

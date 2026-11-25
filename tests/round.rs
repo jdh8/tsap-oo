@@ -239,6 +239,42 @@ fn dealer_wins_on_the_deal() {
     conserved(&round);
 }
 
+/// The 點花 is the top of the pile, turned where it lies: three cards like
+/// it in the winner's 33 胡 are three 花胡, and with a 底 of 1 each seat
+/// pays 1 + 23 + 3.
+#[test]
+fn a_base_and_a_flower_pay() {
+    let dream = hand("帥帥帥帥仕仕仕仕相相相相.帥帥帥仕仕仕相相相..");
+    let filler = hand("俥俥俥俥傌傌傌傌炮炮炮炮兵兵兵兵.帥俥俥俥..");
+    let more = hand(".傌傌傌傌炮炮炮炮兵兵兵兵.將將將將士士士士.");
+    let rest = hand("..象象象象車車車車馬馬馬馬包包包包卒卒卒卒.");
+    let mut pile = pile([dream, filler, more, rest]);
+    // The 31 cards left after the deal lie first, the last of them on top.
+    let top = 30;
+    let held = pile[..=top].iter().position(|&c| dream.count(c) == 3);
+    pile.swap(held.unwrap(), top);
+    let flower = pile[top];
+
+    let mut rules = Rules::new();
+    (rules.base, rules.flower) = (Some(1), true);
+    let round = Round::from_pile(rules, THIRD, pile.clone()).unwrap();
+    let result = round.result().unwrap();
+    assert_eq!(result.hu, 33);
+    assert_eq!((result.flower, result.flower_hu()), (Some(flower), 3));
+    conserved(&round);
+    let mut game = tsap_oo::Game::new(rules, THIRD);
+    game.settle(result);
+    assert_eq!(game.scores(), [-27, -27, 81, -27]);
+
+    // Off, as in `Rules::new`: no card is turned and the whole 胡 is paid.
+    let round = Round::from_pile(Rules::new(), THIRD, pile).unwrap();
+    let result = round.result().unwrap();
+    assert_eq!((result.flower, result.flower_hu()), (None, 0));
+    let mut game = tsap_oo::Game::new(Rules::new(), THIRD);
+    game.settle(result);
+    assert_eq!(game.scores(), [-33, -33, 99, -33]);
+}
+
 /// 大肚: 俥俥俥傌炮 is a triplet and two loose cards, never 俥俥 and 俥傌炮.
 #[test]
 fn a_concealed_triplet_is_not_split_to_win() {
@@ -295,6 +331,14 @@ mod playouts {
             rules.players = players;
             playout(rules);
         }
+    }
+
+    /// The same with a 底 and a 點花: the settlement alone changes.
+    #[test]
+    fn bots_finish_rounds_with_a_base_and_a_flower() {
+        let mut rules = Rules::new();
+        (rules.base, rules.flower) = (Some(1), true);
+        playout(rules);
     }
 
     /// The same with an `ExpectBot` in the second seat, which plays by the
@@ -441,7 +485,15 @@ mod playouts {
                         result.layout.iter().map(|m| m.cards().len()).sum::<usize>(),
                         21
                     );
+                    // The 點花 is turned only under its rule; each other
+                    // seat pays the 胡 as the rules have it, and the 花胡.
+                    assert_eq!(result.flower.is_some(), rules.flower);
+                    let each = rules.pays(result.hu) + result.flower_hu();
+                    assert!(each <= rules.pays(result.hu) + 3);
+                    let before = game.scores()[winner.index()];
                     game.settle(result);
+                    let won = (rules.players - 1) * each as usize;
+                    assert_eq!(game.scores()[winner.index()] - before, won as i32);
                     assert_eq!(game.dealer(), winner);
                 }
                 None if result.foul.is_some() => {
