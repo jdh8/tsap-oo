@@ -42,7 +42,8 @@ Update this table when a batch is done.
 | 0 | `examples/hazard.rs`, `ab/src/oracle.rs`, `ExpectBot::outlook_mut`, this document | No; owes zero deals that part | None | Done: zero deals part in all three runs |
 | 1 | The oracles and the Peeker at two players, and the bot that ships against `HeuristicBot` | No: oracles never ship | None | Done: `danger` and `live` win on the web and on the desktop; `waits` and `cards` are closed |
 | 2 | h by the fewest concealed cards into `Outlook` | Yes | `cards` wins on the web and on the desktop | Not started: B did not win |
-| 3 | An inference for each open channel, largest first | Yes | Its oracle wins on both settings; a gatekeeper is in place | `danger` first: its halves `win` and `claim` both win (W, X), and `ExpectBot::wary` on `Giveaway`'s tables loses on the web (T), so it stays off; T's trace closes `Giveaway` as fitted: the oracle's price one card ahead is not what the deal pays.  `live` is next |
+| 3 | An inference for each open channel, largest first | Yes | Its oracle wins on both settings; a gatekeeper is in place | `danger` first: its halves `win` and `claim` both win (W, X), and `ExpectBot::wary` on `Giveaway`'s tables loses on the web (T), so it stays off; T's trace closes `Giveaway` as fitted: the oracle's price one card ahead is not what the deal pays.  `live`: the public cards say next to nothing about what still comes (`kept`), and `ExpectBot::counting` on those chances reads −0.006 ± 0.009 on the web (L): closed, and taken out.  Batch 4 is next |
+| 4 | `examples/posterior.rs`: what the hands that fit the other seat's whole history say of its hand | No | None; it gates a sampler | Queued behind L: both samplers, 200 rounds, seed 800 |
 
 ## The oracles
 
@@ -461,6 +462,35 @@ a reading of when the other seat is waiting, which `waits` and `cards` did
 not give.  `live` is next: it is open on both settings, and the pong says
 the same public cards are worth more there.
 
+**The win half by the stage**, read 2026-11-26 off the same rows
+(`giveaway 4500 600 rows`), before anything was written for it.  The
+evidence cannot see the card the other seat wins on; its exposed 胡 and its
+count of concealed cards, which every seat can read, see when it is close.
+Of the cards it has not let go it wins on 0.08% while it holds 18 concealed
+cards or more, 2.7% at 12 to 14 and 5.6% at 6 to 8; 0.34% with under 2 胡
+exposed and 6.6% with 8 or 9; and on 0.09% of the cards it has let go.
+While it holds 14 concealed cards or fewer, the copies of the card this
+seat sees tell cards apart by a factor of three (4.4% for one, 1.5% for
+three).
+
+Fitted on the first 3,000 deals and read on the other 1,500 (3,000 rounds,
+13,354 discards), a cost by 胡 and by cards, times a factor by the copies
+seen:
+
+| Discarding by value less | Discards moved | Kept a round, one card ahead | Cards won on |
+| --- | ---: | ---: | ---: |
+| nothing: the bot as it ships | | 0 | 221 |
+| the oracle's win half | | 0.715 | |
+| the cost by the stage at 0.29, what T's deals paid for a win | 1.6% | 0.011 | 214 |
+| the same times the card's factor, at 0.29 | 3.3% | 0.010 | 212 |
+| the same at the oracle's price | 5.1% | 0.012 | 206 |
+
+That is a seventieth of the oracle's win half, where `Giveaway`'s tables
+kept a sixth of the whole oracle and lost.  The stage says when the other
+seat is waiting and not on what: the cards a seat chooses among at one
+discard share the stage, and late in a round few of them have been let go.
+Nothing is built for it and no run is made.
+
 How they are read:
 
 - **W and X gate nothing.**  They say which half of `danger` an inference
@@ -476,6 +506,176 @@ How they are read:
   a table of two: `ExpectBot` with and without `wary` against the guest on
   paired deals.  It is built only if T wins, and before anything ships.
 - **8 胡 and the larger tables** each owe their own tables and A/B.
+
+### `live`: what the public cards say will still come
+
+Designed 2026-11-26, base `8a8ecf9`.  The oracle takes the cards the other
+seat keeps out of `live`; an inference has to say of each kind this seat has
+not seen how likely its copies are to come, from what every seat can see.
+
+**What is public about a kind.**  `examples/kept.rs` plays the web page's
+bot against `HeuristicBot` at a table of two, each deal once in either
+seat, and at every discard valued in points it takes each kind the seat has
+not seen every copy of, by the same `Evidence` as `danger`: where the
+copies are (kept by the other seat as the oracle reads it, loose in its
+hand, or in the pile), and how many came up before the round ended, drawn
+or thrown from the other seat's hand.  4,500 rounds, seed 700: 1,127,942
+kinds and 3,362,744 copies.
+
+| The kind | Copies | The other seat keeps | Holds loose | Kinds it keeps every copy of | Came up | Over its rank | Left free, over its rank |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| It threw a copy from its hand | 195,182 | 7.2% | 0.5% | 1.4% | 10.1% | 0.916 | 0.988 |
+| It let a copy go | 254,574 | 8.7% | 3.0% | 1.2% | 10.3% | 0.966 | 1.019 |
+| Neither, and it threw two kinds of the run | 4,804 | 22.1% | 0.0% | 6.1% | 6.8% | 0.880 | 0.822 |
+| Neither, and it threw one kind of the run | 458,034 | 12.9% | 0.7% | 1.4% | 10.4% | 0.969 | 0.971 |
+| Neither, and none | 2,450,150 | 14.3% | 7.2% | 1.3% | 13.9% | 1.013 | 1.004 |
+| All | 3,362,744 | 13.3% | 5.6% | 1.3% | 12.9% | 1 | 1 |
+
+"Over its rank" is the copies that came up over the copies expected if
+every unseen card of the rank were as likely to be each card of that rank
+that followed; `Outlook` weighs the ranks already.  "Left free" counts only
+the cards the other seat did not take, by a win or a claim, which are the
+ones this seat may answer.
+
+- **The evidence does not find the dead kinds.**  The oracle's sharpest
+  reading is a kind whose every unseen copy the other seat keeps.  That is
+  1.3% of the kinds, and 1.2% to 1.4% in every row but the smallest.
+- **What it holds less of does not come more.**  The other seat keeps half
+  as much of a kind it threw (7.2% against 14.3%), and the kind comes up
+  0.92 times as often, not more: the cards it holds loose are the ones it
+  throws next, and a kind it threw has none loose left (0.5% against
+  7.2%).
+- **Left free, the rows are level**: 0.988 for a kind it threw, 1.019 for
+  one it let go, 1.004 for one it has shown nothing about.  The fresh kinds
+  come up more and it takes more of them.  By the copies of the run not
+  seen the cells run from 0.939 to 1.046; only the 4,804 copies with two
+  kinds of the run thrown, one in 700, are far from 1, at 0.822.
+- **The pong of T's trace is not `live`.**  The reading there was that a
+  card the other seat has use for is deader to this seat than the DP
+  knows.  A fresh kind is as live as one thrown or let go.
+
+**The inference** is `Giveaway::chance`, the last column by `Evidence`
+with the copies of the run not seen by twos, as `Giveaway::cost` has them.
+`Graph::weighed` counts each copy of a live card as its chance of one, in
+the entries and in the count of its rank, so every card weighed alike is no
+card weighed; `ExpectBot::counting` builds its graphs so.  It is off unless
+asked for; `COUNTING=1` asks in `ab/`.
+
+Approximations: the chances are over the rest of the round, one table for
+every stage of it; they weigh the cards that come and not the pruning nor a
+leaf's curve past the gate, which read `live` whole; and they learn
+`HeuristicBot`, as `Giveaway::cost` does.
+
+**The runs**, declared 2026-11-26 before any data; two players at 10 胡,
+control `8a8ecf9`, `RESHUFFLE=8`, queued through pueue from one frozen copy
+of the working tree.  The smoke run was 300 deals of seed base 7 with the
+chances of an earlier cut of 60 rounds (64 part) and gives no verdict; the
+table is measured on other deals (`kept`, seed 700).
+
+On the web setting, `EXPECT=new GATE_CARDS=10 SHALLOW=0` against
+`BASELINE_EXPECT=new BASELINE_SHALLOW=0`:
+
+| Run | Candidate | Deals | seed base | Part | Candidate − control | 95% CI | Verdict |
+| --- | --- | ---: | ---: | ---: | ---: | --- | --- |
+| Z₂ | as it ships: owes zero deals that part | 2,000 | 1805000000 | 0 | +0.000 ± 0.000 | [+0.000, +0.000] | zero deals part |
+| L | `COUNTING=1` | 40,000 | 1805100000 | 9,929 | −0.006 ± 0.009 | [−0.025, +0.012] | insufficient data; closed |
+
+On the desktop setting, `GATE_CARDS=14 SHALLOW=17` against
+`BASELINE_GATE=14 BASELINE_SHALLOW=17`, only if L is a win:
+
+| Run | Candidate | Deals | seed base | Part | Candidate − control | 95% CI | Verdict |
+| --- | --- | ---: | ---: | ---: | ---: | --- | --- |
+| L′ | `COUNTING=1` | 16,000 | 1805200000 | | | | not run: L is not a win |
+
+How they are read:
+
+- **L is 40,000 deals** for a standard error near 0.008: the smoke run's
+  was 0.093 over 300.  The table says there is little to find, so the run
+  is there to close the evidence, not to look for a gain.
+- **`counting` ships at two players and 10 胡** if L and L′ both win and
+  the gatekeeper of `danger` does not lose.
+- **This evidence is closed for `live`** if the upper end of L's CI is
+  under +0.05, half of what the oracle gets on the web: it is not run
+  again, and `counting`, `Giveaway::chance` and `Graph::weighed` are taken
+  out.  Otherwise a straddling CI is insufficient data, and a loss is
+  traced first.
+
+Read 2026-11-26.  The bots as they ship part on no deal with the hook in
+(Z₂).  `counting` parts on one deal in four and reads −0.006 ± 0.009 points
+a deal; its seat wins 50.24% of the deals against the control's 50.26%.
+The upper end of the CI, +0.012, is under +0.05, so this evidence is closed
+for `live` as declared: the table said there was nothing to weigh, and
+weighing by it moves nothing that 40,000 deals can see.  L′ was not run.
+`ExpectBot::counting`, `Giveaway::chance` and `Graph::weighed` are taken
+out in the commit after the one that records this; `examples/kept.rs` and
+the table stay.
+
+## Batch 4: the other seat's hand from its whole history
+
+Designed 2026-11-26, base `8a8ecf9`.  Batch 3 read each card by what is
+public about it, and both readings came to next to nothing: the chances of
+`live` are level, and the stage says when the other seat is waiting and not
+on what.  What is left is the whole of it at once: a hand that would have
+done everything the other seat did.
+
+**The posterior.**  Nothing drawn enters a hand, so every card that left
+the other seat's hand is public, and a guess at the hand it holds now is a
+guess at the hand it was dealt.  Deal that hand, replay the round with
+`HeuristicBot` holding it, this seat doing what it did, and the guess fits
+when every public event comes out as it went: each discard, each claim,
+and each card it let go that it would have won on, konged or claimed.
+`HeuristicBot` has no dice, so among hands dealt evenly from the unseen
+cards the ones that fit are the posterior, each as likely as another.
+
+**The measurement** is `examples/posterior.rs`: the web page's bot against
+`HeuristicBot` at a table of two, each deal once in either seat, and at
+every discard valued in points 50 hands that fit, by the other seat's count
+of concealed cards:
+
+- the hands dealt for one that fits, in bits: what the history says;
+- how much of the spread of the copies it holds of each kind the
+  posterior's mean takes off an even deal's: `live`;
+- the chance the posterior gives a win on a discard it does win on and on
+  one it does not, beside the same of 200 hands dealt evenly: `win`;
+- what discarding by value less that chance of 9 points keeps a round, one
+  card ahead, at 0.29 (what T's deals paid for a win) and at 1: beside the
+  oracle's win half, 0.715 over `giveaway`'s rows, and the stage's 0.010.
+
+Two samplers.  Dealing evenly and keeping what fits is exact, and thins
+out: one hand in thousands fits late in a round (the debug smoke, 3 rounds
+of seed 7: 1.3 bits with 18 cards or more, 4.0 with 15 to 17).  A chain
+reaches the rest: from the hand the other seat holds it swaps a card of the
+hand for one of the pile, keeps the swap if the hand still fits, and takes
+a hand every 60 swaps after 300.  No seat could start there; the chain
+says what the posterior holds, not that a bot can sample it.
+
+**The runs**, declared 2026-11-26 before any data, queued through pueue
+behind L from one frozen copy of the working tree.  Not an A/B: nothing
+plays by it, and there is no verdict.
+
+| Run | Sampler | Rounds | seed | Status |
+| --- | --- | ---: | ---: | --- |
+| P₁ | `PROPOSALS=20000 SAMPLES=50`: dealt evenly | 200 | 800 | queued |
+| P₂ | `CHAIN=60 SAMPLES=50`: the chain | 200 | 800 | queued |
+
+How they are read:
+
+- **The chain is read only where it agrees with P₁**: its rows with 12
+  cards or more against P₁'s that are not thin.  A chain that sticks to
+  the hand it started from flatters the posterior.
+- **A sampler is designed** if the posterior keeps a third of the oracle's
+  win half or more, one card ahead: `Giveaway`'s tables kept a sixth of
+  their oracle and lost.  Under a tenth closes it.  Between the two, the
+  `claim` half is measured the same way before deciding.
+- **It learns `HeuristicBot` to the letter.**  A person plays no hand the
+  way `HeuristicBot` would, so against one nothing fits; a sampler that
+  ships needs a looser test of fit, and the gatekeeper before anything
+  else.
+
+Approximations: every win costs 9 points, the mean of `giveaway`'s rows;
+this seat's eat that a pong took back is replayed as its pass; the chain's
+hands are not independent, and the noise taken off the posterior's spread
+counts them as if they were.
 
 ## Closing each batch
 

@@ -313,7 +313,7 @@ enum Kind {
 
 #[derive(Debug, Clone, Copy)]
 struct Entry {
-    /// How many of this card are unseen
+    /// How many of this card are unseen, by its chance
     count: f64,
     /// Its rank, which [`Outlook::drawn`] and
     /// [`discarded`](Outlook::discarded) weigh it by
@@ -335,7 +335,7 @@ pub struct Graph {
     threshold: u32,
     /// The seats that pay a win and are paid a foul
     others: f64,
-    /// The unseen cards of each rank
+    /// The unseen cards of each rank, each by its chance
     unseen: [f64; 7],
     roots: Vec<usize>,
     /// The hand of each node
@@ -362,9 +362,27 @@ impl Graph {
     /// often than it remains.
     #[must_use]
     pub fn new(rules: &Rules, live: Hand, roots: &[(Hand, u32)], prune: Prune) -> Self {
+        Self::weighed(rules, live, &|_| 1.0, roots, prune)
+    }
+
+    /// As [`new`](Self::new), each copy of a `live` card counting as
+    /// `chance` of one: a card twice as likely to come up as another of
+    /// its rank has twice its chance
+    // ponytail: the chances weigh the cards that come, not which hands can
+    // still win or which leaves are worth what: `Prune` and a leaf's curve
+    // read `live` whole.
+    #[must_use]
+    pub fn weighed(
+        rules: &Rules,
+        live: Hand,
+        chance: &dyn Fn(Card) -> f64,
+        roots: &[(Hand, u32)],
+        prune: Prune,
+    ) -> Self {
         let mut build = Build {
             rules,
             live,
+            chance,
             prune,
             win: Solver::new(rules.concealed, None).locked(),
             layouts: [1, 16].map(|cost| Solver::new(rules.concealed, Some(cost)).locked()),
@@ -374,7 +392,7 @@ impl Graph {
                 threshold: rules.threshold,
                 others: (rules.players - 1) as f64,
                 unseen: live.distinct().fold([0.0; 7], |mut unseen, (card, n)| {
-                    unseen[card.rank as usize] += f64::from(n);
+                    unseen[card.rank as usize] += f64::from(n) * chance(card);
                     unseen
                 }),
                 roots: Vec::new(),
@@ -630,6 +648,8 @@ pub struct ExpectBot {
     gone: Hand,
     /// Whether a discard is worth less by its [`Giveaway::cost`]
     wary: bool,
+    /// Whether an unseen card counts by its [`Giveaway::chance`]
+    counting: bool,
 }
 
 impl ExpectBot {
@@ -667,6 +687,7 @@ impl ExpectBot {
             shallow: None,
             gone: Hand::EMPTY,
             wary: false,
+            counting: false,
         }
     }
 
@@ -730,6 +751,18 @@ impl ExpectBot {
     #[must_use]
     pub const fn wary(mut self) -> Self {
         self.wary = true;
+        self
+    }
+
+    /// The same bot counting each card it has not seen by its
+    /// [`Giveaway::chance`], how often the public cards say a copy comes up
+    /// beside another of its rank, wherever it values its answers in points
+    ///
+    /// The chances are measured at a table of two at 10 胡
+    /// (`doc/opponents.md`, batch 3).
+    #[must_use]
+    pub const fn counting(mut self) -> Self {
+        self.counting = true;
         self
     }
 
@@ -801,7 +834,9 @@ impl ExpectBot {
             depth,
             ..Prune::default()
         };
-        let graph = Graph::new(view.rules(), live, &roots, prune);
+        let giveaway = self.counting.then(|| Giveaway::new(view));
+        let chance = |card| giveaway.map_or(1.0, |giveaway| giveaway.chance(card));
+        let graph = Graph::weighed(view.rules(), live, &chance, &roots, prune);
         let draws = Self::draws(view);
         let curves: Vec<_> = graph
             .leaves()
@@ -931,6 +966,8 @@ impl Strategy for ExpectBot {
 struct Build<'a> {
     rules: &'a Rules,
     live: Hand,
+    /// What a copy of each live card counts as
+    chance: &'a dyn Fn(Card) -> f64,
     prune: Prune,
     /// Exact partitions, for the win
     win: Solver,
@@ -1022,7 +1059,7 @@ impl Build<'_> {
             };
             if let Some(kind) = kind {
                 self.graph.entries.push(Entry {
-                    count: f64::from(count),
+                    count: f64::from(count) * (self.chance)(card),
                     rank: card.rank,
                     kind,
                     first,
@@ -1248,6 +1285,25 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn a_chance_weighs_a_card_within_its_rank() {
+        // As above, with a yellow 炮 that claims nothing: 2 of 4 cannons win
+        let rules = Rules::new();
+        let hand: Hand = "俥傌...".parse().unwrap();
+        let red = Card::new(Color::Red, Rank::Cannon);
+        let yellow = Card::new(Color::Yellow, Rank::Cannon);
+        let live: Hand = [red, red, yellow, yellow].into_iter().collect();
+        let value = |chance: &dyn Fn(Card) -> f64| {
+            let graph = Graph::weighed(&rules, live, chance, &[(hand, 9)], Prune::default());
+            root(&graph, &free(), 1, Payoff::Points)
+        };
+        assert!((value(&|_| 1.0) - 15.0).abs() < 1e-12);
+        // Every card alike is no card weighed
+        assert!((value(&|_| 0.7) - 15.0).abs() < 1e-12);
+        // 2 × 0.5 of 2 × 0.5 + 2
+        assert!((value(&|card| if card == red { 0.5 } else { 1.0 }) - 10.0).abs() < 1e-12);
     }
 
     /// The recurrence expanded directly, claims judged by the round's own

@@ -18,7 +18,7 @@
 //! `run.sh` runs in `ab/`) in place of `Eval::default`; and with `ORACLE`
 //! (`live`, `danger`, or its halves `win` and `claim`) that `ExpectBot`
 //! with one input read off the other hands (`oracle.rs`); and with `WARY`
-//! `ExpectBot::wary`.  Set `BASELINE_SAMPLES` to seat the control's
+//! `ExpectBot::wary`, with `COUNTING` `ExpectBot::counting`.  Set `BASELINE_SAMPLES` to seat the control's
 //! `MonteCarloBot` of that many samples in seat 1 on the control side, gated
 //! at `GATE_CARDS` (default 10), in place of its `HeuristicBot`: a head to
 //! head of two bots that each beat it.  Set `BASELINE_EXPECT` to seat the
@@ -103,7 +103,7 @@ enum Outcome {
     Split(Split),
 }
 
-/// `EXPECT`'s bot, before `WARY` and `ORACLE`
+/// `EXPECT`'s bot, before `WARY`, `COUNTING` and `ORACLE`
 fn expect_bot(rules: &new::Rules) -> Option<new::ExpectBot> {
     let gate = |name| std::env::var(name).ok().map(|s| s.parse().unwrap());
     // `EXPECT` puts an ExpectBot in the candidate seat, h scaled by it.
@@ -145,6 +145,9 @@ fn candidate_bot(rules: &new::Rules, seed: u64) -> Box<dyn new::Strategy> {
     if let Some(mut bot) = expect_bot(rules) {
         if std::env::var_os("WARY").is_some() {
             bot = bot.wary();
+        }
+        if std::env::var_os("COUNTING").is_some() {
+            bot = bot.counting();
         }
         #[cfg(feature = "peek")]
         if let Ok(kind) = std::env::var("ORACLE") {

@@ -5,6 +5,9 @@
 //! measured here against what every seat can see of the card, and
 //! [`ExpectBot::wary`](crate::ExpectBot::wary) takes it off the discard's
 //! value.  The design and the measurement are in `doc/opponents.md`, batch 3.
+//! The same evidence says how often a card not seen still comes up:
+//! [`Giveaway::chance`], which
+//! [`ExpectBot::counting`](crate::ExpectBot::counting) counts the card by.
 //!
 //! A concealed hand only shrinks: nothing drawn enters it.  So a card the
 //! next seat let go it has still no use for, and one it threw from its hand
@@ -50,6 +53,22 @@ const FRESH: [[f64; 6]; 3] = [
     [0.896, 0.581, 0.753, 0.887, 0.937, 1.236],
     [0.357, 0.274, 0.297, 0.330, 0.569, 0.639],
     [0.109, 0.109, 0.109, 0.109, 0.109, 0.109],
+];
+
+/// How often a copy of a [`Evidence::Thrown`] card comes up and is left to
+/// the seat, over a card of its rank at large
+const COMES_THROWN: f64 = 0.988;
+
+/// The same of a [`Evidence::Passed`] card
+const COMES_PASSED: f64 = 1.019;
+
+/// The same of a [`Evidence::Fresh`] card, by `thrown` and by `unseen`
+// ponytail: measured as `FRESH` is, by `examples/kept.rs` (4,500 rounds,
+// seed 700), over the whole round: one table for every stage of it.
+const COMES_FRESH: [[f64; 6]; 3] = [
+    [1.004, 1.029, 1.046, 1.002, 0.959, 0.993],
+    [0.971, 1.010, 0.977, 0.939, 1.012, 0.978],
+    [0.822, 0.822, 0.822, 0.822, 0.822, 0.822],
 ];
 
 /// What each discard of a seat gives the next one, by the public cards
@@ -113,6 +132,19 @@ impl Giveaway {
             Evidence::Thrown => THROWN,
             Evidence::Passed => PASSED,
             Evidence::Fresh { thrown, unseen } => FRESH[thrown][unseen],
+        }
+    }
+
+    /// How often a copy of `card` the seat has not seen comes up before the
+    /// round ends, drawn or thrown from the next seat's hand, and is not
+    /// taken by that seat, over a card of its rank at large: the mean over
+    /// cards with the same [`Evidence`]
+    #[must_use]
+    pub fn chance(&self, card: Card) -> f64 {
+        match self.evidence(card) {
+            Evidence::Thrown => COMES_THROWN,
+            Evidence::Passed => COMES_PASSED,
+            Evidence::Fresh { thrown, unseen } => COMES_FRESH[thrown][unseen],
         }
     }
 }

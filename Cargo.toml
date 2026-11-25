@@ -77,6 +77,10 @@ name = "hazard"
 required-features = ["rand"]
 
 [[example]]
+name = "kept"
+required-features = ["rand"]
+
+[[example]]
 name = "leaves"
 required-features = ["rand"]
 
@@ -90,6 +94,10 @@ required-features = ["rand"]
 
 [[example]]
 name = "overspend"
+required-features = ["rand"]
+
+[[example]]
+name = "posterior"
 required-features = ["rand"]
 
 [[example]]
