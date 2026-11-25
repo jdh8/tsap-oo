@@ -13,7 +13,7 @@ draws a round; since `07d5602` (2026-11-21) the hand of the empty seats is
 dead and a table of two draws 25 ([`variants.md`](variants.md)).  And its
 control was `HeuristicBot`; what ships at two players now is `ExpectBot`
 with tables of its own.  The room left above the bot that ships is not
-known.
+known.  (P has measured it since: +1.874 ± 0.200 against the desktop bot.)
 
 **The table is two players at 10 胡**, where the Peeker's signal was more
 than ten standard errors in 3,200 deals, where a point the opponent gains is
@@ -40,9 +40,9 @@ Update this table when a batch is done.
 | Batch | Output | Changes play | Gate | Status |
 | --- | --- | --- | --- | --- |
 | 0 | `examples/hazard.rs`, `ab/src/oracle.rs`, `ExpectBot::outlook_mut`, this document | No; owes zero deals that part | None | Done: zero deals part in all three runs |
-| 1 | The oracles and the Peeker at two players, and the bot that ships against `HeuristicBot` | No: oracles never ship | None | A to D are in: `danger` and `live` win on the web, `waits` and `cards` are closed.  P, the H runs, C′ and D′ are in flight |
+| 1 | The oracles and the Peeker at two players, and the bot that ships against `HeuristicBot` | No: oracles never ship | None | All in but D′: `danger` and `live` win on the web, `live` on the desktop too; `waits` and `cards` are closed.  D′ is in flight |
 | 2 | h by the fewest concealed cards into `Outlook` | Yes | `cards` wins on the web and on the desktop | Not started: B did not win |
-| 3 | An inference for each open channel, largest first | Yes | Its oracle wins on both settings; a gatekeeper is in place | Waits on C′ and D′ |
+| 3 | An inference for each open channel, largest first | Yes | Its oracle wins on both settings; a gatekeeper is in place | `live` is open; `danger` waits on D′ |
 
 ## The oracles
 
@@ -208,8 +208,11 @@ Each runs only if its web run is a win (`pueue add --after`, as
 | --- | --- | ---: | ---: | ---: | --- | --- |
 | A′ | `waits` | 1804100000 | | | | not run: A is not a win |
 | B′ | `cards` | 1804200000 | | | | not run: B is not a win |
-| C′ | `live` | 1804300000 | | | | |
+| C′ | `live` | 1804300000 | 5,921 | +0.172 ± 0.039 | [+0.095, +0.249] | win |
 | D′ | `danger` | 1804400000 | | | | |
+
+`live` is open: worth more to the desktop bot than to the web one (+0.172
+against +0.107), not less as the risk below feared.
 
 **The Peeker against the bot that ships**, 3,200 deals as on 2026-11-17,
 `RESHUFFLE=0` (every replay would be a search), candidate `SAMPLES=128
@@ -218,7 +221,12 @@ the desktop bot.
 
 | Run | seed base | Differ | Candidate − control | 95% CI | Verdict |
 | --- | ---: | ---: | ---: | --- | --- |
-| P | 1803700000 | | | | |
+| P | 1803700000 | 1,806 | +1.874 ± 0.200 | [+1.482, +2.267] | win |
+
+The room above the bot that ships is two thirds of the void +2.824, which
+was against `HeuristicBot` with 65 draws a round.  `danger` on the web
+(+0.984) is half of it, `live` on the desktop a tenth; they are measured
+one at a time and on different settings, so they need not add up.
 
 **The bot that ships against `HeuristicBot`**, which
 [`variants.md`](variants.md) lists as never measured under the rule in
@@ -226,9 +234,12 @@ force.  Candidate `EXPECT=new`, control the default seat, `RESHUFFLE=8`.
 
 | Run | Table | Setting | Deals | seed base | Part | Candidate − control | 95% CI | Verdict |
 | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |
-| H2 | two players | Web | 10,000 | 1803800000 | | | | |
-| H3 | three players | Web | 10,000 | 1803900000 | | | | |
-| H2′ | two players | Desktop | 4,000 | 1804000000 | | | | |
+| H2 | two players | Web | 10,000 | 1803800000 | 8,583 | +0.405 ± 0.042 | [+0.324, +0.487] | win |
+| H3 | three players | Web | 10,000 | 1803900000 | 8,568 | +0.348 ± 0.063 | [+0.225, +0.472] | win |
+| H2′ | two players | Desktop | 4,000 | 1804000000 | 3,382 | +0.615 ± 0.067 | [+0.483, +0.746] | win |
+
+The bot that ships beats `HeuristicBot` at two and at three players at
+10 胡, and on the desktop at two by half again as much as on the web.
 
 ### How the verdicts are read
 

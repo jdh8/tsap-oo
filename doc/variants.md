@@ -228,9 +228,12 @@ picked.
    under three players' `Outlook`, so the two have to change together).
 5. **The numbers under the old rules stay in `research/outlook.md`, "Tables
    of two and three", all void.**  They include `ExpectBot`'s +0.106 and
-   +0.118 against `HeuristicBot`.  Under the new rules the overall
-   difference of `ExpectBot` from `HeuristicBot` at a small table has not
-   been measured directly.
+   +0.118 against `HeuristicBot`.  Under the new rules the bot that ships
+   beats `HeuristicBot` at 10 胡 (`opponents.md`, H runs, `RESHUFFLE=8`,
+   control `1430e6b`): two players web +0.405 ± 0.042, 10,000 deals, seed
+   base 1803800000; three players web +0.348 ± 0.063, 10,000 deals,
+   1803900000; two players desktop +0.615 ± 0.067, 4,000 deals,
+   1804000000; all wins.
 6. **`HeuristicBot`'s constants are those of four players.**  One place is
    known to differ at a small table: not feeding the next seat (`FEED` 4)
    was a win at a table of two under the old rules (+0.007 ± 0.003) and
