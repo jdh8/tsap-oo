@@ -31,8 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   insufficient data and closed: neither CI reaches +0.1.  The zero runs of
   the hooks part on no deal (2,000, 2,000 and 500 deals, seed bases
   1803000000 to 1803200000).  On the desktop setting, 8,000 deals:
-  `live` +0.172 ± 0.039, [+0.095, +0.249], 5,921 part, seed base
-  1804300000, win, so `live` is open; `danger` is not in yet.  The Peeker
+  `danger` +1.039 ± 0.051, [+0.939, +1.139], 6,024 part, seed base
+  1804400000, win, and `live` +0.172 ± 0.039, [+0.095, +0.249], 5,921 part,
+  seed base 1804300000, win, so both are open.  The Peeker
   (`RESHUFFLE=0`, 3,200 deals, seed base 1803700000) against the desktop
   bot: +1.874 ± 0.200, [+1.482, +2.267], 1,806 differ, win.  The bot that
   ships against `HeuristicBot`: two players web +0.405 ± 0.042, [+0.324,

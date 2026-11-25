@@ -40,9 +40,9 @@ Update this table when a batch is done.
 | Batch | Output | Changes play | Gate | Status |
 | --- | --- | --- | --- | --- |
 | 0 | `examples/hazard.rs`, `ab/src/oracle.rs`, `ExpectBot::outlook_mut`, this document | No; owes zero deals that part | None | Done: zero deals part in all three runs |
-| 1 | The oracles and the Peeker at two players, and the bot that ships against `HeuristicBot` | No: oracles never ship | None | All in but D′: `danger` and `live` win on the web, `live` on the desktop too; `waits` and `cards` are closed.  D′ is in flight |
+| 1 | The oracles and the Peeker at two players, and the bot that ships against `HeuristicBot` | No: oracles never ship | None | Done: `danger` and `live` win on the web and on the desktop; `waits` and `cards` are closed |
 | 2 | h by the fewest concealed cards into `Outlook` | Yes | `cards` wins on the web and on the desktop | Not started: B did not win |
-| 3 | An inference for each open channel, largest first | Yes | Its oracle wins on both settings; a gatekeeper is in place | `live` is open; `danger` waits on D′ |
+| 3 | An inference for each open channel, largest first | Yes | Its oracle wins on both settings; a gatekeeper is in place | `danger` and `live` are open, `danger` first; not started |
 
 ## The oracles
 
@@ -209,10 +209,11 @@ Each runs only if its web run is a win (`pueue add --after`, as
 | A′ | `waits` | 1804100000 | | | | not run: A is not a win |
 | B′ | `cards` | 1804200000 | | | | not run: B is not a win |
 | C′ | `live` | 1804300000 | 5,921 | +0.172 ± 0.039 | [+0.095, +0.249] | win |
-| D′ | `danger` | 1804400000 | | | | |
+| D′ | `danger` | 1804400000 | 6,024 | +1.039 ± 0.051 | [+0.939, +1.139] | win |
 
-`live` is open: worth more to the desktop bot than to the web one (+0.172
-against +0.107), not less as the risk below feared.
+`live` and `danger` are both open, and both worth more to the desktop bot
+than to the web one (+0.172 against +0.107, +1.039 against +0.984), not
+less as the risk below feared.
 
 **The Peeker against the bot that ships**, 3,200 deals as on 2026-11-17,
 `RESHUFFLE=0` (every replay would be a search), candidate `SAMPLES=128
