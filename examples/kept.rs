@@ -261,7 +261,8 @@ fn main() {
             line(&format!("{} or {}", 2 * unseen, 2 * unseen + 1), cell);
         }
     }
-    // The ratio in a rank of the cards left free, as a table beside `FRESH`
+    // The ratio in a rank of the cards left free, as the table `dbe68dc`'s
+    // `Giveaway::chance` held
     let ratio = |c: Count| c.free as f64 / c.left.max(f64::MIN_POSITIVE);
     println!("\nconst COMES_THROWN: f64 = {:.3};", ratio(counts[0]));
     println!("const COMES_PASSED: f64 = {:.3};", ratio(counts[1]));

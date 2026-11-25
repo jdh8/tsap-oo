@@ -69,25 +69,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pays 0.315 ± 0.042 for a card eaten where the oracle, one card ahead,
   charges 1.747, and a card ponged is the better one to throw.
 
-- `Giveaway::chance` reads how often a card a seat has not seen still
-  comes off the public cards, `Graph::weighed` counts each copy of a live
-  card as its chance of one, and `ExpectBot::counting` builds its graphs
-  so; it is off unless asked for, and no bot that ships asks.  `cargo run
-  --release --example kept -- [rounds] [seed]` measures the chances: at a
-  table of two, where the copies of each kind the web page's bot has not
-  seen are, and how many come up before the round ends, by the kind's
-  `Evidence`.  Over 4,500 rounds each way, seed 700, `HeuristicBot` keeps
-  7.2% of the copies of a kind it threw and 14.3% of one it has shown
-  nothing about, and of the cards it leaves free the first come up 0.988
-  times as often as their rank at large and the second 1.004: the public
-  cards say next to nothing about what still comes.  `COUNTING=1` in `ab/`
-  seats `ExpectBot::counting`.  The design and the runs declared for it are
-  batch 3 of `doc/opponents.md`.  At two players and 10 胡 on the web
-  setting, control `8a8ecf9`, `RESHUFFLE=8`: the bots as they ship part on
-  0 of 2,000 deals (seed base 1805000000); `COUNTING=1` is −0.006 ± 0.009
-  points a deal, 95% CI [−0.025, +0.012], over 40,000 deals (1805100000),
-  9,929 part: insufficient data, and closed as declared, since the CI does
-  not reach +0.05.  Its desktop run was not made.
+- `cargo run --release --example kept -- [rounds] [seed]` measures what
+  the public cards say of the cards still to come at a table of two: where
+  the copies of each kind the web page's bot has not seen are, and how many
+  come up before the round ends, by the kind's `Evidence`.  Over 4,500
+  rounds each way, seed 700, `HeuristicBot` keeps 7.2% of the copies of a
+  kind it threw and 14.3% of one it has shown nothing about, and of the
+  cards it leaves free the first come up 0.988 times as often as their rank
+  at large and the second 1.004: next to nothing.  An `ExpectBot` counting
+  each unseen card by that table (`COUNTING=1` in `ab/`) was measured and
+  taken out; `dbe68dc` has it.  At two players and 10 胡 on the web
+  setting, control `8a8ecf9`, `RESHUFFLE=8`: the bots as they ship parted
+  on 0 of 2,000 deals with the hook in (seed base 1805000000); `COUNTING=1`
+  was −0.006 ± 0.009 points a deal, 95% CI [−0.025, +0.012], over 40,000
+  deals (1805100000), 9,929 part: insufficient data, and closed as
+  declared, since the CI does not reach +0.05.  Its desktop run was not
+  made.  The design is batch 3 of `doc/opponents.md`.  No bot changes.
 
 - `cargo run --release --example posterior -- [rounds] [seed]` measures
   what the other seat's whole history says of its hand at a table of two:

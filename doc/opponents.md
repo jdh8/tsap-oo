@@ -559,7 +559,8 @@ with the copies of the run not seen by twos, as `Giveaway::cost` has them.
 `Graph::weighed` counts each copy of a live card as its chance of one, in
 the entries and in the count of its rank, so every card weighed alike is no
 card weighed; `ExpectBot::counting` builds its graphs so.  It is off unless
-asked for; `COUNTING=1` asks in `ab/`.
+asked for; `COUNTING=1` asks in `ab/`.  All of it is only in `dbe68dc`:
+L closed it.
 
 Approximations: the chances are over the rest of the round, one table for
 every stage of it; they weigh the cards that come and not the pruning nor a
@@ -607,8 +608,7 @@ The upper end of the CI, +0.012, is under +0.05, so this evidence is closed
 for `live` as declared: the table said there was nothing to weigh, and
 weighing by it moves nothing that 40,000 deals can see.  L′ was not run.
 `ExpectBot::counting`, `Giveaway::chance` and `Graph::weighed` are taken
-out in the commit after the one that records this; `examples/kept.rs` and
-the table stay.
+out; `dbe68dc` has them.  `examples/kept.rs` and the table stay.
 
 ## Batch 4: the other seat's hand from its whole history
 
