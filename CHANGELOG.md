@@ -21,9 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offer them under 「設定」 as 「結算」 and 「點花」, and the result sheet
   shows the 點花, the 花胡 and what each seat pays.  With both off play
   is as it was: `ab/run.sh 2000` against `8173c01`, seed base 1795672457,
-  `RESHUFFLE=8`, zero deals part.  No bot knows either
-  rule and nothing is measured under them (`doc/variants.md`, "底 and
-  點花"); the hint's points are still those of the whole 胡.
+  `RESHUFFLE=8`, zero deals part.  No bot knows either rule; the hint's
+  points are still those of the whole 胡.  `ExpectBot`'s DP reading the
+  底 (a win paid `Rules::pays`, a 相公 `Rules::foul`, `Outlook::loss` less
+  what a 底 leaves unpaid) was measured at a 底 of 1 against `b44ad28`,
+  four players at 10 胡, `RESHUFFLE=8`, and stays out of `main`: alone,
+  with `HeuristicBot` past the gate, +0.009 ± 0.002 points a deal, 95% CI
+  [+0.006, +0.012], 200,000 deals, seed base 1795676472, 8,782 part, win;
+  as the web's bot, whose `Eval` tables past the gate were learnt on the
+  whole 胡, −0.740 ± 0.014, [−0.767, −0.713], 30,000 deals, seed base
+  1795679206, 21,979 part, loss; the web's bot without those tables
+  against the web's bot with them, +0.008 ± 0.013, [−0.018, +0.034],
+  30,000 deals, seed base 1795685070, 24,205 part, insufficient data
+  (`doc/variants.md`, "The DP reads the 底").
 
 - `doc/opponents.md` plans reading the opponent at a table of two: an
   oracle for each channel before any inference is written.  `ORACLE=live`,

@@ -159,7 +159,9 @@ Added 2026-11-26, base `8173c01`.  Two settlement rules, both off in
 `Rules::new` and both under 「設定」 on the web page and in the desktop app
 (「結算」, 「點花」).  **The rules engine has them and no bot knows of
 either.  One change has been measured under a 底 ("The DP reads the 底"
-below), and 30,000 deals do not tell it from nothing.**
+below): alone it is a win of +0.009 points a deal, and with the web's
+tables, learnt on the whole 胡, a loss of 0.74 a deal.  It is not in
+`main`.**
 
 | Rule | Field | What it does | Source |
 | --- | --- | --- | --- |
@@ -195,7 +197,7 @@ Board Game Arena's figure; the field takes any.
   `FLOWER`: 點花 is left alone.  Every change to how a bot plays under a
   底 is its own run.
 
-### The DP reads the 底: insufficient data
+### The DP reads the 底: a win alone, a loss with the tables
 
 Declared 2026-11-26, before any data.  The control is `b44ad28` throughout,
 four players at 10 胡, `RESHUFFLE=8`, each run on the clock's seed base.
@@ -213,9 +215,9 @@ leaves in the old; `HeuristicBot` is not touched.
 | `base-zero-web` | none | `EXPECT=new GATE_CARDS=10 SHALLOW=0` | `BASELINE_EXPECT=new BASELINE_SHALLOW=0` | 2,000 | No deal parts | 1795672484 | 0 | As declared |
 | `base-zero-desktop` | none | `EXPECT=new GATE_CARDS=14 SHALLOW=17` | `BASELINE_EXPECT=new BASELINE_GATE=14 BASELINE_SHALLOW=17` | 500 | No deal parts | 1795672583 | 0 | As declared |
 | `base-leaves` | 1 | `EXPECT=new GATE_CARDS=10`: the DP in the gate, `HeuristicBot` past it | `BASELINE_EXPECT=1`: the same with the whole 胡 | 30,000 | A win | 1795672717 | 1,300 | +0.005 ± 0.004, 95% CI [−0.003, +0.013]: insufficient data |
-| `base-leaves-2` | 1 | The same as `base-leaves` | The same | 200,000 | A win | | | Queued |
-| `base-web` | 1 | `EXPECT=new GATE_CARDS=10 SHALLOW=0`: the web's bot | `BASELINE_EXPECT=new BASELINE_SHALLOW=0`: the web's bot today | 30,000 | Not known; only if `base-leaves` or `base-leaves-2` wins | | | Queued behind `base-leaves-2` |
-| `base-web-bare` | 1 | `EXPECT=new GATE_CARDS=10`: the web's bot without the tables | `BASELINE_EXPECT=new BASELINE_SHALLOW=0` | 30,000 | Not known; only if `base-leaves` or `base-leaves-2` wins | | | Queued behind `base-leaves-2` |
+| `base-leaves-2` | 1 | The same as `base-leaves` | The same | 200,000 | A win | 1795676472 | 8,782 | +0.009 ± 0.002, 95% CI [+0.006, +0.012]: win |
+| `base-web-2` | 1 | `EXPECT=new GATE_CARDS=10 SHALLOW=0`: the web's bot | `BASELINE_EXPECT=new BASELINE_SHALLOW=0`: the web's bot today | 30,000 | Not known; only if `base-leaves` or `base-leaves-2` wins | 1795679206 | 21,979 | −0.740 ± 0.014, 95% CI [−0.767, −0.713]: loss |
+| `base-web-bare-2` | 1 | `EXPECT=new GATE_CARDS=10`: the web's bot without the tables | `BASELINE_EXPECT=new BASELINE_SHALLOW=0` | 30,000 | Not known; only if `base-leaves` or `base-leaves-2` wins | 1795685070 | 24,205 | +0.008 ± 0.013, 95% CI [−0.018, +0.034]: insufficient data |
 
 Read 2026-11-26.  Without a 底 no deal parts, with the web's bot or the
 desktop's.  With a 底 of 1 the change alone parts on 1,300 deals of 30,000
@@ -230,6 +232,39 @@ Declared 2026-11-26, before its data: `base-leaves-2` is the same run at
 200,000 deals on a fresh seed base.  It gives its verdict alone; the 30,000
 deals above are not pooled into it.  The two web runs wait on it as they
 waited on the first.
+
+Read 2026-11-26.  **Alone the change is a win.**  Over 200,000 deals it
+parts on 8,782 (among them a mean of +0.200, a standard deviation of 5.49
+within a deal and 2.57 between), +0.009 ± 0.002 points a deal, 95% CI
+[+0.006, +0.012]; its seat wins 24.35% of the deals against the control's
+24.45%, so it wins a little less often and collects more when it does.
+**With the web's tables it is a heavy loss.**  As the web's bot, the DP
+with `Eval`'s leaves past the gate, it parts on 21,979 deals of 30,000 and
+loses 0.740 ± 0.014 a deal, 95% CI [−0.767, −0.713]; its seat wins 16.88%
+of the deals against 25.01%.  The mechanism is the one declared above:
+past the gate the graph's wins are in the 底's points (a win of 12 胡
+collects 3 a seat) while its leaves, `Eval`'s values, are in the whole 胡
+(a hand near winning is worth about 10 a seat), so a hand that wins is
+worth less than one that stays a leaf, and the bot steers away from the
+shapes that win.  A trace of the loss (`base-web-trace`, 2,000 deals, seed
+base 1795694203, `TRACE` on; −0.846 ± 0.057, 1,451 part) finds no few
+deals to blame: 912 splits are discards at a mean of −1.10 and 539 are
+claims at −1.28, the largest single kind the control's pong passed over by
+the candidate (56 deals, −3.35), and the mean loss a split grows from −0.8
+in the first five decisions to −1.9 past twenty, where the leaves are
+nearest.  **Without the tables the web's bot
+is not told from the one it has.**  The DP in the gate reading the 底 and
+`HeuristicBot` past it, against the web's bot today with its tables,
+parts on 24,205 deals of 30,000 and is +0.008 ± 0.013, 95% CI [−0.018,
++0.034], insufficient data: under a 底 the tables as they are give the
+web's bot nothing that can be measured.
+
+What follows.  The change is a win only where `HeuristicBot` plays past
+the gate, which neither client ships, and a loss as the web's bot, which
+both do with a 底 on; so it stays out of `main` until `Eval` is retrained
+on rounds paid with a 底 (then `base-web-2` again), or the 底 is read in
+the gate only and the shallow graph keeps the whole 胡 (its own run on
+the web's setting).  Neither is started.
 
 `base-leaves` is the change alone.  The other two are what the web would
 ship under a 底 before the tables are retrained: the tables as they are,
