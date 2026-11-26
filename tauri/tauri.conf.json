@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "io.github.jdh8.tsap-oo",
   "build": {
-    "frontendDist": ["../web/index.html", "../web/app.js", "../web/style.css"]
+    "frontendDist": ["../web/index.html", "../web/app.js", "../web/style.css", "../web/icon.svg"]
   },
   "app": {
     "withGlobalTauri": true,

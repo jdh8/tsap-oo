@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<!-- web/icon.svg on the macOS icon grid: an 824 tile, corner radius 185.
+     Regenerate the PNG: rsvg-convert -w 512 -h 512 icon.svg -o icon.png -->
+<rect x="100" y="100" width="824" height="824" rx="185" fill="#24507a"/>
+<g transform="translate(512 512) scale(34.333)">
+<circle r="6.5" fill="none" stroke="#fff" stroke-width="1.5"/>
+<path d="M0,-3l3,3 -3,3 -3,-3z" fill="#fff"/>
+</g>
+</svg>

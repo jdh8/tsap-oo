@@ -29,13 +29,28 @@ cargo run --release
 
 From the repository root, `cargo desktop` is the same command.
 
-No Tauri CLI and no wasm build are needed: `cargo` embeds the three files
+No Tauri CLI and no wasm build are needed: `cargo` embeds the files
 `tauri.conf.json` lists.  A change to `web/` shows after the next build.
 
 On Linux Tauri links WebKitGTK 4.1.  On Fedora:
 
 ```console
 sudo dnf install webkit2gtk4.1-devel gtk3-devel libsoup3-devel
+```
+
+On Wayland the window has no icon of its own: GNOME takes it from the
+`.desktop` file named after the window's app id, which is the binary's name.
+Without a package to install one, write it by hand, with your checkout's
+paths:
+
+```ini
+# ~/.local/share/applications/tsap-oo-tauri.desktop
+[Desktop Entry]
+Type=Application
+Name=十胡
+Exec=/path/to/tsap-oo/tauri/target/release/tsap-oo-tauri
+Icon=/path/to/tsap-oo/tauri/icons/icon.png
+StartupWMClass=tsap-oo-tauri
 ```
 
 ## Adding an engine call

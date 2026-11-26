@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-9 -9 18 18">
+<!-- The book's coin (../tsap-oo-book/fig.py) in white on the table's felt,
+     filling the tile as a favicon's glyph should: 16 px leaves no room for margins -->
+<rect x="-9" y="-9" width="18" height="18" rx="4" fill="#24507a"/>
+<circle r="6.5" fill="none" stroke="#fff" stroke-width="1.5"/>
+<path d="M0,-3l3,3 -3,3 -3,-3z" fill="#fff"/>
+</svg>

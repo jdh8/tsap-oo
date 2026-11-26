@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- An icon: the book's coin in white on the table's blue, on a rounded tile.
+  The web page's favicon (`web/icon.svg`) fills its square with the tile;
+  the desktop app's (`tauri/icons/icon.svg`, rendered to `icon.png`) keeps
+  the macOS margin.  It replaces the desktop app's red 十 on a card.
+  `tauri/README.md` says how to show it under Wayland, which takes it from
+  a `.desktop` file.
 - Two settlement rules, both off in `Rules::new`.  `Rules::base` is a 底:
   each seat pays the 底 and the 胡 above the threshold in place of the
   whole 胡 (`Rules::pays`; at a 底 of 1, 13 胡 is paid 1 + 3), and a 相公
