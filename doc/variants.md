@@ -218,6 +218,7 @@ leaves in the old; `HeuristicBot` is not touched.
 | `base-leaves-2` | 1 | The same as `base-leaves` | The same | 200,000 | A win | 1795676472 | 8,782 | +0.009 ± 0.002, 95% CI [+0.006, +0.012]: win |
 | `base-web-2` | 1 | `EXPECT=new GATE_CARDS=10 SHALLOW=0`: the web's bot | `BASELINE_EXPECT=new BASELINE_SHALLOW=0`: the web's bot today | 30,000 | Not known; only if `base-leaves` or `base-leaves-2` wins | 1795679206 | 21,979 | −0.740 ± 0.014, 95% CI [−0.767, −0.713]: loss |
 | `base-web-bare-2` | 1 | `EXPECT=new GATE_CARDS=10`: the web's bot without the tables | `BASELINE_EXPECT=new BASELINE_SHALLOW=0` | 30,000 | Not known; only if `base-leaves` or `base-leaves-2` wins | 1795685070 | 24,205 | +0.008 ± 0.013, 95% CI [−0.018, +0.034]: insufficient data |
+| `base-web-gate` | 1 | `EXPECT=new GATE_CARDS=10 SHALLOW=0`: the web's bot, the 底 read in the gate only | `BASELINE_EXPECT=new BASELINE_SHALLOW=0`, control `e0ac321` | 100,000 | A win, near +0.01 | 1795695031 | 5,945 | +0.017 ± 0.002, 95% CI [+0.012, +0.021]: win |
 
 Read 2026-11-26.  Without a 底 no deal parts, with the web's bot or the
 desktop's.  With a 底 of 1 the change alone parts on 1,300 deals of 30,000
@@ -264,7 +265,26 @@ the gate, which neither client ships, and a loss as the web's bot, which
 both do with a 底 on; so it stays out of `main` until `Eval` is retrained
 on rounds paid with a 底 (then `base-web-2` again), or the 底 is read in
 the gate only and the shallow graph keeps the whole 胡 (its own run on
-the web's setting).  Neither is started.
+the web's setting).  The second is declared below.
+
+Declared 2026-11-26, before its data: `base-web-gate`.  `ExpectBot::values`
+builds the shallow graph with `Rules::base` cleared, so past the gate wins
+and leaves are both in the whole 胡 and play there is the control's; in
+the gate the whole graph reads the 底 as in `base-leaves-2`.  The control
+is `main` HEAD, `e0ac321`, whose bots are `b44ad28`'s.  100,000 deals: the
+deals that part should be the gate's alone, near `base-leaves-2`'s 4%,
+where 30,000 deals did not resolve an effect of this size.
+
+Read 2026-11-26.  **Read in the gate only, the 底 is a win as the web's
+bot.**  Over 100,000 deals it parts on 5,945 (among them a mean of
++0.280, a standard deviation of 5.09 within a deal and 2.45 between),
++0.017 ± 0.002 points a deal, 95% CI [+0.012, +0.021]; its seat wins
+25.19% of the deals against the control's 25.29%, so again it wins a
+little less often and collects more when it does.  The deals that part,
+6%, are near `base-leaves-2`'s 4%: past the gate play is the control's,
+as declared.  `ExpectBot` reads the 底 so in `main`; the desktop's gate
+under a 底, `Eval` retrained under one, and `HeuristicBot`'s weights are
+not run.
 
 `base-leaves` is the change alone.  The other two are what the web would
 ship under a 底 before the tables are retrained: the tables as they are,

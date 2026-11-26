@@ -31,7 +31,9 @@ pub struct Outlook {
     pub end: Vec<f64>,
     /// How many public cards a segment holds, by draws left
     pub cards: Vec<f64>,
-    /// What the seat scores then: minus what it pays the winner
+    /// What the seat scores then: minus the 胡 it pays the winner, before
+    /// any 底 ([`Rules::pays`](crate::Rules::pays)), which a [`Graph`]
+    /// takes off
     pub loss: f64,
     /// The chance a public card other than a general comes to the seat to
     /// eat: its own draw, or its 上家's that the 上家 lets go, or the
@@ -332,7 +334,8 @@ struct Entry {
 /// ceiling prunes.  It has no edges.
 #[derive(Debug, Clone)]
 pub struct Graph {
-    threshold: u32,
+    /// What a win and a 相公 pay
+    rules: Rules,
     /// The seats that pay a win and are paid a foul
     others: f64,
     /// The unseen cards of each rank
@@ -371,7 +374,7 @@ impl Graph {
             index: HashMap::new(),
             depth: 0,
             graph: Self {
-                threshold: rules.threshold,
+                rules: *rules,
                 others: (rules.players - 1) as f64,
                 unseen: live.distinct().fold([0.0; 7], |mut unseen, (card, n)| {
                     unseen[card.rank as usize] += f64::from(n);
@@ -518,7 +521,10 @@ impl Graph {
     ) -> Vec<f64> {
         assert_eq!(leaves.len(), self.leaves.len(), "one curve a leaf");
         let (loss, foul) = match payoff {
-            Payoff::Points => (outlook.loss, -self.others * f64::from(self.threshold)),
+            Payoff::Points => (
+                outlook.loss + unpaid(&self.rules),
+                -self.others * f64::from(self.rules.foul()),
+            ),
             Payoff::Win => (0.0, 0.0),
         };
         let mut before = vec![0.0; self.len()];
@@ -570,7 +576,7 @@ impl Graph {
                 for entry in &self.entries[first as usize..self.ends[node] as usize] {
                     let answer = match entry.kind {
                         Kind::Win(hu) => match payoff {
-                            Payoff::Points => self.others * f64::from(hu),
+                            Payoff::Points => self.others * f64::from(self.rules.pays(hu)),
                             Payoff::Win => 1.0,
                         },
                         Kind::Kong => forced(entry),
@@ -603,6 +609,12 @@ impl Graph {
         }
         before
     }
+}
+
+/// The 胡 of a win a 底 leaves unpaid, the same for every win since none
+/// is below the threshold: what [`Outlook::loss`], measured in 胡, is off by
+fn unpaid(rules: &Rules) -> f64 {
+    f64::from(rules.threshold) - f64::from(rules.pays(rules.threshold))
 }
 
 /// What [`ExpectBot::new`] scales the measured h by
@@ -801,7 +813,15 @@ impl ExpectBot {
             depth,
             ..Prune::default()
         };
-        let graph = Graph::new(view.rules(), live, &roots, prune);
+        let mut rules = *view.rules();
+        if depth.is_some() {
+            // ponytail: `Eval`'s leaves are in the whole 胡, so the shallow
+            // graph pays its wins in it too; a 底 is read in the gate only
+            // until the tables are retrained under one (`doc/variants.md`,
+            // "The DP reads the 底").
+            rules.base = None;
+        }
+        let graph = Graph::new(&rules, live, &roots, prune);
         let draws = Self::draws(view);
         let curves: Vec<_> = graph
             .leaves()
@@ -1269,7 +1289,7 @@ mod tests {
                 return v;
             }
             let stay = self.value(hand, base, t - 1);
-            let foul = -3.0 * f64::from(self.rules.threshold);
+            let foul = -3.0 * f64::from(self.rules.foul());
             // One card a draw, so every card but the last is drawn.
             let rates = if t == 1 {
                 self.outlook.discarded[0]
@@ -1304,7 +1324,7 @@ mod tests {
                     .max()
                     .filter(|&hu| hu >= self.rules.threshold);
                 let answer = if let Some(hu) = win {
-                    3.0 * f64::from(hu)
+                    3.0 * f64::from(self.rules.pays(hu))
                 } else if hand.count(card) == 3 {
                     claim(self, Meld::Quad(card))
                 } else {
@@ -1333,7 +1353,8 @@ mod tests {
                 sum += share * f64::from(count) * rates[card.rank as usize] / total * answer;
             }
             let end = self.outlook.end[0];
-            let v = end * self.outlook.loss + (1.0 - end) * sum;
+            let loss = self.outlook.loss + unpaid(self.rules);
+            let v = end * loss + (1.0 - end) * sum;
             self.memo.insert((hand, base, t), v);
             v
         }
@@ -1341,14 +1362,16 @@ mod tests {
 
     #[test]
     fn the_graph_is_the_recurrence() {
-        let rules = Rules::new();
+        let mut rules = Rules::new();
         let mut rng = Rng(0x9e37_79b9_7f4a_7c15);
         let unpruned = Prune {
             generals: None,
             ..Prune::default()
         };
         let mut claimed = 0;
-        for _ in 0..200 {
+        for i in 0..200 {
+            // Every other hand under a 底 of 1.
+            rules.base = (i % 2 == 1).then_some(1);
             let size = 1 + rng.below(6);
             let hand = rng.hand(Hand::FULL, size);
             let n = 8 + rng.below(16);
