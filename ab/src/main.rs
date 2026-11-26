@@ -28,7 +28,9 @@
 //! the candidate, its leaves read from the control's `Eval::default`, or
 //! with `BASELINE_EXPECT=new` from its `Eval::of`: the control as it ships.
 //! `PLAYERS` (default 4) is the table's size on both sides, and
-//! `THRESHOLD` (default 10) the 胡 to win: 8 is `Rules::eight`.
+//! `THRESHOLD` (default 10) the 胡 to win: 8 is `Rules::eight`.  `BASE` is
+//! the 底 on both sides (`Rules::base`), none unless set; the control must
+//! have the field.
 //!
 //! Set `RESHUFFLE` to K to average out the luck after the two first part
 //! ways: the deal is played once with the candidate, and at its first choice
@@ -71,6 +73,11 @@ fn players() -> usize {
 /// The 胡 to win: `THRESHOLD`, or ten
 fn threshold() -> u32 {
     std::env::var("THRESHOLD").map_or(10, |s| s.parse().unwrap())
+}
+
+/// The 底: `BASE`, or none
+fn base() -> Option<u32> {
+    std::env::var("BASE").ok().map(|s| s.parse().unwrap())
 }
 
 /// How many times the pile is reshuffled where the two part, unless
@@ -224,6 +231,7 @@ fn play(
     let (mut nr, mut or) = (new::Rules::new(), old::Rules::new());
     (nr.players, or.players) = (players(), players());
     (nr.threshold, or.threshold) = (threshold(), threshold());
+    (nr.base, or.base) = (base(), base());
     let mut a = new::Round::from_pile(nr, new::Seat::ALL[dealer], deck.to_vec()).unwrap();
     let mut b = old::Round::from_pile(or, old::Seat::ALL[dealer], deck.to_vec()).unwrap();
     let mut bot = candidate_bot(&nr, seed);

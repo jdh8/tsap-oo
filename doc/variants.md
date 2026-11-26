@@ -157,8 +157,9 @@ picked.
 
 Added 2026-11-26, base `8173c01`.  Two settlement rules, both off in
 `Rules::new` and both under 「設定」 on the web page and in the desktop app
-(「結算」, 「點花」).  **The rules engine has them; no bot knows of
-either, and nothing has been measured under them.**
+(「結算」, 「點花」).  **The rules engine has them and no bot knows of
+either.  One change has been measured under a 底 ("The DP reads the 底"
+below), and 30,000 deals do not tell it from nothing.**
 
 | Rule | Field | What it does | Source |
 | --- | --- | --- | --- |
@@ -189,10 +190,55 @@ Board Game Arena's figure; the field takes any.
   the whole 胡.  The 點花 is drawn after the round and is the same in
   expectation for any hand of singles, so it should move play little; that
   is not measured either.
-- **`ab/`** has no switch for either yet: the control is `main` HEAD's own
-  crate, which must have the fields first.  After that, `BASE` and
-  `FLOWER` set on both sides, as `THRESHOLD` and `PLAYERS` are, and every
-  change to how a bot plays under a 底 is its own run.
+- **`ab/`** has `BASE`, set on both sides as `THRESHOLD` and `PLAYERS`
+  are; the control must have the field, so `b44ad28` or later.  There is no
+  `FLOWER`: 點花 is left alone.  Every change to how a bot plays under a
+  底 is its own run.
+
+### The DP reads the 底: insufficient data
+
+Declared 2026-11-26, before any data.  The control is `b44ad28` throughout,
+four players at 10 胡, `RESHUFFLE=8`, each run on the clock's seed base.
+
+`Graph` pays a win `Rules::pays` and a 相公 `Rules::foul`, and takes off
+`Outlook::loss`, which is measured in 胡, what a 底 leaves unpaid.  Every
+win is at the threshold or above, so that is the same 9 for each at a 底
+of 1: −12.26 is −3.26, exactly so while the other seats play as they did.
+Without a 底 none of the three moves.  `Eval`'s tables are not retrained,
+so past the gate a shallow graph has its wins in the new points and its
+leaves in the old; `HeuristicBot` is not touched.
+
+| Run | 底 | Candidate | Control | Deals | Declared | Seed base | Part | Result |
+| --- | --- | --- | --- | ---: | --- | ---: | ---: | --- |
+| `base-zero-web` | none | `EXPECT=new GATE_CARDS=10 SHALLOW=0` | `BASELINE_EXPECT=new BASELINE_SHALLOW=0` | 2,000 | No deal parts | 1795672484 | 0 | As declared |
+| `base-zero-desktop` | none | `EXPECT=new GATE_CARDS=14 SHALLOW=17` | `BASELINE_EXPECT=new BASELINE_GATE=14 BASELINE_SHALLOW=17` | 500 | No deal parts | 1795672583 | 0 | As declared |
+| `base-leaves` | 1 | `EXPECT=new GATE_CARDS=10`: the DP in the gate, `HeuristicBot` past it | `BASELINE_EXPECT=1`: the same with the whole 胡 | 30,000 | A win | 1795672717 | 1,300 | +0.005 ± 0.004, 95% CI [−0.003, +0.013]: insufficient data |
+| `base-leaves-2` | 1 | The same as `base-leaves` | The same | 200,000 | A win | | | Queued |
+| `base-web` | 1 | `EXPECT=new GATE_CARDS=10 SHALLOW=0`: the web's bot | `BASELINE_EXPECT=new BASELINE_SHALLOW=0`: the web's bot today | 30,000 | Not known; only if `base-leaves` or `base-leaves-2` wins | | | Queued behind `base-leaves-2` |
+| `base-web-bare` | 1 | `EXPECT=new GATE_CARDS=10`: the web's bot without the tables | `BASELINE_EXPECT=new BASELINE_SHALLOW=0` | 30,000 | Not known; only if `base-leaves` or `base-leaves-2` wins | | | Queued behind `base-leaves-2` |
+
+Read 2026-11-26.  Without a 底 no deal parts, with the web's bot or the
+desktop's.  With a 底 of 1 the change alone parts on 1,300 deals of 30,000
+(among them a mean of +0.108, a standard deviation of 5.36 within a deal
+and 2.75 between) and its seat wins 24.82% of the deals against the
+control's 24.93%.  The CI straddles 0, which is neither a win nor a loss:
+the two runs behind it did not start, and the change stays out of `main`.
+At this spread an effect of +0.005 needs about 170,000 deals for a CI clear
+of 0.
+
+Declared 2026-11-26, before its data: `base-leaves-2` is the same run at
+200,000 deals on a fresh seed base.  It gives its verdict alone; the 30,000
+deals above are not pooled into it.  The two web runs wait on it as they
+waited on the first.
+
+`base-leaves` is the change alone.  The other two are what the web would
+ship under a 底 before the tables are retrained: the tables as they are,
+or none.  The deal counts are from the web's trial under the whole 胡
+(`doc/eval.md`: 400 deals a minute, a standard error of 0.363 at 400
+deals), since no trial runs beside the queue; a 底 pays less a round, so
+the standard error in points should be smaller, by how much not known.
+Not run: the desktop's gate under a 底, the tables retrained, and
+`HeuristicBot`'s weights.
 
 ## What 8 胡 lacks
 
