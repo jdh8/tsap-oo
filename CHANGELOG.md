@@ -629,6 +629,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An unchanged `tauri/` no longer recompiles on every build.  `tauri-build`
+  watches `tauri/capabilities`, and cargo treats a missing watched path as
+  always stale, so the build script reran and the app crate rebuilt each
+  time.  An empty `capabilities/` (a `.gitkeep`, which the capability parser
+  skips) makes a no-op build a no-op.
+
 - At a table of two or three the web's hint and the desktop's opponents
   broke concealed triplets from the deal on: `ExpectBot::shallow` read a row
   of `Eval` no label had reached.  The labels come from rounds of four,
