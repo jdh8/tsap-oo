@@ -390,7 +390,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The web page draws a general's coin above the piece as well as below it,
   each near its end of the strip and clear of the piece, so the card reads
-  the same from both ends.  On a phone the cards you only
+  the same from both ends.  The coin is a quarter larger on a full strip,
+  0.5em across, and drawn in the proportions of the book's figures: a
+  thinner rim and a larger hole.  On a phone the cards you only
   read (melds on the table, discards, waits, the claim buttons) are too
   short for either coin and carry none; your hand, your melds and the card
   on offer keep both (`web/style.css`).

@@ -199,21 +199,28 @@ section.me { display: flex; flex-direction: column; align-items: center; gap: 0.
   position: absolute;
   /* near the end of the strip; on a short card, midway between the piece
      and the end */
-  --inset: min(0.3em, 25% - 0.45em);
+  --coin: 0.5em;
+  --inset: min(0.3em, 25% - 0.25em - var(--coin) / 2);
   left: 50%;
-  width: 0.4em;
-  height: 0.4em;
+  width: var(--coin);
+  height: var(--coin);
   translate: -50% 0;
   rotate: 45deg;
   box-sizing: border-box;
-  border: 0.06em solid currentColor;
+  /* the coin of the book's figures (../tsap-oo-book/fig.py): 14.5 across,
+     a rim of 1.5, and a square hole 6 from corner to corner, standing on
+     one */
+  border: calc(var(--coin) * 3 / 29) solid currentColor;
   border-radius: 50%;
-  /* the square hole, standing on its corner */
-  background: linear-gradient(currentColor, currentColor) center / 35% 35% no-repeat;
+  background: linear-gradient(currentColor, currentColor) center / 37% 37% no-repeat;
   pointer-events: none;
 }
 .card[data-code$="K"]::before { top: var(--inset); }
 .card[data-code$="K"]::after { bottom: var(--inset); }
+/* The cards you only read have less room past the piece: a smaller coin,
+   nearer the end, leaves them the air a full strip has. */
+.card[data-code$="K"]:not(:is(.hand, .exposed, .offer) *)::before,
+.card[data-code$="K"]:not(:is(.hand, .exposed, .offer) *)::after { --coin: 0.4em; --inset: 0.2em; }
 .card.red { background: var(--red); }
 .card.yellow { background: var(--yellow); }
 .card.green { background: var(--green); }
