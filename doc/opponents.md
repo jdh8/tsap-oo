@@ -43,7 +43,7 @@ Update this table when a batch is done.
 | 1 | The oracles and the Peeker at two players, and the bot that ships against `HeuristicBot` | No: oracles never ship | None | Done: `danger` and `live` win on the web and on the desktop; `waits` and `cards` are closed |
 | 2 | h by the fewest concealed cards into `Outlook` | Yes | `cards` wins on the web and on the desktop | Not started: B did not win |
 | 3 | An inference for each open channel, largest first | Yes | Its oracle wins on both settings; a gatekeeper is in place | `danger` first: its halves `win` and `claim` both win (W, X), and `ExpectBot::wary` on `Giveaway`'s tables loses on the web (T), so it stays off; T's trace closes `Giveaway` as fitted: the oracle's price one card ahead is not what the deal pays.  `live`: the public cards say next to nothing about what still comes (`kept`), and `ExpectBot::counting` on those chances reads −0.006 ± 0.009 on the web (L): closed, and taken out.  Batch 4 is next |
-| 4 | `examples/posterior.rs`: what the hands that fit the other seat's whole history say of its hand | No | None; it gates a sampler | Queued behind L: both samplers, 200 rounds, seed 800 |
+| 4 | `examples/posterior.rs`: what the hands that fit the other seat's whole history say of its hand | No | None; it gates a sampler | Run and read: dealt evenly, nearly half the decisions are thin and it keeps 0.022 of the oracle's 0.705; the chain keeps 0.154 and does not agree with it where both reach.  Under a third either way, so no sampler is designed.  Closed 2026-11-26; the `claim` half is not measured |
 
 ## The oracles
 
@@ -655,8 +655,8 @@ plays by it, and there is no verdict.
 
 | Run | Sampler | Rounds | seed | Status |
 | --- | --- | ---: | ---: | --- |
-| P₁ | `PROPOSALS=20000 SAMPLES=50`: dealt evenly | 200 | 800 | queued |
-| P₂ | `CHAIN=60 SAMPLES=50`: the chain | 200 | 800 | queued |
+| P₁ | `PROPOSALS=20000 SAMPLES=50`: dealt evenly | 200 | 800 | Done in 5 h 38 min: 47.4% of the decisions are thin |
+| P₂ | `CHAIN=60 SAMPLES=50`: the chain | 200 | 800 | Done in 2 h 9 min: does not agree with P₁ |
 
 How they are read:
 
@@ -676,6 +676,69 @@ Approximations: every win costs 9 points, the mean of `giveaway`'s rows;
 this seat's eat that a pong took back is replayed as its pass; the chain's
 hands are not independent, and the noise taken off the posterior's spread
 counts them as if they were.
+
+**The results**, read 2026-11-26: 1,815 decisions in the 400 rounds.
+`thin` is the decisions with fewer than 20 hands that fit, which count as
+the bot's own; `bits` the hands dealt for one that fits (P₂: the swaps
+tried for one kept); `held` the spread taken off.  `wins` are the discards
+the other seat wins on at the decisions that are not thin, with the chance
+the posterior and the even deal give them; `others` are the rest.
+
+P₁, dealt evenly:
+
+| Cards | Decisions | Thin | Bits | Held | Wins | Posterior | Prior | Others | Posterior | Prior |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 18+ | 632 | 7.4% | 3.2 | 2.1% | 7 | 0.00% | 0.00% | 7,134 | 0.05% | 0.00% |
+| 15-17 | 512 | 43.6% | 6.9 | 6.3% | 3 | 3.24% | 0.00% | 3,021 | 0.17% | 0.00% |
+| 12-14 | 379 | 83.1% | 8.3 | 8.2% | 1 | 0.00% | 0.00% | 608 | 0.39% | 0.01% |
+| 9-11 | 214 | 95.3% | 9.3 | 13.9% | 2 | 1.92% | 0.00% | 80 | 1.15% | 0.01% |
+| 8- | 78 | 92.3% | 6.7 | 84.8% | 0 | 0.00% | 0.00% | 26 | 1.76% | 0.48% |
+| All | 1,815 | 47.4% | 4.7 | 3.8% | 13 | 1.04% | 0.00% | 10,869 | 0.11% | 0.01% |
+
+P₂, the chain:
+
+| Cards | Decisions | Thin | Bits | Held | Wins | Posterior | Prior | Others | Posterior | Prior |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 18+ | 632 | 0.0% | 0.7 | 7.0% | 11 | 0.36% | 0.00% | 7,527 | 0.10% | 0.00% |
+| 15-17 | 512 | 0.0% | 1.8 | 27.0% | 38 | 13.05% | 0.03% | 4,742 | 0.70% | 0.00% |
+| 12-14 | 379 | 0.0% | 2.8 | 47.4% | 85 | 29.32% | 0.00% | 2,876 | 1.82% | 0.01% |
+| 9-11 | 214 | 0.0% | 3.7 | 63.9% | 59 | 29.22% | 0.01% | 1,299 | 2.62% | 0.01% |
+| 8- | 78 | 0.0% | 4.3 | 80.5% | 17 | 51.29% | 0.06% | 378 | 2.80% | 0.08% |
+| All | 1,815 | 0.0% | 2.0 | 27.8% | 210 | 26.61% | 0.01% | 16,822 | 0.82% | 0.01% |
+
+Points kept a round, one card ahead, the discards moved, and the cards
+won on of the bot's 34:
+
+| Chance, at price | P₁ kept | Moved | Won on | P₂ kept | Moved | Won on |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| The oracle's win half | 0.705 | | | 0.705 | | |
+| The posterior at 0.29 | −0.000 | 1.21% | 34 | 0.140 | 6.72% | 25 |
+| The posterior at 1 | 0.022 | 1.49% | 33 | 0.154 | 8.10% | 22 |
+| The prior at 1 | −0.000 | 0.17% | 34 | −0.000 | 0.83% | 34 |
+
+- **Dealing evenly does not reach where the wins are.**  It is thin on
+  7.4% of the decisions with 18 cards or more, 43.6% with 15 to 17 and
+  83.1% with 12 to 14, and of the 210 discards the other seat wins on it
+  reaches 13.  Its 0.022, 3% of the oracle, is a floor: every thin
+  decision counts as the bot's own.
+- **The two do not agree, so the chain is not read**, as declared.  With
+  12 cards or more the chain takes 7.0%, 27.0% and 47.4% off the spread
+  where P₁ takes 2.1%, 6.3% and 8.2%.  P₁'s rows leave the thin decisions
+  out, which are the ones the history says most about, so some gap is
+  owed; but with 18 cards or more P₁ reaches 92.6% of the decisions, and
+  the rest would have to give up two thirds of their spread to make it up.
+  The likelier reading is that the chain stays near the hand it started
+  from.  These two runs cannot split the gap between the two causes.
+- **No sampler is designed.**  Flattered or not, the chain's 0.154 is 22%
+  of the oracle (20% at 0.29), under the third declared; `Giveaway` kept a
+  sixth and lost.  The posterior's own figure lies between 3% and 22%,
+  which is between closing and measuring the `claim` half.
+- **Closed, 2026-11-26.**  The `claim` half measured the same way would
+  stand on the same two samplers and the same gap, so it is not measured.
+- **What a seat could run is P₁**, and it took 5 h 38 min for 400 rounds
+  and was thin at four decisions in five once the other seat was down to
+  14 cards.
+  The chain starts from the hand no seat sees.
 
 ## Closing each batch
 

@@ -19,7 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are as Board Game Arena's Chinese help has them; the sources are in
   `../tsap-oo-book/research/settlement.md`.  `web/` and the desktop app
   offer them under 「設定」 as 「結算」 and 「點花」, and the result sheet
-  shows the 點花, the 花胡 and what each seat pays.  No bot knows either
+  shows the 點花, the 花胡 and what each seat pays.  With both off play
+  is as it was: `ab/run.sh 2000` against `8173c01`, seed base 1795672457,
+  `RESHUFFLE=8`, zero deals part.  No bot knows either
   rule and nothing is measured under them (`doc/variants.md`, "底 and
   點花"); the hint's points are still those of the whole 胡.
 
@@ -105,7 +107,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hands dealt from the unseen cards and replayed through `HeuristicBot`,
   the ones that reproduce every public event kept, against the hand it
   holds.  `CHAIN` samples by swaps from that hand where dealing thins out.
-  The design is batch 4 of `doc/opponents.md`.  No bot changes.
+  At 200 rounds each way, seed 800, the oracle's win half keeps 0.705
+  points a round one card ahead.  Dealt evenly, 20,000 hands a decision,
+  47.4% of the 1,815 decisions have fewer than 20 hands that fit and the
+  posterior keeps 0.022; the chain keeps 0.154 and takes three to six
+  times as much off the spread where both reach, so it is not read.  Both
+  are under the third declared for designing a sampler, and the batch is
+  closed.  The design is batch 4 of `doc/opponents.md`.  No bot changes.
 
 - `TRACE=FILE` has `ab/` write a line for each deal that parts: its seed,
   the mean and spread of the difference among its shuffles, where the two
