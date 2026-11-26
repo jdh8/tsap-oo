@@ -191,12 +191,15 @@ section.me { display: flex; flex-direction: column; align-items: center; gap: 0.
   flex: none;
   position: relative;
 }
-/* Generals carry the coin printed on the real card.  Not dots: two dots are
-   the horse's ornament. */
-.card[data-code$="K"]::after {
+/* Generals carry the coin printed on the real card, above the piece and
+   below it.  Not dots: two dots are the horse's ornament.  `::before` is
+   free here: it is the 聽 mark of a discard, and a general is never one. */
+.card[data-code$="K"]::before, .card[data-code$="K"]::after {
   content: "";
   position: absolute;
-  top: calc(50% + 0.6em);
+  /* near the end of the strip; on a short card, midway between the piece
+     and the end */
+  --inset: min(0.3em, 25% - 0.45em);
   left: 50%;
   width: 0.4em;
   height: 0.4em;
@@ -209,6 +212,8 @@ section.me { display: flex; flex-direction: column; align-items: center; gap: 0.
   background: linear-gradient(currentColor, currentColor) center / 35% 35% no-repeat;
   pointer-events: none;
 }
+.card[data-code$="K"]::before { top: var(--inset); }
+.card[data-code$="K"]::after { bottom: var(--inset); }
 .card.red { background: var(--red); }
 .card.yellow { background: var(--yellow); }
 .card.green { background: var(--green); }
@@ -384,5 +389,8 @@ body.log-hidden .log { display: none; }
   .fan .card.back:not(:first-child) { margin-left: calc(var(--card-w) * -0.85); }
   .card.back { border-width: 1px; }
   button.action .card { --card-h: 1.6rem; }
+  /* A stub has no room for the coins: only the full strips keep them. */
+  .card[data-code$="K"]:not(:is(.hand, .exposed, .offer) *)::before,
+  .card[data-code$="K"]:not(:is(.hand, .exposed, .offer) *)::after { display: none; }
   .log { max-height: 8rem; }
 }

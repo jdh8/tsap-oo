@@ -388,6 +388,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The web page draws a general's coin above the piece as well as below it,
+  each near its end of the strip and clear of the piece, so the card reads
+  the same from both ends.  On a phone the cards you only
+  read (melds on the table, discards, waits, the claim buttons) are too
+  short for either coin and carry none; your hand, your melds and the card
+  on offer keep both (`web/style.css`).
 - Two players at 8 胡 play by tables of their own, as two players at 10 胡
   do.  `ExpectBot::new` takes the `Outlook` measured at 8 胡 (h × 1.3), and
   `Eval::of(&Rules)` picks tables labelled under it
