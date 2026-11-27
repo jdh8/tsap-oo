@@ -1173,7 +1173,9 @@ for that case does not arise.
   (which is `target/eval-2-16.bin`, 359 KB), two players at 8 胡
   `src/eval-16-2-8.bin` (which is `target/eval-2-8/eval-16.bin`, 359 KB),
   and the rest is `Eval::default`.  The three-player table is not compiled
-  into the binary.
+  into the binary.  Since 2026-11-27 four players at 10 胡 with a 底 of 1
+  are `src/eval-16-base.bin`, learnt under that 底 (`variants.md`, "An
+  `Eval` labelled under a 底", where its runs are).
 - **`ExpectBot::new`**: two players at 10 and at 8 胡 use `Outlook::new`
   times 1.3, and the rest is `Outlook::default` times `END_SCALE` as before.
 - **`bot()` in `web/src/lib.rs`** uses `Eval::of(rules)`, shared by the web

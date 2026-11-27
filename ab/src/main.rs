@@ -15,7 +15,8 @@
 //! `GATE_CARDS` (default 10), and with `SHALLOW` as well playing past the
 //! gate by `ExpectBot::shallow` with that many cards two claims deep, its
 //! leaves read from the tables in the file `EVAL` names (an absolute path:
-//! `run.sh` runs in `ab/`) in place of `Eval::default`; and with `ORACLE`
+//! `run.sh` runs in `ab/`) in place of `Eval::default`, and taken for learnt
+//! under `BASE` (`Eval::under`); and with `ORACLE`
 //! (`live`, `danger`, or its halves `win` and `claim`) that `ExpectBot`
 //! with one input read off the other hands (`oracle.rs`); and with `WARY`
 //! `ExpectBot::wary`.  Set `BASELINE_SAMPLES` to seat the control's
@@ -140,7 +141,11 @@ fn expect_bot(rules: &new::Rules) -> Option<new::ExpectBot> {
                     new::Eval::default()
                 }
             },
-            |path| new::Eval::from_bytes(&std::fs::read(path).unwrap()).unwrap(),
+            |path| {
+                new::Eval::from_bytes(&std::fs::read(path).unwrap())
+                    .unwrap()
+                    .under(rules.base)
+            },
         );
         bot = bot.shallow(eval, deep);
     }

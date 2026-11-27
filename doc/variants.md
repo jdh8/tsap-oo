@@ -157,11 +157,14 @@ picked.
 
 Added 2026-11-26, base `8173c01`.  Two settlement rules, both off in
 `Rules::new` and both under 「設定」 on the web page and in the desktop app
-(「結算」, 「點花」).  **The rules engine has them and no bot knows of
-either.  One change has been measured under a 底 ("The DP reads the 底"
-below): alone it is a win of +0.009 points a deal, and with the web's
-tables, learnt on the whole 胡, a loss of 0.74 a deal.  It is not in
-`main`.**
+(「結算」, 「點花」).  **The rules engine has them.  Of the bots only
+`ExpectBot`'s gate knows the 底 ("The DP reads the 底" below): read there
+alone it is a win of +0.017 points a deal as the web's bot, and read past
+the gate too, against tables learnt on the whole 胡, a loss of 0.74.
+With tables learnt under a 底 of 1 the web's bot reads it throughout, a
+win of +0.089 over the gate alone ("An `Eval` labelled under a 底").  The
+desktop's bot wins both ways too: +0.038 for the 底 in its gate, and
++0.063 over that with the tables.  No bot knows the 點花.**
 
 | Rule | Field | What it does | Source |
 | --- | --- | --- | --- |
@@ -219,6 +222,7 @@ leaves in the old; `HeuristicBot` is not touched.
 | `base-web-2` | 1 | `EXPECT=new GATE_CARDS=10 SHALLOW=0`: the web's bot | `BASELINE_EXPECT=new BASELINE_SHALLOW=0`: the web's bot today | 30,000 | Not known; only if `base-leaves` or `base-leaves-2` wins | 1795679206 | 21,979 | −0.740 ± 0.014, 95% CI [−0.767, −0.713]: loss |
 | `base-web-bare-2` | 1 | `EXPECT=new GATE_CARDS=10`: the web's bot without the tables | `BASELINE_EXPECT=new BASELINE_SHALLOW=0` | 30,000 | Not known; only if `base-leaves` or `base-leaves-2` wins | 1795685070 | 24,205 | +0.008 ± 0.013, 95% CI [−0.018, +0.034]: insufficient data |
 | `base-web-gate` | 1 | `EXPECT=new GATE_CARDS=10 SHALLOW=0`: the web's bot, the 底 read in the gate only | `BASELINE_EXPECT=new BASELINE_SHALLOW=0`, control `e0ac321` | 100,000 | A win, near +0.01 | 1795695031 | 5,945 | +0.017 ± 0.002, 95% CI [+0.012, +0.021]: win |
+| `base-desktop-gate` | 1 | `EXPECT=new GATE_CARDS=14 SHALLOW=17`: the desktop's bot as `c5ce6de` has it, the 底 read in the gate only | `BASELINE_EXPECT=new BASELINE_GATE=14 BASELINE_SHALLOW=17`, control `e0ac321` | 40,000 | A win | 1795723537 | 8,084 | +0.038 ± 0.006, 95% CI [+0.026, +0.050]: win |
 
 Read 2026-11-26.  Without a 底 no deal parts, with the web's bot or the
 desktop's.  With a 底 of 1 the change alone parts on 1,300 deals of 30,000
@@ -286,6 +290,31 @@ as declared.  `ExpectBot` reads the 底 so in `main`; the desktop's gate
 under a 底, `Eval` retrained under one, and `HeuristicBot`'s weights are
 not run.
 
+Declared 2026-11-26, before its data: `base-desktop-gate`.  Since `c5ce6de`
+`ExpectBot` reads the 底 in its gate at every setting, and only the web's
+gate of 10 cards was measured.  This is the same change at the desktop's
+setting, a gate of 14 cards and a graph two claims deep to 17: the
+candidate is `c5ce6de` itself, in a worktree of its own, and the control
+`e0ac321`, the last revision whose `ExpectBot` pays the whole 胡
+throughout.  40,000 deals.  The desktop's trial under the whole 胡
+(`eval.md`, batch 4) took 6.8 minutes for 400 deals of which 76% part,
+0.07 seconds a play; a wider gate should part on more deals than the web's
+6%, and at 15% the run takes about 4 hours and, at `base-web-gate`'s
+spread, has a standard error near 0.006.  A win: nothing changes, and the
+desktop's row is measured.  A loss: trace the deals that moved the most
+before anything else.  Straddling 0: insufficient data, and the desktop
+keeps what `main` has.
+
+Read 2026-11-27.  **Read in the gate only, the 底 is a win as the
+desktop's bot too.**  Over 40,000 deals it parts on 8,084 (among them a
+mean of +0.190, a standard deviation of 5.48 within a deal and 1.93
+between), +0.038 ± 0.006 points a deal, 95% CI [+0.026, +0.050]; its seat
+wins 25.16% of the deals against the control's 25.55%, fewer and larger
+wins as on the web.  One deal in five parts, against the web's 6% and the
+15% guessed, and the run took 3.5 hours with the standard error where it
+was put.  As declared: nothing changes, and the desktop's gate under a 底
+is measured.
+
 `base-leaves` is the change alone.  The other two are what the web would
 ship under a 底 before the tables are retrained: the tables as they are,
 or none.  The deal counts are from the web's trial under the whole 胡
@@ -294,6 +323,172 @@ deals), since no trial runs beside the queue; a 底 pays less a round, so
 the standard error in points should be smaller, by how much not known.
 Not run: the desktop's gate under a 底, the tables retrained, and
 `HeuristicBot`'s weights.
+
+### An `Eval` labelled under a 底
+
+Declared 2026-11-26, before any data, base `c5ce6de`; everything is queued
+through pueue from one frozen copy of the working tree
+(`target/base-eval/queue.sh`).
+
+**Why.**  Past the gate the bots still play for the whole 胡: the shallow
+graph clears the 底, because `Eval`'s leaves were learnt on it.  That is
+most of a round, every decision above 10 cards on the web and above 14 on
+the desktop.  And under a 底 the tables as they are were not told from
+`HeuristicBot` past the gate: `base-web-bare-2` is +0.008 ± 0.013 for the
+bot without them, of which the 底 in its gate is +0.009 (`base-leaves-2`),
+where under the whole 胡 the tables won +0.191 ± 0.046 (`eval.md`,
+batch 4).  With a 底 of 1 a 胡 above the threshold is a third of a small
+win, not a twelfth, so the hands worth building are not the same.
+
+The method is that of `eval.md`, "Tables for two and three players", with
+`examples/eval.rs` taking `BASE`:
+
+- **The `Outlook` is not measured anew.**  `HeuristicBot` does not read
+  the 底, so the rounds it plays are the same: h, e and the cards a draw
+  stand, and L is the same in 胡, off which `Graph` takes what a 底 leaves
+  unpaid.
+- **Labels:** `BASE=1 EXPECT=1 eval label 2000 1806000000`, 2,000 rounds.
+  `EXPECT=1` is the `Outlook` of `ExpectBot::new` at four players and 10 胡
+  (the ranks' rates, h × 1), as in batch 3 of `generals.md`, whose
+  labelling took 8,767 seconds.  Seat 1 plays `c5ce6de`'s `ExpectBot` at a
+  gate of 14, the 底 read in its gate; every value is in the 底's points.
+- **Training:** `eval train labels eval 20 1 4 16`.  The A/Bs are queued
+  before the training is seen, so the table judged is fixed here as D = 16,
+  which had the smallest validation RMSE every time before; the other two
+  are reported.
+- **Loss table:** not run.  The verdict is the A/B's.
+- **Code.**  `Eval::under` marks tables as learnt under a 底, and
+  `ExpectBot`'s shallow graph keeps `Rules::base` with tables learnt under
+  the table's own, clearing it as before with any other.  `Eval::of` has
+  no such table, so nothing that ships moves.  `ab/` takes `EVAL`'s file
+  for learnt under `BASE`.
+- **Zero deals part:** `base-eval-zero`, the web's bot at a 底 of 1 with
+  the switch in and off, 2,000 deals.  The labelling starts only if it
+  reads 0.
+- **A/B:** control `c5ce6de`, four players at 10 胡, a 底 of 1,
+  `RESHUFFLE=8`, each run on the clock's seed base, the other seats
+  `HeuristicBot`.  The candidate reads the 底 throughout, its leaves from
+  the new table; the control is the bot as it ships, the 底 in its gate
+  and the whole 胡 past it.
+
+  | Run | Setting | Candidate | Control | Deals | Declared | Seed base | Part | Result |
+  | --- | --- | --- | --- | ---: | --- | ---: | ---: | --- |
+  | `base-eval-zero` | Web | `BASE=1 EXPECT=new GATE_CARDS=10 SHALLOW=0` | `BASELINE_EXPECT=new BASELINE_SHALLOW=0` | 2,000 | No deal parts | 1795701358 | 0 | As declared |
+  | `base-web-eval` | Web | `BASE=1 EXPECT=new GATE_CARDS=10 SHALLOW=0 EVAL=…` | `BASELINE_EXPECT=new BASELINE_SHALLOW=0` | 60,000 | A win | 1795711414 | 40,958 | +0.089 ± 0.008, 95% CI [+0.073, +0.104]: win |
+  | `base-desktop-eval` | Desktop | `BASE=1 EXPECT=new GATE_CARDS=14 SHALLOW=17 EVAL=…` | `BASELINE_EXPECT=new BASELINE_GATE=14 BASELINE_SHALLOW=17` | 20,000 | Not known; starts only if `base-web-eval` wins | 1795735979 | 10,604 | +0.063 ± 0.012, 95% CI [+0.040, +0.086]: win |
+
+  **Zero deals part** (2026-11-26, 96 seconds): seed base 1795701358, 0 of
+  2,000 deals part, seat 1 winning 24.95% on both sides.  As declared; the
+  labelling started.
+
+- **How the verdicts are read.**  `base-web-eval` a win: the table is
+  compiled in for four players at 10 胡 and a 底 of 1 (`Eval::of`, 359 KB
+  more of wasm), with the runs of zero deals at the other tables and the
+  replay of the wired bot that `eval.md` has for the tables of two; the
+  desktop reads it too if `base-desktop-eval` wins, and if not `bot()`
+  chooses by its setting.  A loss: trace the deals that moved the most
+  first.  Straddling 0: insufficient data, the table stays out of the
+  binary and `Eval::under` goes with it.
+- **What a win would not show.**  The new table differs from the control's
+  in the 底 and in the `Outlook` its labels were made under (the ranks'
+  rates and h × 1, against the even draw and h × 1.5).  The second alone,
+  on the whole 胡, read +0.019 ± 0.025 on the web and +0.020 ± 0.036 on
+  the desktop, insufficient data both (`generals.md`, batch 3).  A win
+  here is of the two together.
+- **The deal counts.**  `base-web-2` and `base-web-bare-2` changed play
+  past the gate under a 底 too: 30,000 deals, three in four parting, a
+  standard error of 0.014 and 0.013.  So 60,000 deals are put at 0.010 and
+  about 2.3 hours (`generals.md`'s 60,000 took 1.6 with 62% parting).  The
+  desktop's spread under a 底 is not known; 20,000 deals took 3.5 hours
+  with 46% parting and 5.7 with 76%.
+- **The order in the queue:** `base-eval-zero`, the labels and the
+  training, `base-web-eval`, `base-desktop-gate` (above), then
+  `base-desktop-eval`; some 14 hours with every core.
+- **Not covered.**  The tables of two, a table of three and 8 胡 under a
+  底 keep the 底 in the gate only, and so does any 底 but 1.
+  `HeuristicBot`'s weights under a 底 are not run: it has no candidate.
+
+Read 2026-11-27.  **The labels and the tables.**  `eval label` took 9,476
+seconds for its 2,000 rounds: 14,486 graphs, 1,950,147 nodes and
+66,911,188 values, of which 194,778 nodes were held out and 60,212,183
+values fitted.  The mean by public cards to come has a held-out RMSE of
+1.103 of the 底's points.
+
+| D | Train RMSE | Held-out RMSE |
+| ---: | ---: | ---: |
+| 1 | 0.690 | 0.726 |
+| 4 | 0.333 | 0.397 |
+| 16 | 0.136 | 0.245 |
+
+D = 16 is again the smallest, and the table judged as declared
+(`target/base-eval/eval-16.bin`); by depth its RMSE is 0.202 at the root's
+values, 0.236 one claim deep and 0.262 two.  The whole 胡's table has
+0.78 of its points (`eval.md`, batch 3): a point under a 底 is some three
+of those at a small win, so the two are not compared.
+
+**`base-web-eval` is a win.**  Over 60,000 deals it parts on 40,958
+(among them a mean of +0.130, a standard deviation of 5.65 within a deal
+and 1.27 between), +0.089 ± 0.008 points a deal, 95% CI [+0.073, +0.104];
+its seat wins 24.89% of the deals against the control's 25.28%, so it wins
+less often and collects more when it does, as the 底 in the gate did.  The
+standard error was put at 0.010; the run took 3.4 hours, not 2.3.  The win
+is over the bot that reads the 底 in its gate alone, itself +0.017 over
+the whole 胡 throughout (`base-web-gate`), and it is of the 底 and the
+labels' `Outlook` together, as said above.  So `base-desktop-eval` runs.
+
+Declared 2026-11-27, before their data: **the table wired in.**
+`Eval::of` gives four players at 10 胡 and a 底 of 1 the new table
+(`src/eval-16-base.bin`, 359 KB, marked `under` its 底) and every other
+table what it had; `bot()` reads `Eval::of`, so in the working tree the
+desktop has it too, which stands only if `base-desktop-eval` wins.  The
+wasm is not rebuilt beside the queue, so its size is not measured yet.
+One pueue task after another from one frozen copy of the tree
+(`base-wired`, `target/base-eval/wired.sh`), control `3f82e04`, whose
+bots are `c5ce6de`'s, `RESHUFFLE=8`, clock seed bases, candidate
+`EXPECT=new` and control `BASELINE_EXPECT=new` at the same gate and depth:
+
+- **Zero deals part** at the tables the new one is not for, 2,000 deals
+  each as the web's bot and 500 as the desktop's.
+
+  | Setting | Table | 底 | Deals | Seed base | Part |
+  | --- | --- | --- | ---: | ---: | ---: |
+  | Web | four players, 10 胡 | none | 2,000 | 1795760142 | 0 |
+  | Web | three players, 10 胡 | none | 2,000 | 1795760241 | 0 |
+  | Web | two players, 10 胡 | none | 2,000 | 1795760342 | 0 |
+  | Web | four players, 8 胡 | none | 2,000 | 1795760463 | 0 |
+  | Web | two players, 8 胡 | none | 2,000 | 1795760580 | 0 |
+  | Web | three players, 10 胡 | 1 | 2,000 | 1795760709 | 0 |
+  | Web | two players, 10 胡 | 1 | 2,000 | 1795760826 | 0 |
+  | Web | four players, 8 胡 | 1 | 2,000 | 1795760953 | 0 |
+  | Web | four players, 10 胡 | 2 | 2,000 | 1795761068 | 0 |
+  | Desktop | four players, 10 胡 | none | 500 | 1795761180 | 0 |
+  | Desktop | two players, 10 胡 | 1 | 500 | 1795761320 | 0 |
+  | Desktop | four players, 10 胡 | 2 | 500 | 1795761479 | 0 |
+
+- **The replay.**  `base-web-eval`'s first 1,000 deals (seed base
+  1795711414, control `c5ce6de`), once with `EXPECT=new` and once with
+  `EXPECT=new EVAL=target/base-eval/eval-16.bin`: the output should be the
+  same word for word, the wired bot being the one measured.  The task
+  fails if the two differ.
+- **The desktop** is settled by `base-desktop-eval`.  A win: `bot()`
+  stands, and the desktop's replay is not run, as for the tables of two
+  (`eval.md`, "Wired into the code").  Anything else: `bot()` gives the
+  desktop `Eval::default` at this table, and that owes its own run of
+  zero deals at the desktop's setting under a 底 of 1.
+
+Read 2026-11-27.  **`base-desktop-eval` is a win.**  Over 20,000 deals it
+parts on 10,604 (among them a mean of +0.118, a standard deviation of 5.61
+within a deal and 1.12 between), +0.063 ± 0.012 points a deal, 95% CI
+[+0.040, +0.086]; its seat wins 25.09% of the deals against the control's
+25.36%.  The run took 6.7 hours.  The win is over the desktop's bot that
+reads the 底 in its gate alone, itself +0.038 over the whole 胡 throughout
+(`base-desktop-gate`), and as on the web it is of the 底 and the labels'
+`Outlook` together.  So `bot()` stands: both clients play four players at
+10 胡 and a 底 of 1 by the new table.
+
+**The table wired in is as declared.**  No deal parts in any of the twelve
+runs above, and the two replays are the same word for word: 699 of the
+1,000 deals part, +0.093 ± 0.066.  The wasm's size is still not measured.
 
 ## What 8 胡 lacks
 

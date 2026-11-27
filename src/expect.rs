@@ -814,11 +814,13 @@ impl ExpectBot {
             ..Prune::default()
         };
         let mut rules = *view.rules();
-        if depth.is_some() {
-            // ponytail: `Eval`'s leaves are in the whole 胡, so the shallow
-            // graph pays its wins in it too; a 底 is read in the gate only
-            // until the tables are retrained under one (`doc/variants.md`,
-            // "The DP reads the 底").
+        let learnt = self.shallow.as_ref().and_then(|(eval, _)| eval.base());
+        if depth.is_some() && learnt != rules.base {
+            // ponytail: a shallow graph pays its wins as its leaves are
+            // paid.  Tables learnt on the whole 胡 have it clear the 底,
+            // which is then read in the gate only; of `Eval::of`'s only
+            // four players' at 10 胡 and a 底 of 1 are learnt under one
+            // (`doc/variants.md`, "An `Eval` labelled under a 底").
             rules.base = None;
         }
         let graph = Graph::new(&rules, live, &roots, prune);
@@ -1182,6 +1184,27 @@ mod tests {
         }
     }
 
+    /// Past the gate a 底 is read only with tables learnt under it: with
+    /// any other the opening discards are worth what they are without one
+    #[test]
+    fn the_shallow_graph_reads_the_base_its_tables_learnt() {
+        let mut pile: Vec<Card> = Hand::FULL.iter().collect();
+        let mut rng = Rng(7);
+        for i in (1..pile.len()).rev() {
+            pile.swap(i, rng.below(i + 1));
+        }
+        let values = |base, learnt| {
+            let mut rules = Rules::new();
+            rules.base = base;
+            let round = crate::Round::from_pile(rules, Seat::ALL[0], pile.clone()).unwrap();
+            ExpectBot::new(&rules)
+                .shallow(Eval::default().under(learnt), 0)
+                .discards(&View::new(&round, Seat::ALL[0]))
+        };
+        assert_eq!(values(Some(1), None), values(None, None));
+        assert_ne!(values(Some(1), Some(1)), values(None, None));
+    }
+
     /// Two players play by their own table of that threshold, h × 1.3,
     /// and every other table by the table of four, its cards drawn evenly:
     /// the only ones whose own won their A/Bs
@@ -1217,7 +1240,11 @@ mod tests {
     /// are learnt only as far as their own outlook counts
     #[test]
     fn every_row_a_table_reads_is_learnt() {
-        for rules in [Rules::new(), Rules::eight()] {
+        let base = Rules {
+            base: Some(1),
+            ..Rules::new()
+        };
+        for rules in [Rules::new(), Rules::eight(), base] {
             for players in 2..=4 {
                 let mut rules = rules;
                 rules.players = players;

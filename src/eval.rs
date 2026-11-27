@@ -100,6 +100,8 @@ pub fn features(hand: Hand, base: u32, live: Hand) -> Features {
 pub struct Eval {
     dim: usize,
     params: Vec<f32>,
+    /// The 底 the labels were paid with: see [`Eval::under`]
+    base: Option<u32>,
 }
 
 impl Default for Eval {
@@ -115,8 +117,10 @@ impl Eval {
     /// The tables a table of `rules` plays by: two players have their own,
     /// learnt from `PLAYERS=2 EXPECT=1.3 eval label 2000 1799800000` at 10 胡
     /// (held-out RMSE 0.53 points) and from `PLAYERS=2 THRESHOLD=8 EXPECT=1.3
-    /// eval label 2000 1801600000` at 8 胡 (0.40 points); any other table
-    /// has [`Eval::default`]
+    /// eval label 2000 1801600000` at 8 胡 (0.40 points); four at 10 胡 with
+    /// a 底 of 1 have theirs, learnt [`under`](Self::under) it from `BASE=1
+    /// EXPECT=1 eval label 2000 1806000000` (0.25 of its points); any other
+    /// table has [`Eval::default`]
     ///
     /// The two players' tables go with the outlook
     /// [`ExpectBot::new`](crate::ExpectBot::new) gives them, which counts 36
@@ -124,15 +128,19 @@ impl Eval {
     /// learnt.
     // ponytail: three players' own tables measured insufficient data against
     // the four-player ones (`doc/eval.md`, "Tables for two and three
-    // players"), so they stay out of the binary.
+    // players"), so they stay out of the binary.  Under a 底 only the one
+    // table is labelled (`doc/variants.md`, "An `Eval` labelled under a 底").
     #[must_use]
     pub fn of(rules: &crate::Rules) -> Self {
-        let bytes: &[u8] = match (rules.players, rules.threshold) {
-            (2, 10) => include_bytes!("eval-16-2.bin"),
-            (2, 8) => include_bytes!("eval-16-2-8.bin"),
+        let (bytes, learnt): (&[u8], _) = match (rules.players, rules.threshold, rules.base) {
+            (4, 10, Some(1)) => (include_bytes!("eval-16-base.bin"), rules.base),
+            (2, 10, _) => (include_bytes!("eval-16-2.bin"), None),
+            (2, 8, _) => (include_bytes!("eval-16-2-8.bin"), None),
             _ => return Self::default(),
         };
-        Self::from_bytes(bytes).expect("the tables built in")
+        Self::from_bytes(bytes)
+            .expect("the tables built in")
+            .under(learnt)
     }
 
     /// How many parameters tables of width `dim` have
@@ -145,7 +153,30 @@ impl Eval {
     /// not [`len(dim)`](Self::len)
     #[must_use]
     pub fn new(dim: usize, params: Vec<f32>) -> Option<Self> {
-        (dim > 0 && params.len() == Self::len(dim)).then_some(Self { dim, params })
+        (dim > 0 && params.len() == Self::len(dim)).then_some(Self {
+            dim,
+            params,
+            base: None,
+        })
+    }
+
+    /// The same tables, as ones learnt from values paid with the 底 `base`
+    /// ([`Rules::base`](crate::Rules::base)); tables are taken for learnt
+    /// on the whole 胡 unless this says otherwise
+    ///
+    /// Past its gate an [`ExpectBot`](crate::ExpectBot) reads a table's 底
+    /// only with tables learnt under it, and pays the whole 胡 with any
+    /// other, as their leaves are.
+    #[must_use]
+    pub fn under(mut self, base: Option<u32>) -> Self {
+        self.base = base;
+        self
+    }
+
+    /// The 底 the tables were learnt under: [`under`](Self::under)'s
+    #[must_use]
+    pub const fn base(&self) -> Option<u32> {
+        self.base
     }
 
     /// Tables from their parameters as little-endian `f32`, the width
@@ -393,6 +424,26 @@ mod tests {
             })
         };
         assert!(two(Rules::new()) != two(Rules::eight()));
+    }
+
+    /// Under a 底 only four players at 10 胡 and a 底 of 1 have tables
+    /// learnt under it; every other table keeps the ones it has without
+    #[test]
+    fn one_table_is_learnt_under_a_base() {
+        for rules in [Rules::new(), Rules::eight()] {
+            for players in 2..=4 {
+                for base in [1, 2] {
+                    let plain = Rules { players, ..rules };
+                    let under = Rules {
+                        base: Some(base),
+                        ..plain
+                    };
+                    let own = (players, rules.threshold, base) == (4, 10, 1);
+                    assert_eq!(Eval::of(&under).base(), own.then_some(1));
+                    assert_eq!(Eval::of(&under) != Eval::of(&plain), own);
+                }
+            }
+        }
     }
 
     /// A row no label reached keeps its initial bias, 0, and a round longer

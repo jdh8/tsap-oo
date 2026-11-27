@@ -42,6 +42,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   30,000 deals, seed base 1795685070, 24,205 part, insufficient data
   (`doc/variants.md`, "The DP reads the 底").
 
+- `Eval::under` marks tables as learnt under a 底, and `Eval::base` reads
+  it back.  Past its gate `ExpectBot` keeps `Rules::base` in the shallow
+  graph with tables learnt under the table's own 底 and clears it, as
+  before, with any other.  The switch alone moves nothing: at a 底 of 1
+  as the web's bot, `ab/run.sh 2000` against `c5ce6de`, seed base
+  1795701358, `RESHUFFLE=8`, zero deals part.  `examples/eval.rs` takes
+  `BASE`, and `ab/` takes `EVAL`'s file for learnt under `BASE`.
+
+- Four players at 10 胡 with a 底 of 1 play by tables learnt under it:
+  `Eval::of` gives them `src/eval-16-base.bin` (359 KB, from `BASE=1
+  EXPECT=1 eval label 2000 1806000000`, width 16, held-out RMSE 0.245 of
+  the 底's points), so past its gate `ExpectBot` reads the 底 as within
+  it.  As the web's bot against `c5ce6de`, which reads the 底 in its gate
+  alone, `RESHUFFLE=8`: +0.089 ± 0.008 points a deal, 95% CI [+0.073,
+  +0.104], 60,000 deals, seed base 1795711414, 40,958 part, win.
+  As the desktop's bot (`GATE_CARDS=14 SHALLOW=17`) against `c5ce6de`:
+  +0.063 ± 0.012, 95% CI [+0.040, +0.086], 20,000 deals, seed base
+  1795735979, 10,604 part, win.  Every other table keeps the tables it
+  had: against `3f82e04`, zero deals part in each of twelve runs, 2,000
+  deals as the web's bot and 500 as the desktop's, at the tables of two
+  and three, at 8 胡, without a 底 and at a 底 of 2 (seed bases
+  1795760142 to 1795761479).  The wired bot replays the measured one word
+  for word on `base-web-eval`'s first 1,000 deals (`doc/variants.md`, "An
+  `Eval` labelled under a 底").
+
+- `c5ce6de`'s 底 in `ExpectBot`'s gate is measured as the desktop's bot
+  too (`GATE_CARDS=14 SHALLOW=17`), at a 底 of 1, four players at 10 胡,
+  `RESHUFFLE=8`, against `e0ac321`: +0.038 ± 0.006 points a deal, 95% CI
+  [+0.026, +0.050], 40,000 deals, seed base 1795723537, 8,084 part, win
+  (`doc/variants.md`, `base-desktop-gate`).  No code changes.
+
 - `doc/opponents.md` plans reading the opponent at a table of two: an
   oracle for each channel before any inference is written.  `ORACLE=live`,
   `waits` or `danger` in `ab/` seats `ExpectBot` as it ships with one input

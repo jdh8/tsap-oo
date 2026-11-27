@@ -24,9 +24,10 @@
 //! ```
 //!
 //! `PLAYERS` (default 4) is the table's size, `THRESHOLD` (default 10) the
-//! 胡 to win, and `EXPECT` (default 1.5) what the h of that table's
-//! [`Outlook::new`] is scaled by: tables for a table of two are labelled
-//! with `PLAYERS=2 EXPECT=1.3`.
+//! 胡 to win, `BASE` the 底 the values are paid with (none unless set), and
+//! `EXPECT` (default 1.5) what the h of that table's [`Outlook::new`] is
+//! scaled by: tables for a table of two are labelled with `PLAYERS=2
+//! EXPECT=1.3`.
 use rand::rngs::SmallRng;
 use rand::{RngExt as _, SeedableRng as _};
 use std::cell::RefCell;
@@ -233,7 +234,8 @@ fn spread<T: Send>(rounds: u64, base: u64, f: impl Fn(u64) -> T + Sync) -> Vec<T
     out.into_iter().map(|x| x.1).collect()
 }
 
-/// The table: [`Rules::new`] with `PLAYERS` seats and `THRESHOLD` to win
+/// The table: [`Rules::new`] with `PLAYERS` seats, `THRESHOLD` to win and
+/// the 底 `BASE`
 fn rules() -> Rules {
     let mut rules = Rules::new();
     if let Ok(threshold) = std::env::var("THRESHOLD") {
@@ -241,6 +243,9 @@ fn rules() -> Rules {
     }
     if let Ok(players) = std::env::var("PLAYERS") {
         rules.players = players.parse().expect("PLAYERS is a number");
+    }
+    if let Ok(base) = std::env::var("BASE") {
+        rules.base = Some(base.parse().expect("BASE is a number"));
     }
     rules
 }
