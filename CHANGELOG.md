@@ -679,6 +679,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A phone's hand is big enough to tap, either way up.  Upright, the hand
+  takes two rows, so a 390px screen gives each card about 34px instead of
+  17px.  On its side the phone layout now applies at all: it started at a
+  width of 40rem, so at 844×390 the page fell back to the desktop one and
+  the hand sat below the fold.  It now also starts at a height of 30rem;
+  on its side the header takes one row, the top seat sits beside its name,
+  the status shares a row with the buttons, and the hand's one row has
+  cards about 37px wide.  On a phone an opponent's backs are one back and
+  a count, the page keeps clear of a notch, and the claim buttons come up
+  in a panel over the table beside a copy of the card on offer, at least
+  2.9rem tall, so five 吃 no longer squeeze the table out of view.
 - An unchanged `tauri/` no longer recompiles on every build.  `tauri-build`
   watches `tauri/capabilities`, and cargo treats a missing watched path as
   always stale, so the build script reran and the app crate rebuilt each

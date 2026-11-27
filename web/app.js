@@ -42,6 +42,11 @@ try {
 // and cannot hover, a mouse can do both.
 let touch = false;
 document.addEventListener('pointerdown', (e) => (touch = e.pointerType !== 'mouse'), true);
+// A phone, as style.css has it: claims go in a panel over the table, by
+// the card they are for, instead of under the hand.
+const PHONE = matchMedia('(max-width: 40rem), (max-height: 30rem)');
+PHONE.onchange = () => state && render();
+
 const twoTaps = () => (settings.tap ? settings.tap === 2 : touch);
 
 function openSettings() {
@@ -238,7 +243,10 @@ function render() {
     const fan = document.createElement('div');
     fan.className = 'fan';
     if (finished && s.hand) for (const c of s.hand) fan.append(cardEl(c));
-    else for (let i = 0; i < s.concealed; i++) fan.append(backEl());
+    else {
+      for (let i = 0; i < s.concealed; i++) fan.append(backEl());
+      fan.dataset.n = s.concealed; // a phone shows one back and this count
+    }
     box.append(fan);
     if (s.exposed.length) box.append(meldsEl(s.exposed));
   });
@@ -324,9 +332,21 @@ function render() {
     }
   }
 
-  // Claim buttons.
-  const actions = id('actions');
-  actions.replaceChildren();
+  // Claim buttons: under the hand, or on a phone in the panel over the table
+  // with a copy of the card on offer.
+  id('actions').replaceChildren();
+  const claims = id('claims');
+  claims.replaceChildren();
+  claims.hidden = !(state.options && PHONE.matches);
+  let actions = id('actions');
+  if (!claims.hidden) {
+    const card = document.createElement('div');
+    card.className = 'offer';
+    card.append(...[...offer.childNodes].map((n) => n.cloneNode(true)));
+    actions = document.createElement('div');
+    actions.className = 'actions';
+    claims.append(card, actions);
+  }
   if (state.options) {
     // As in Tenhou, a button shows only the cards leaving your hand: the
     // meld minus the offered card.
@@ -415,7 +435,7 @@ async function showHint() {
   if (shown !== state || !rows.length || document.querySelector('.grade')) return;
   const els = (code) => [
     ...document.querySelectorAll(
-      `#hand [data-code="${code}"]:not(.locked), #actions [data-hint="${code}"]`,
+      `#hand [data-code="${code}"]:not(.locked), #actions [data-hint="${code}"], #claims [data-hint="${code}"]`,
     ),
   ];
   els(rows[0].code).at(-1)?.classList.add('hint');
