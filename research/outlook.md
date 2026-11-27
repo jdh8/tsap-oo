@@ -789,3 +789,43 @@ players".
 - **The multiplier 1.4 at a table of three and two players at 8 胡 are not
   adopted,** one for insufficient data, the other because only the web's
   settings won and the declaration asked for both runs.
+
+## Against the bot that ships
+
+Declared in `doc/eval.md`, "The table of two against the bot that ships":
+the `Outlook` of two players at 10 胡 measured with the bot a player meets
+in every seat (`BOT=web`, `BOT=desktop`), on the seeds and round counts of
+"Empty seats' hands are dead", base `39e3870`.  h or e a tenth or more off
+the table in the code opens batch 2 for that client.
+
+| Inside the gate | Code (`HeuristicBot`) | Web's bot | Desktop's bot |
+| --- | ---: | ---: | ---: |
+| h (per card) | 0.0544 | 0.0568 | owed |
+| L | −12.11 | −12.01 | owed |
+| e | 0.7442 | 0.7372 | owed |
+| A general is the seat's own draw | 0.4688 | 0.4618 | owed |
+| Public cards a draw (not split by the gate) | 1.711 | 1.789 | owed |
+| Decisions inside the gate (per 10,000 rounds) | 15,567 | 18,516 | owed |
+
+- **The web: closed.**  h is 4% and e 1% off the code's, under the tenth
+  the declaration asks for, so batch 2 is not designed for the web's bot.
+- **The shape by draws left moved more than the total.**  h by draws left
+  is 0.096 to 0.087 at 0 to 3 draws left against the code's 0.069 to
+  0.077, and 0.021 at 23 to 25 against 0.033; the cards a segment run to
+  3.13 at 25 draws left against 2.78.  The declaration reads only the
+  totals.
+- **The tables in the code overpredict more against this opponent.**
+  Against the web's bot on seed 213, starting from the tables in the code:
+
+  | | Predicted win rate | Actual | Predicted score | Actual score |
+  | --- | ---: | ---: | ---: | ---: |
+  | Measured | 0.545 | 0.476 | 1.80 | 0.06 ± 0.17 |
+  | h × 1.5 | 0.460 | 0.476 | −0.54 | 0.06 |
+  | Cards a segment × 0.8 | 0.516 | 0.476 | 1.58 | 0.06 |
+  | e × 0.7 | 0.533 | 0.476 | 1.55 | 0.06 |
+
+  Interpolated as in "Constants", the bias of the win rate vanishes at h ×
+  1.40, against 1.26 under `HeuristicBot` self-play; the code takes 1.3.
+  The new tables on seed 211 predict 0.457 against 0.478 (−0.27 points
+  against 0.03 ± 0.17).  No multiplier is changed: that is batch 2's, and
+  the web's is closed.

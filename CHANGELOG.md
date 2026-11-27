@@ -73,7 +73,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   what it is for: the `Outlook` of two players measured against the
   opponent a player meets.  `doc/variants.md`, "A 底 at the tables of two
   and three", declares the 底's runs away from four players at 10 胡.  No
-  play changes; neither has data yet.
+  play changes.  Against the web's bot, h is 0.0568 and e 0.7372 inside
+  the gate, within a tenth of the code's 0.0544 and 0.7442, so the web's
+  question is closed (`research/outlook.md`, "Against the bot that
+  ships"); the desktop's and the 底's runs have no data yet.
+- The web's wasm with four players' table under a 底 of 1 is 1,709 KB,
+  1,452 KB gzipped (from 1,344 KB and 1,116 KB).
 
 - `c5ce6de`'s 底 in `ExpectBot`'s gate is measured as the desktop's bot
   too (`GATE_CARDS=14 SHALLOW=17`), at a 底 of 1, four players at 10 胡,

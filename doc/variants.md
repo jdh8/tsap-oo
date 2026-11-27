@@ -488,7 +488,8 @@ reads the 底 in its gate alone, itself +0.038 over the whole 胡 throughout
 
 **The table wired in is as declared.**  No deal parts in any of the twelve
 runs above, and the two replays are the same word for word: 699 of the
-1,000 deals part, +0.093 ± 0.066.  The wasm's size is still not measured.
+1,000 deals part, +0.093 ± 0.066.  The wasm is 1,709 KB, 1,452 KB
+gzipped (`tsap-oo-wasm-size`, 2026-11-28), from 1,344 KB and 1,116 KB.
 
 ### A 底 at the tables of two and three
 

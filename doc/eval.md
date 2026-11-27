@@ -1180,8 +1180,9 @@ for that case does not arise.
   times 1.3, and the rest is `Outlook::default` times `END_SCALE` as before.
 - **`bot()` in `web/src/lib.rs`** uses `Eval::of(rules)`, shared by the web
   page and the desktop app.  The wasm went from 620 KB to 982 KB (782 KB
-  gzipped) with the 10-胡 table of two, and to 1,344 KB (1,116 KB gzipped)
-  with the 8-胡 one.
+  gzipped) with the 10-胡 table of two, to 1,344 KB (1,116 KB gzipped)
+  with the 8-胡 one, and to 1,709 KB (1,452 KB gzipped) with four
+  players' table under a 底 of 1 (`variants.md`, `tsap-oo-wasm-size`).
 - **Rows 37 to 45 of the two-player 10-胡 table have no labels** (their
   biases are still the initial 0), nor have rows 36 to 45 of the 8-胡 one:
   the two-player `Outlook` counts only up to 36 public cards a round at 10
@@ -1282,6 +1283,13 @@ an `Outlook` measured from its own earlier play, which moves when the bot
 does.  One round of that is taken, not its fixed point.  Tables of two
 learnt under a 底 (`variants.md`, "A 底 at the tables of two and three")
 would be relabelled with the rest.
+
+**Batch 1, the web: closed.**  `outlook-2-web` (2026-11-28): h 0.0568 and
+e 0.7372 inside the gate, 4% and 1% off the code's, so batch 2 is not
+designed for the web.  The numbers, and a multiplier of 1.40 where the
+bias vanishes against this opponent, are in `research/outlook.md`,
+"Against the bot that ships".  The desktop's, `outlook-2-desktop`, is
+owed.
 
 ## 8 胡: the 10-胡 tables beyond the gate
 
