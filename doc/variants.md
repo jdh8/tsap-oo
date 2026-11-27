@@ -490,6 +490,73 @@ reads the 底 in its gate alone, itself +0.038 over the whole 胡 throughout
 runs above, and the two replays are the same word for word: 699 of the
 1,000 deals part, +0.093 ± 0.066.  The wasm's size is still not measured.
 
+### A 底 at the tables of two and three
+
+Declared 2026-11-27, before any data, base `7f0c316`; everything is queued
+through pueue (`target/base-2/queue.sh`), the A/Bs from frozen copies of
+the working tree.  Throughout: a 底 of 1, `RESHUFFLE=8`, clock seed bases,
+the other seats `HeuristicBot`, and the control `7f0c316` unless said.
+
+**Why.**  "Not covered" above: away from four players at 10 胡 the 底 is
+read in the gate only, and that was measured at four players alone.  Two
+players have tables of their own at 10 and at 8 胡, learnt on the whole
+胡, and a table of three plays by four's.
+
+- **Labels for two players,** as above with the `Outlook` those tables
+  ship with: `PLAYERS=2 BASE=1 EXPECT=1.3 eval label 2000 1806100000` at
+  10 胡 and the same with `THRESHOLD=8` and seed base 1806200000 at 8,
+  each then `eval train labels eval 20 1 4 16` with D = 16 the table
+  judged (`target/base-2/eval-10-16.bin`, `eval-8-16.bin`).  The two
+  `Outlook`s are not measured anew, as at four.  The 8-胡 labels start
+  only if `base-2-web-eval` wins.
+- **Three players have no labels.**  The candidate is four players' table
+  learnt under the 底, as three play by four's on the whole 胡.  Its
+  labels were made under four players' `Outlook` (the ranks' rates, h × 1)
+  and a table of three plays by the even draw and h × 1.5, so this pairs a
+  table with an `Outlook` it was not learnt under.
+- **No run of zero deals:** no code changes; `EVAL` and `BASE` are the
+  switches `base-web-eval` used.
+
+| Run | Table | Candidate | Control | Deals | Declared |
+| --- | --- | --- | --- | ---: | --- |
+| `base-2-gate` | Two, 10 胡, web | `EXPECT=new GATE_CARDS=10 SHALLOW=0`: the bot as it ships, the 底 in its gate | `BASELINE_EXPECT=new BASELINE_SHALLOW=0`, control `e0ac321`: the whole 胡 throughout | 100,000 | A win |
+| `base-3-eval` | Three, 10 胡, web | `EXPECT=new GATE_CARDS=10 SHALLOW=0 EVAL=src/eval-16-base.bin` | `BASELINE_EXPECT=new BASELINE_SHALLOW=0` | 30,000 | Not known |
+| `base-2-web-eval` | Two, 10 胡, web | `EXPECT=new GATE_CARDS=10 SHALLOW=0 EVAL=…/eval-10-16.bin` | `BASELINE_EXPECT=new BASELINE_SHALLOW=0` | 20,000 | A win |
+| `base-2-desktop-eval` | Two, 10 胡, desktop | `EXPECT=new GATE_CARDS=14 SHALLOW=17 EVAL=…/eval-10-16.bin` | `BASELINE_EXPECT=new BASELINE_GATE=14 BASELINE_SHALLOW=17` | 8,000 | Not known; starts only if `base-2-web-eval` wins |
+| `base-2-8-web-eval` | Two, 8 胡, web | As `base-2-web-eval` with `THRESHOLD=8` and `eval-8-16.bin` | The same | 20,000 | Not known; starts only if its labels were made |
+| `base-2-8-desktop-eval` | Two, 8 胡, desktop | As `base-2-desktop-eval` with `THRESHOLD=8` and `eval-8-16.bin` | The same | 8,000 | Not known; starts only if `base-2-8-web-eval` wins |
+
+- **How the verdicts are read.**  Each is its own.
+  - `base-2-gate` a win: nothing changes, and the row of two is measured.
+    A loss: trace the deals that moved the most, then the gate clears the
+    底 at two, with its own run of zero deals.  Straddling 0: insufficient
+    data, play stays.  The desktop's gate at two is not queued: it is owed
+    only where `base-2-desktop-eval` is not a win, since a win there
+    replaces the play it would measure.
+  - An `eval` run a win: that table goes into `Eval::of` for its client,
+    with the runs of zero deals at the other tables and the replay, as
+    for four players; `bot()` chooses by its setting where only the web
+    wins.  A loss: trace first.  Straddling 0: the table stays out.
+  - `base-3-eval` a win: the desktop's run is declared next, and the arm
+    of `Eval::of` reads bytes already compiled in.  Anything else: three
+    players keep the 底 in the gate only, and labels of their own are
+    not made, as on the whole 胡.
+- **The deal counts.**  Under a 底 a standard error is about a quarter
+  of the whole 胡's: at four players' desktop 0.012 at 20,000 deals
+  against 0.049 at 8 胡.  The tables of two had 0.040 at 10,000 deals on the web
+  and 0.037 at 8,000 on the desktop (`eval.md`, W8′ and Y8′), so 20,000
+  and 8,000 deals are put near 0.008 and 0.010, where four players' wins
+  were +0.089 and +0.063; about 1.5 and 3.5 hours.  Each labelling took
+  2.4 to 4.8 hours before.  `base-2-gate` parts on few deals, as
+  `base-web-gate` did at the same count.  Some 24 hours with every core
+  if every run starts.
+- **The wasm.**  Each table wired in is 359 KB more; with both of two
+  players' that is six tables.  Whether the web takes them is decided
+  when the verdicts and `tsap-oo-wasm-size` are read.
+- **Not covered.**  Four players at 8 胡 under a 底, which have no tables
+  of their own on the whole 胡 either; three players at 8 胡; any 底 but
+  1; `HeuristicBot`'s weights, which still have no candidate.
+
 ## What 8 胡 lacks
 
 1. **The `Outlook` `ExpectBot` uses was measured at 10 胡.**  8 胡's table

@@ -1238,6 +1238,51 @@ part, +0.505 ± 0.125).  Only docs and one doc comment have been touched
 since.  The desktop setting was not replayed: it differs from the web's by
 the gate and the depth alone, which `ab/` sets the same way on either run.
 
+### The table of two against the bot that ships
+
+Declared 2026-11-27, before any data, base `7f0c316`.  The last of "Open
+questions": the `Outlook` of two players is measured from `HeuristicBot`
+self-play, and at a table of two the opponent a player meets, and the hint
+advises against, is `ExpectBot` with the tables learnt under that
+`Outlook`.  It beats `HeuristicBot` there by +0.405 ± 0.042 points a deal
+on the web's setting and +0.615 ± 0.067 on the desktop's (`opponents.md`,
+the H runs), so it should end rounds sooner: h higher, L and e not known.
+
+**Batch 0, the tool.**  `examples/outlook.rs` takes `BOT`: `web` or
+`desktop` seats that client's opponent in every seat, as `bot()` in
+`web/src/lib.rs` builds it, and unset is `HeuristicBot` as before.  Only
+the example changes, so no play moves and no run of zero deals is owed.
+
+**Batch 1, the measurement,** two players at 10 胡, one pueue task a bot
+(`outlook-2-web`, `outlook-2-desktop`; `target/outlook-2/queue.sh`).  The
+seeds and the round counts are those of `research/outlook.md`, "Empty
+seats' hands are dead", so the deals are the ones `END_2` and `CARDS_2`
+were measured on:
+
+- `PLAYERS=2 BOT=… outlook 10000 210`: h, L, e and the cards a draw of the
+  bot's own play, and the new tables calibrated on seed 211.
+- `PLAYERS=2 BOT=… outlook 0 212 10000`: the tables in the code, and with
+  h × 1.5, calibrated against the bot's own play on seed 213.  That is the
+  bias of the values the hint shows today beside this opponent, and where
+  it vanishes is the multiplier that would replace 1.3.
+
+No play changes.  **How it is read,** each bot its own: h within the gate
+or e a tenth or more away from the table in the code (0.0544 and 0.7442)
+opens batch 2 for that client; less closes the question for it, and the
+numbers go into `research/outlook.md`.  The desktop's bot is put at 0.07
+seconds a play, about two hours for its task (an estimate); the web's
+takes minutes.
+
+**Batch 2, not designed until batch 1 is read.**  What it would take: the
+new tables in `src/expect.rs` and their multiplier, labels and an `Eval`
+under them, and `ab/` with the other seats settable, since against
+`HeuristicBot`, as `ab/` seats it, a table measured against `ExpectBot`
+has nothing to show.  One limit is known beforehand: the bot would play by
+an `Outlook` measured from its own earlier play, which moves when the bot
+does.  One round of that is taken, not its fixed point.  Tables of two
+learnt under a 底 (`variants.md`, "A 底 at the tables of two and three")
+would be relabelled with the rest.
+
 ## 8 胡: the 10-胡 tables beyond the gate
 
 "Shape" says that until 8 胡 has tables of its own, it is `HeuristicBot`
@@ -1400,4 +1445,5 @@ After batch 4 has one win.  Those that change play each run their own A/B.
   bot that ships; if h or e moves by a tenth, relabel `Eval` under the new
   `Outlook`.  The A/B needs the other seat settable first: against
   `HeuristicBot`, as `ab/` seats it, a table measured against `ExpectBot`
-  has nothing to show.  (Raised 2026-11-25, not started.)
+  has nothing to show.  (Raised 2026-11-25; the measurement is declared
+  in "The table of two against the bot that ships".)

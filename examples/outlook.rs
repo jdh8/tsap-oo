@@ -28,17 +28,34 @@
 //! ```
 //!
 //! `THRESHOLD` (default 10) is the 胡 to win: 8 is `Rules::eight`.
-//! `PLAYERS` (default 4) is the table's size.
+//! `PLAYERS` (default 4) is the table's size.  `BOT` seats a client's
+//! opponent in every seat in place of `HeuristicBot`: `web` or `desktop`.
 use tsap_oo::susik::{Hand, Meld, Rank};
 use tsap_oo::{
-    Event, Graph, HeuristicBot, Outlook, Payoff, Phase, Prune, Rules, Seat, Step, Strategy, Table,
-    View,
+    Eval, Event, ExpectBot, Graph, HeuristicBot, Outlook, Payoff, Phase, Prune, Rules, Seat, Step,
+    Strategy, Table, View,
 };
 
 mod common;
 
 /// The concealed cards from which the DP plays
 const GATE: usize = 10;
+
+/// The bot in every seat: `HeuristicBot`, or under `BOT` the web page's
+/// opponent or the desktop's, as `bot()` in `web/src/lib.rs` builds them
+fn bot(rules: &Rules) -> Box<dyn Strategy> {
+    let (gate, deep) = match std::env::var("BOT").as_deref() {
+        Err(_) => return Box::new(HeuristicBot::new(rules)),
+        Ok("web") => (10, 0),
+        Ok("desktop") => (14, 17),
+        Ok(other) => panic!("BOT is web or desktop, not {other}"),
+    };
+    Box::new(
+        ExpectBot::new(rules)
+            .gated(gate)
+            .shallow(Eval::of(rules), deep),
+    )
+}
 
 /// Draws in a round: the pile after the deal less the dead tail
 const fn draws(rules: &Rules) -> usize {
@@ -472,7 +489,7 @@ fn wilson(k: u64, n: u64) -> (f64, f64) {
 fn calibrate(rules: &Rules, outlooks: &[(&str, Outlook)], rounds: u64, seed: u64) {
     let mut bins = vec![[Bin::default(); 10]; outlooks.len()];
     let played = common::deals(*rules, rounds, seed, |round| {
-        let bots = Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(rules)) as Box<dyn Strategy>));
+        let bots = Seat::ALL.map(|_| Some(bot(rules)));
         let mut table = Table::new(round, bots);
         // (seat, outlook, predicted chance, predicted points)
         let mut predictions = Vec::new();
@@ -602,8 +619,7 @@ fn main() {
     }
     let mut tally = Tally::new(&rules);
     let played = common::deals(rules, rounds, seed, |round| {
-        let bots =
-            Seat::ALL.map(|_| Some(Box::new(HeuristicBot::new(&rules)) as Box<dyn Strategy>));
+        let bots = Seat::ALL.map(|_| Some(bot(&rules)));
         let dealt = Seat::ALL.map(|seat| round.hand(seat));
         let mut table = Table::new(round, bots);
         table.run().expect("bots act legally");
@@ -613,8 +629,10 @@ fn main() {
         tally.round(round.events(), round.dealer(), *dealt);
     }
     println!(
-        "{rounds} rounds of HeuristicBot self-play, seed {seed}, {} players, {} to win",
-        rules.players, rules.threshold
+        "{rounds} rounds of {} self-play, seed {seed}, {} players, {} to win",
+        std::env::var("BOT").map_or_else(|_| "HeuristicBot".into(), |bot| format!("the {bot} bot")),
+        rules.players,
+        rules.threshold
     );
     tally.print();
     // h from segments with fewer gated cards than this is too noisy

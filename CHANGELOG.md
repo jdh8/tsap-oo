@@ -67,6 +67,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for word on `base-web-eval`'s first 1,000 deals (`doc/variants.md`, "An
   `Eval` labelled under a 底").
 
+- `cargo run --release --example outlook` takes `BOT`: `web` or `desktop`
+  seats that client's opponent in every seat in place of `HeuristicBot`.
+  `doc/eval.md`, "The table of two against the bot that ships", declares
+  what it is for: the `Outlook` of two players measured against the
+  opponent a player meets.  `doc/variants.md`, "A 底 at the tables of two
+  and three", declares the 底's runs away from four players at 10 胡.  No
+  play changes; neither has data yet.
+
 - `c5ce6de`'s 底 in `ExpectBot`'s gate is measured as the desktop's bot
   too (`GATE_CARDS=14 SHALLOW=17`), at a 底 of 1, four players at 10 胡,
   `RESHUFFLE=8`, against `e0ac321`: +0.038 ± 0.006 points a deal, 95% CI
