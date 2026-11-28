@@ -599,6 +599,19 @@ D = 16 is the smallest again, and the table judged as declared
 the root's values, 0.181 one claim deep and 0.165 two.  The labelling
 took 4.4 hours, within the 2.4 to 4.8 it was put at.
 
+Read 2026-11-28.  **`base-2-web-eval` is a win, as declared.**  Seed base
+1795838870, control `7f0c316`.  Over 20,000 deals it parts on 14,789
+(among them a mean of +0.087, a standard deviation of 2.90 within a deal
+and 0.56 between), +0.064 ± 0.007 points a deal, 95% CI [+0.050,
++0.078]; its seat wins 49.20% of the deals against the control's 50.28%,
+fewer and larger wins again.  The standard error was put near 0.008 and
+the run took 1.6 hours.  The win is over the bot that reads the 底 in
+its gate alone, itself +0.015 over the whole 胡 throughout
+(`base-2-gate`); here the labels' `Outlook` is the control's, so it is of
+the 底 alone.  So `base-2-desktop-eval` and the 8-胡 labels run, and the
+table is owed to `Eval::of` for the web, with the runs of zero deals and
+the replay, once the wasm's 359 KB are decided.
+
 ## What 8 胡 lacks
 
 1. **The `Outlook` `ExpectBot` uses was measured at 10 胡.**  8 胡's table

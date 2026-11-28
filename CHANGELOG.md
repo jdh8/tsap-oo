@@ -102,6 +102,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   30,000 deals, seed base 1795814816, 22,434 part, win (`doc/variants.md`,
   `base-3-eval`).  No code changes.
 
+- Measured, not wired in yet: two players at 10 胡 under a 底 of 1 with
+  tables learnt under it (`PLAYERS=2 BASE=1 EXPECT=1.3 eval label 2000
+  1806100000`, width 16, held-out RMSE 0.175 of the 底's points), as the
+  web's bot against `7f0c316`, which reads the 底 in its gate alone,
+  `RESHUFFLE=8`: +0.064 ± 0.007 points a deal, 95% CI [+0.050, +0.078],
+  20,000 deals, seed base 1795838870, 14,789 part, win (`doc/variants.md`,
+  `base-2-web-eval`).  No code changes.
+
 - `doc/opponents.md` plans reading the opponent at a table of two: an
   oracle for each channel before any inference is written.  `ORACLE=live`,
   `waits` or `danger` in `ab/` seats `ExpectBot` as it ships with one input
