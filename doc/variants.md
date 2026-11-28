@@ -648,6 +648,25 @@ below its web's (+0.089).  So the table of two at 10 胡 goes into
 `Eval::of` for both clients, one arm, and the desktop's gate at two under
 a 底 is not owed.
 
+Read 2026-11-29.  **The labels and the tables of two at 8 胡**
+(`base-2-8-label`).  `eval label` took 16,196 seconds for its 2,000
+rounds, seed base 1806200000: 16,175 graphs, 2,280,050 nodes and
+64,117,145 values, of which 229,811 nodes were held out and 57,646,202
+values fitted.  The mean by public cards to come has a held-out RMSE of
+0.792 of the 底's points.
+
+| D | Train RMSE | Held-out RMSE |
+| ---: | ---: | ---: |
+| 1 | 0.350 | 0.409 |
+| 4 | 0.158 | 0.257 |
+| 16 | 0.054 | 0.223 |
+
+D = 16 is the smallest again, and the table judged as declared
+(`target/base-2/eval-8-16.bin`, 359 KB); by depth its RMSE is 0.260 at
+the root's values, 0.230 one claim deep and 0.208 two.  Each is above 10
+胡's, as 8 胡 pays more of its wins above the threshold.  The labelling
+took 4.5 hours.
+
 ## What 8 胡 lacks
 
 1. **The `Outlook` `ExpectBot` uses was measured at 10 胡.**  8 胡's table
