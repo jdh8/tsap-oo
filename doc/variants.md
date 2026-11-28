@@ -558,6 +558,16 @@ players have tables of their own at 10 and at 8 胡, learnt on the whole
   of their own on the whole 胡 either; three players at 8 胡; any 底 but
   1; `HeuristicBot`'s weights, which still have no candidate.
 
+Read 2026-11-28.  **`base-2-gate` is a win: read in the gate only, the 底
+wins at a table of two as well.**  Seed base 1795798131, control
+`e0ac321`.  Over 100,000 deals it parts on 7,989 (among them a mean of
++0.186, a standard deviation of 2.72 within a deal and 1.12 between),
++0.015 ± 0.001 points a deal, 95% CI [+0.012, +0.017]; its seat wins
+49.77% of the deals against the control's 50.04%, fewer and larger wins
+as at four.  8% of the deals part, near `base-web-gate`'s 6%, and the run
+took 1.8 hours.  As declared: nothing changes, and the row of two is
+measured.
+
 ## What 8 胡 lacks
 
 1. **The `Outlook` `ExpectBot` uses was measured at 10 胡.**  8 胡's table

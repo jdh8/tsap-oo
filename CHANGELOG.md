@@ -76,7 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   play changes.  Against the web's bot, h is 0.0568 and e 0.7372 inside
   the gate, within a tenth of the code's 0.0544 and 0.7442, so the web's
   question is closed (`research/outlook.md`, "Against the bot that
-  ships"); the desktop's and the 底's runs have no data yet.
+  ships"); the desktop's run has no data yet, and the 底's are below.
 - The web's wasm with four players' table under a 底 of 1 is 1,709 KB,
   1,452 KB gzipped (from 1,344 KB and 1,116 KB).
 
@@ -85,6 +85,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `RESHUFFLE=8`, against `e0ac321`: +0.038 ± 0.006 points a deal, 95% CI
   [+0.026, +0.050], 40,000 deals, seed base 1795723537, 8,084 part, win
   (`doc/variants.md`, `base-desktop-gate`).  No code changes.
+
+- The 底 in `ExpectBot`'s gate is measured at a table of two as well: as
+  the web's bot at a 底 of 1, two players at 10 胡, `RESHUFFLE=8`,
+  against `e0ac321`, which plays for the whole 胡 throughout: +0.015 ±
+  0.001 points a deal, 95% CI [+0.012, +0.017], 100,000 deals, seed base
+  1795798131, 7,989 part, win (`doc/variants.md`, `base-2-gate`).  No
+  code changes.
 
 - `doc/opponents.md` plans reading the opponent at a table of two: an
   oracle for each channel before any inference is written.  `ORACLE=live`,
