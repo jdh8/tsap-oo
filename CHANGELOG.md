@@ -707,8 +707,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ones above the hand.  They grow from the left end and one laid down
   never moves again; the hand follows them, its left edge pushed along.
   Hand and melds always number 20 or 21 and a small card is narrower than
-  a slot, so the row neither grows nor moves the table above it.  Upright
-  and on a desktop the page is as it was.
+  a slot, so the row neither grows nor moves the table above it.  The
+  status and 提示 are centred as one, where the status alone sat left of
+  centre, and your waits go in the room to their right, the 胡 and the
+  copies beside each card, in place of a row under the hand; more than
+  fit there scroll sideways.  Upright and on a desktop the page is as it
+  was.
 
 ### Removed
 

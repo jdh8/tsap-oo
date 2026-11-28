@@ -442,7 +442,9 @@ body.log-hidden .log { display: none; }
 }
 
 /* A phone on its side: the width a 21-card hand needs, the height it lacks.
-   One header row, the top seat beside its name, status beside the buttons.
+   One header row, the top seat beside its name.  The status and the button
+   share a row, centred as one, and your waits go in the room to its right,
+   the 胡 and the copies beside each card, so they cost the table no height.
    Your cards keep one row of 21 slots all game.  Your melds are small
    cards growing from the left end, and one laid down never moves again;
    the hand follows them, a slot a card whatever it holds, so the melds
@@ -452,10 +454,12 @@ body.log-hidden .log { display: none; }
   :root { --card-w: 2.4rem; --card-h: 3.8rem; }
   .scores { order: 0; flex-basis: auto; }
   .opp.top { flex-direction: row; justify-content: center; }
-  section.me { display: grid; grid-template-columns: 1fr auto 1fr; gap: 0 0.5rem; }
-  .status { grid-row: 1; grid-column: 1; justify-self: end; align-self: center; }
-  .actions { grid-row: 1; grid-column: 2 / 4; justify-self: start; min-height: 0; }
-  .waits { grid-column: 1 / -1; justify-self: center; }
+  section.me { display: grid; grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 1fr); gap: 0 0.5rem; }
+  .status { grid-row: 1; grid-column: 2; align-self: center; }
+  .actions { grid-row: 1; grid-column: 3; min-height: 0; }
+  /* ponytail: more waits than the half row holds scroll sideways */
+  .waits, .waits.reserve { grid-row: 1; grid-column: 4; justify-self: start; max-width: 100%; min-height: 0; overflow-x: auto; white-space: nowrap; }
+  .waits .wait { flex-direction: row; text-align: left; }
   .mine {
     --gap: min(0.25rem, 0.4cqw);
     container-type: inline-size;
