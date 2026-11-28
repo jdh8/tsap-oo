@@ -120,7 +120,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   points), as the web's bot against `7f0c316`, which reads the 底 in its
   gate alone, `RESHUFFLE=8`: +0.088 ± 0.009 points a deal, 95% CI
   [+0.070, +0.107], 20,000 deals, seed base 1795873065, 13,418 part, win
-  (`doc/variants.md`, `base-2-8-web-eval`).  No code changes.
+  (`doc/variants.md`, `base-2-8-web-eval`).  No code changes.  As the
+  desktop's bot (`GATE_CARDS=14 SHALLOW=17`) against `7f0c316`: +0.058 ±
+  0.013, 95% CI [+0.033, +0.083], 8,000 deals, seed base 1795877472, 4,441
+  part, win (`base-2-8-desktop-eval`).
 
 - `doc/opponents.md` plans reading the opponent at a table of two: an
   oracle for each channel before any inference is written.  `ORACLE=live`,

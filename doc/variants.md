@@ -678,6 +678,16 @@ win is over the bot that reads the 底 in its gate alone; the gate at two
 was measured at 10 胡 only (`base-2-gate`).  So `base-2-8-desktop-eval`
 runs, and the table is owed to `Eval::of` for the web at least.
 
+Read 2026-11-29.  **`base-2-8-desktop-eval` is a win: as the desktop's
+bot, two players at 8 胡 play better by their tables learnt under the
+底.**  Seed base 1795877472, control `7f0c316`.  Over 8,000 deals it parts
+on 4,441 (among them a mean of +0.105, a standard deviation of 3.89 within
+a deal and 0.66 between), +0.058 ± 0.013 points a deal, 95% CI [+0.033,
++0.083]; its seat wins 50.24% of the deals against the control's 50.76%.
+The standard error was put near 0.010 and the run took 2.9 hours.  As at
+10 胡, the desktop's win is below the web's (+0.088).  So the table of two
+at 8 胡 goes into `Eval::of` for both clients, one arm.
+
 ## What 8 胡 lacks
 
 1. **The `Outlook` `ExpectBot` uses was measured at 10 胡.**  8 胡's table
