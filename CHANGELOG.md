@@ -711,8 +711,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   status and 提示 are centred as one, where the status alone sat left of
   centre, and your waits go in the room to their right, the 胡 and the
   copies beside each card, in place of a row under the hand; more than
-  fit there scroll sideways.  Upright and on a desktop the page is as it
-  was.
+  fit there scroll sideways.  On a desktop the page is as it was.
+- A phone upright follows it.  The hand has two rows of 11 slots and
+  keeps the room of both, where the columns were half the cards in hand:
+  a card was 31px wide at 21 in hand on a 390px screen and 91px at 8,
+  wider than tall.  Your melds are small cards in the same two rows,
+  ahead of the hand, in place of a row of full-size ones above it, and
+  your waits lie left of 提示 on its row in place of a row of their own,
+  so laying a meld down or coming to wait moves neither the hand nor the
+  table.  `web/style.css` only; the rules for the small melds and the
+  waits are now one block for both ways up, and on its side the page is
+  pixel for pixel as it was.
 
 ### Removed
 

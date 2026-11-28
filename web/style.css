@@ -403,12 +403,47 @@ body.log-hidden .log { display: none; }
   .log { max-height: 8rem; }
 }
 
+/* A phone held either way: nothing you lay down or come to wait on moves
+   the hand or the table.  Your melds are small cards in the hand's own box,
+   ahead of the hand, so one laid down never moves again and the hand
+   follows them; a slot is a card whatever the hand holds.  Hand and melds
+   always number 20 or 21 and a small card is narrower than a slot, so the
+   box never outgrows itself.  Your waits share a row with 提示, the 胡 and
+   the copies beside each card. */
+@media (max-width: 40rem) and (orientation: portrait), (max-height: 30rem) and (orientation: landscape) {
+  /* ponytail: more waits than the room holds scroll sideways */
+  .waits, .waits.reserve { justify-self: start; max-width: 100%; min-height: 0; overflow-x: auto; white-space: nowrap; }
+  .waits .wait { flex-direction: row; text-align: left; }
+  .exposed .card { --card-w: var(--small-w); --card-h: var(--small-h); font-size: var(--small-font); }
+  .exposed .card[data-code$="K"]::before, .exposed .card[data-code$="K"]::after { display: none; }
+}
+
 /* A phone upright: too narrow for one row of 21 cards that a thumb can hit,
-   so the hand takes two rows of about 33px cards.  Height is what it has. */
+   so the box is two rows of 11 slots, about 31px each, and keeps the room
+   of both.  Melds and hand wrap through it as one line of cards, each meld
+   as tall as a slot so a row of melds alone is a full row.  Height is what
+   it has: the status keeps its own row, and the waits lie left of 提示 on
+   the last. */
 @media (max-width: 40rem) and (orientation: portrait) {
   :root { --card-h: 3.6rem; }
-  .hand { --cols: round(up, var(--n) / 2, 1); flex-wrap: wrap; gap: 1.5rem 0.2rem; padding-top: 1rem; }
-  .hand .card { flex: 0 0 calc((100% - (var(--cols) - 1) * 0.2rem) / var(--cols)); font-size: min(1.25rem, 6cqw); }
+  section.me { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 0.5rem; }
+  .status { grid-column: 1 / -1; justify-self: center; }
+  .waits { grid-column: 1; }
+  .actions { grid-column: 2; }
+  .mine {
+    container-type: inline-size;
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    align-items: flex-end;
+    gap: 1.5rem 0.2rem;
+    min-height: calc(2 * var(--card-h) + 3.5rem);
+    padding: 1rem 0;
+  }
+  .exposed, .exposed .melds, .hand { display: contents; }
+  .exposed .meld { flex: none; margin-top: calc(var(--card-h) - var(--small-h) - 4px); }
+  .hand .card { flex: 0 0 calc((100% - 10 * 0.2rem) / 11); font-size: min(1.25rem, 6cqw); }
 }
 
 /* A phone either way: an opponent's backs only count, so one back stands
@@ -444,12 +479,8 @@ body.log-hidden .log { display: none; }
 /* A phone on its side: the width a 21-card hand needs, the height it lacks.
    One header row, the top seat beside its name.  The status and the button
    share a row, centred as one, and your waits go in the room to its right,
-   the 胡 and the copies beside each card, so they cost the table no height.
-   Your cards keep one row of 21 slots all game.  Your melds are small
-   cards growing from the left end, and one laid down never moves again;
-   the hand follows them, a slot a card whatever it holds, so the melds
-   push its left edge along.  Hand and melds always number 20 or 21, and a
-   small card is narrower than a slot, so the row never outgrows itself. */
+   so they cost the table no height.  The box is one row of 21 slots, the
+   melds growing from its left end and pushing the hand's left edge along. */
 @media (max-height: 30rem) and (orientation: landscape) {
   :root { --card-w: 2.4rem; --card-h: 3.8rem; }
   .scores { order: 0; flex-basis: auto; }
@@ -457,9 +488,7 @@ body.log-hidden .log { display: none; }
   section.me { display: grid; grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 1fr); gap: 0 0.5rem; }
   .status { grid-row: 1; grid-column: 2; align-self: center; }
   .actions { grid-row: 1; grid-column: 3; min-height: 0; }
-  /* ponytail: more waits than the half row holds scroll sideways */
-  .waits, .waits.reserve { grid-row: 1; grid-column: 4; justify-self: start; max-width: 100%; min-height: 0; overflow-x: auto; white-space: nowrap; }
-  .waits .wait { flex-direction: row; text-align: left; }
+  .waits { grid-row: 1; grid-column: 4; }
   .mine {
     --gap: min(0.25rem, 0.4cqw);
     container-type: inline-size;
@@ -478,7 +507,5 @@ body.log-hidden .log { display: none; }
   .exposed { flex: none; }
   .exposed:not(:empty) { margin-right: 0.4rem; }
   .exposed .melds { flex-wrap: nowrap; }
-  .exposed .card { --card-w: var(--small-w); --card-h: var(--small-h); font-size: var(--small-font); }
-  .exposed .card[data-code$="K"]::before, .exposed .card[data-code$="K"]::after { display: none; }
   main { gap: 0.2rem; padding-inline: max(0.5rem, env(safe-area-inset-left)) max(0.5rem, env(safe-area-inset-right)); }
 }
