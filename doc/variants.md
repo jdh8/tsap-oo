@@ -612,6 +612,30 @@ the 底 alone.  So `base-2-desktop-eval` and the 8-胡 labels run, and the
 table is owed to `Eval::of` for the web, with the runs of zero deals and
 the replay, once the wasm's 359 KB are decided.
 
+Declared 2026-11-28, before its data: **`base-3-desktop-eval`,** which
+`base-3-eval`'s win calls for.  Three players at 10 胡, a 底 of 1, the
+desktop's bot with four players' table learnt under the 底, queued
+through `ab/queue.sh` behind what is in flight:
+
+| Run | Table | Candidate | Control | Deals | Declared |
+| --- | --- | --- | --- | ---: | --- |
+| `base-3-desktop-eval` | Three, 10 胡, desktop | `EXPECT=new GATE_CARDS=14 SHALLOW=17 EVAL=src/eval-16-base.bin` | `BASELINE_EXPECT=new BASELINE_GATE=14 BASELINE_SHALLOW=17`, control `7f0c316` | 10,000 | Not known |
+
+- **How it is read.**  A win: `Eval::of` gives three players at 10 胡
+  under a 底 of 1 four's table for both clients, one arm.  Anything else:
+  only the web takes it, `bot()` choosing by its setting, and the
+  desktop keeps the 底 in the gate at three.  A loss is traced first.
+- **The deal count.**  A deal's standard error on the desktop was 0.87 of
+  the web's at four players (0.012 at 20,000 deals against 0.008 at
+  60,000), and three's on the web was 0.009 at 30,000, so 10,000 deals
+  are put near 0.014, where four players' win on the desktop was +0.063.
+  About 4.5 hours: four's 20,000 took 6.7, and on the web a deal of three
+  took 1.3 times a deal of four.
+- **The wiring waits for the desktop's runs.**  Which clients an arm of
+  `Eval::of` serves is this run's to say for three and
+  `base-2-desktop-eval`'s for two, so no table is wired in before they
+  are read, and one set of runs of zero deals then covers them all.
+
 ## What 8 胡 lacks
 
 1. **The `Outlook` `ExpectBot` uses was measured at 10 胡.**  8 胡's table

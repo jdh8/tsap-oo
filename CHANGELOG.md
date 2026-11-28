@@ -100,7 +100,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the web's bot against `7f0c316`, which reads the 底 in its gate alone,
   `RESHUFFLE=8`: +0.112 ± 0.009 points a deal, 95% CI [+0.094, +0.130],
   30,000 deals, seed base 1795814816, 22,434 part, win (`doc/variants.md`,
-  `base-3-eval`).  No code changes.
+  `base-3-eval`).  No code changes.  The desktop's run,
+  `base-3-desktop-eval`, is declared there and has no data yet.
 
 - Measured, not wired in yet: two players at 10 胡 under a 底 of 1 with
   tables learnt under it (`PLAYERS=2 BASE=1 EXPECT=1.3 eval label 2000
