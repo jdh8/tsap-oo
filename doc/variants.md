@@ -568,6 +568,19 @@ as at four.  8% of the deals part, near `base-web-gate`'s 6%, and the run
 took 1.8 hours.  As declared: nothing changes, and the row of two is
 measured.
 
+Read 2026-11-28.  **`base-3-eval` is a win: as the web's bot, three
+players play better by four's table learnt under the 底.**  Seed base
+1795814816, control `7f0c316`.  Over 30,000 deals it parts on 22,434
+(among them a mean of +0.150, a standard deviation of 4.62 within a deal
+and 0.86 between), +0.112 ± 0.009 points a deal, 95% CI [+0.094,
++0.130]; its seat wins 33.06% of the deals against the control's 33.23%.
+The run took 2.2 hours.  The win is over the bot that reads the 底 in
+its gate alone, and it is of a table paired with an `Outlook` it was not
+learnt under, as said above; it is larger than four players' own +0.089
+all the same.  So the desktop's run is declared next, and the table goes
+into `Eval::of` for the web with its runs of zero deals and its replay;
+neither is run yet.
+
 ## What 8 胡 lacks
 
 1. **The `Outlook` `ExpectBot` uses was measured at 10 胡.**  8 胡's table
