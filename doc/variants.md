@@ -636,6 +636,18 @@ through `ab/queue.sh` behind what is in flight:
   `base-2-desktop-eval`'s for two, so no table is wired in before they
   are read, and one set of runs of zero deals then covers them all.
 
+Read 2026-11-29.  **`base-2-desktop-eval` is a win: the desktop's bot at
+a table of two plays better by the tables of two learnt under the 底.**
+Seed base 1795844568, control `7f0c316`.  Over 8,000 deals it parts on
+4,915 (among them a mean of +0.054, a standard deviation of 2.86 within a
+deal and 0.47 between), +0.033 ± 0.010 points a deal, 95% CI [+0.014,
++0.052]; its seat wins 49.96% of the deals against the control's 50.65%.
+The standard error was put near 0.010 and the run took 3.4 hours.  The
+win is half the web's +0.064, as four players' desktop win (+0.063) was
+below its web's (+0.089).  So the table of two at 10 胡 goes into
+`Eval::of` for both clients, one arm, and the desktop's gate at two under
+a 底 is not owed.
+
 ## What 8 胡 lacks
 
 1. **The `Outlook` `ExpectBot` uses was measured at 10 胡.**  8 胡's table
