@@ -701,6 +701,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the control eating a pair: +0.053 ± 0.002 points a deal, 95% CI
   [+0.049, +0.056], a win.  B gives +0.0353 [+0.0323, +0.0383], A
   +0.0173 [+0.0162, +0.0184].
+- On a phone on its side your cards keep one row all game.  The hand has
+  21 slots, so a card is as wide with 2 in hand as with 21, and your
+  melds are small cards on the same row in place of a row of full-size
+  ones above the hand.  They grow from the left end and one laid down
+  never moves again; the hand follows them, its left edge pushed along.
+  Hand and melds always number 20 or 21 and a small card is narrower than
+  a slot, so the row neither grows nor moves the table above it.  Upright
+  and on a desktop the page is as it was.
 
 ### Removed
 
