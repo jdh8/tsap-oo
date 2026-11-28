@@ -667,6 +667,17 @@ the root's values, 0.230 one claim deep and 0.208 two.  Each is above 10
 胡's, as 8 胡 pays more of its wins above the threshold.  The labelling
 took 4.5 hours.
 
+Read 2026-11-29.  **`base-2-8-web-eval` is a win: as the web's bot, two
+players at 8 胡 play better by their tables learnt under the 底.**  Seed
+base 1795873065, control `7f0c316`.  Over 20,000 deals it parts on
+13,418 (among them a mean of +0.132, a standard deviation of 3.98 within
+a deal and 0.79 between), +0.088 ± 0.009 points a deal, 95% CI [+0.070,
++0.107]; its seat wins 49.77% of the deals against the control's 50.30%.
+The standard error was put near 0.008 and the run took 1.2 hours.  The
+win is over the bot that reads the 底 in its gate alone; the gate at two
+was measured at 10 胡 only (`base-2-gate`).  So `base-2-8-desktop-eval`
+runs, and the table is owed to `Eval::of` for the web at least.
+
 ## What 8 胡 lacks
 
 1. **The `Outlook` `ExpectBot` uses was measured at 10 胡.**  8 胡's table
