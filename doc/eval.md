@@ -1288,8 +1288,13 @@ would be relabelled with the rest.
 e 0.7372 inside the gate, 4% and 1% off the code's, so batch 2 is not
 designed for the web.  The numbers, and a multiplier of 1.40 where the
 bias vanishes against this opponent, are in `research/outlook.md`,
-"Against the bot that ships".  The desktop's, `outlook-2-desktop`, is
-owed.
+"Against the bot that ships".
+
+**Batch 1, the desktop: closed.**  `outlook-2-desktop` (2026-11-28): h
+0.0576 and e 0.7365 inside the gate, 6% and 1% off the code's, and a
+multiplier of 1.43 where the bias vanishes.  Batch 2 is designed for
+neither client: the `Outlook` of two stands as measured from
+`HeuristicBot`.
 
 ## 8 胡: the 10-胡 tables beyond the gate
 
@@ -1453,5 +1458,6 @@ After batch 4 has one win.  Those that change play each run their own A/B.
   bot that ships; if h or e moves by a tenth, relabel `Eval` under the new
   `Outlook`.  The A/B needs the other seat settable first: against
   `HeuristicBot`, as `ab/` seats it, a table measured against `ExpectBot`
-  has nothing to show.  (Raised 2026-11-25; the measurement is declared
-  in "The table of two against the bot that ships".)
+  has nothing to show.  (Raised 2026-11-25; measured 2026-11-28 in "The
+  table of two against the bot that ships": h moved by 4% and 6%, e by
+  1%, so nothing is relabelled.)

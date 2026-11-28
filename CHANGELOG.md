@@ -76,7 +76,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   play changes.  Against the web's bot, h is 0.0568 and e 0.7372 inside
   the gate, within a tenth of the code's 0.0544 and 0.7442, so the web's
   question is closed (`research/outlook.md`, "Against the bot that
-  ships"); the desktop's run has no data yet, and the 底's are below.
+  ships").  Against the desktop's bot h is 0.0576 and e 0.7365, so the
+  desktop's is closed too: the `Outlook` of two stands as measured from
+  `HeuristicBot`.  The 底's runs are below.
 - The web's wasm with four players' table under a 底 of 1 is 1,709 KB,
   1,452 KB gzipped (from 1,344 KB and 1,116 KB).
 

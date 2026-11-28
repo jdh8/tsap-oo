@@ -800,19 +800,26 @@ the table in the code opens batch 2 for that client.
 
 | Inside the gate | Code (`HeuristicBot`) | Web's bot | Desktop's bot |
 | --- | ---: | ---: | ---: |
-| h (per card) | 0.0544 | 0.0568 | owed |
-| L | −12.11 | −12.01 | owed |
-| e | 0.7442 | 0.7372 | owed |
-| A general is the seat's own draw | 0.4688 | 0.4618 | owed |
-| Public cards a draw (not split by the gate) | 1.711 | 1.789 | owed |
-| Decisions inside the gate (per 10,000 rounds) | 15,567 | 18,516 | owed |
+| h (per card) | 0.0544 | 0.0568 | 0.0576 |
+| L | −12.11 | −12.01 | −11.98 |
+| e | 0.7442 | 0.7372 | 0.7365 |
+| A general is the seat's own draw | 0.4688 | 0.4618 | 0.4614 |
+| Public cards a draw (not split by the gate) | 1.711 | 1.789 | 1.782 |
+| Decisions inside the gate (per 10,000 rounds) | 15,567 | 18,516 | 17,546 |
+
+The gate is the tool's for both bots, discards leaving 10 cards or fewer;
+the desktop's bot plays by a gate of 14.
 
 - **The web: closed.**  h is 4% and e 1% off the code's, under the tenth
   the declaration asks for, so batch 2 is not designed for the web's bot.
+- **The desktop: closed too.**  `outlook-2-desktop` (read 2026-11-28; the
+  task took 2.8 hours, put at two): h is 6% and e 1% off the code's.
+  Batch 2 is designed for neither client.
 - **The shape by draws left moved more than the total.**  h by draws left
   is 0.096 to 0.087 at 0 to 3 draws left against the code's 0.069 to
   0.077, and 0.021 at 23 to 25 against 0.033; the cards a segment run to
-  3.13 at 25 draws left against 2.78.  The declaration reads only the
+  3.13 at 25 draws left against 2.78.  The desktop's bot is the same
+  shape: 0.098 to 0.077, 0.027 and 3.12.  The declaration reads only the
   totals.
 - **The tables in the code overpredict more against this opponent.**
   Against the web's bot on seed 213, starting from the tables in the code:
@@ -827,5 +834,17 @@ the table in the code opens batch 2 for that client.
   Interpolated as in "Constants", the bias of the win rate vanishes at h ×
   1.40, against 1.26 under `HeuristicBot` self-play; the code takes 1.3.
   The new tables on seed 211 predict 0.457 against 0.478 (−0.27 points
-  against 0.03 ± 0.17).  No multiplier is changed: that is batch 2's, and
-  the web's is closed.
+  against 0.03 ± 0.17).
+
+  Against the desktop's bot, the same:
+
+  | | Predicted win rate | Actual | Predicted score | Actual score |
+  | --- | ---: | ---: | ---: | ---: |
+  | Measured | 0.555 | 0.480 | 1.97 | 0.09 ± 0.18 |
+  | h × 1.5 | 0.469 | 0.480 | −0.36 | 0.09 |
+  | Cards a segment × 0.8 | 0.525 | 0.480 | 1.75 | 0.09 |
+  | e × 0.7 | 0.543 | 0.480 | 1.73 | 0.09 |
+
+  The bias vanishes at h × 1.43, and the new tables on seed 211 predict
+  0.460 against 0.480 (−0.20 points against 0.07 ± 0.17).  No multiplier
+  is changed: that is batch 2's, and both clients' are closed.
